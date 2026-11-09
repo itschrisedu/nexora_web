@@ -454,22 +454,35 @@ function ComprobanteContent() {
           modelo: l.m,
           codigo: l.c,
           color: l.col,
+          serie: l.ser || 'Adulto',
           numeracion: l.num,
+          imageUrl: l.img,
           cantidadPares: l.qty,
           precioUnitario: l.u || 0,
           subtotal: l.tot || 0,
           observacion: l.obs,
         })),
+        devoluciones: Array.isArray(data.devoluciones)
+          ? data.devoluciones.map((d: any) => ({
+              modelo: d.m || d.modelo || 'Calzado',
+              color: d.col || d.color,
+              serie: d.ser || d.serie,
+              cantidadPares: Number(d.qty || d.cantidadPares || 1),
+              motivo: d.motivo || d.mot,
+              montoDescontado: Number(d.monto || d.montoDescontado || 0),
+            }))
+          : undefined,
         totales: {
           totalPares: Number(data.pares || 0),
           totalPagar: Number(data.tot || 0),
+          totalDevoluciones: Number(data.tot_dev || data.totalDevoluciones || 0),
           adelanto: Number(data.ad || 0),
           saldoPendiente: data.sal !== undefined ? Number(data.sal) : Math.max(0, Number(data.tot || 0) - Number(data.ad || 0)),
           metodoAdelanto: data.met_ad || (data.ref ? 'TRANSFERENCIA' : 'EFECTIVO'),
           referenciaAdelanto: data.ref || undefined,
         },
       };
-      descargarPedidoClientePdf(pdfData);
+      await descargarPedidoClientePdf(pdfData);
     } else if (data.t === 'VENTA_POS') {
       const pdfData: TicketPosPdfData = {
         emisor: {

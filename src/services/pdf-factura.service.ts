@@ -494,7 +494,7 @@ export function formatearTituloModelo(modeloRaw: string, marcaRaw?: string): {
  * Extrae tallas con cantidad > 0 de un desglose o de una cadena de numeración
  */
 export function extraerTallasValidas(
-  tallasDetalle?: Array<{ talla: string | number; cantidad: number }>,
+  tallasDetalle?: Array<{ talla: string | number; cantidad: number }> | string,
   numeracionStr?: string
 ): Array<{ talla: string; cantidad: number }> {
   if (Array.isArray(tallasDetalle) && tallasDetalle.length > 0) {
@@ -503,12 +503,13 @@ export function extraerTallasValidas(
       .map((t) => ({ talla: String(t.talla), cantidad: Number(t.cantidad) }));
   }
 
-  if (numeracionStr) {
+  const strToParse = typeof tallasDetalle === "string" ? tallasDetalle : numeracionStr;
+  if (strToParse) {
     const result: Array<{ talla: string; cantidad: number }> = [];
     // Soporta formatos: T38 (1), T38: 1, T38: 1p, T38 (0)
     const regex = /T?(\d{2})\s*(?:\(|:)\s*(\d+)/gi;
     let match;
-    while ((match = regex.exec(numeracionStr)) !== null) {
+    while ((match = regex.exec(strToParse)) !== null) {
       const cant = parseInt(match[2], 10);
       if (cant > 0) {
         result.push({ talla: match[1], cantidad: cant });
@@ -930,6 +931,15 @@ export async function compartirOrdenCompraPdf(
 // GENERACIÓN DE PDF PARA PEDIDOS DE CLIENTES
 // ══════════════════════════════════════════
 
+export interface DevolucionClientePdfItem {
+  modelo: string;
+  color?: string;
+  serie?: string;
+  cantidadPares: number;
+  motivo?: string;
+  montoDescontado: number;
+}
+
 export interface PedidoClientePdfData {
   emisor: {
     nombre: string;
@@ -942,11 +952,11 @@ export interface PedidoClientePdfData {
     numero: string;
     fecha: string;
     tipoPago?: string;
-    tipoEntrega?: string;
-    courier?: string;
-    guiaEnvio?: string;
     comprobantePago?: string;
     referenciaPago?: string;
+    tipoEntrega?: "PRESENCIAL" | "ENVIO" | string;
+    courier?: string;
+    guiaEnvio?: string;
     observaciones?: string;
   };
   cliente: {
@@ -968,12 +978,16 @@ export interface PedidoClientePdfData {
     precioUnitario: number;
     subtotal: number;
     observacion?: string;
+    tallasDetalle?: string;
+    loadedImageBase64?: string | null;
   }[];
+  devoluciones?: DevolucionClientePdfItem[];
   totales: {
     totalPares: number;
     subtotal?: number;
     descuento?: number;
     costoEnvio?: number;
+    totalDevoluciones?: number;
     totalPagar: number;
     adelanto?: number;
     saldoPendiente?: number;
@@ -982,15 +996,30 @@ export interface PedidoClientePdfData {
   };
 }
 
-export function generarPedidoClientePdfDoc(data: PedidoClientePdfData): jsPDF {
+export async function generarPedidoClientePdfDoc(data: PedidoClientePdfData): Promise<jsPDF> {
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
     format: "a4",
   });
 
+  // 1. Pre-cargar imágenes de las líneas en paralelo con timeout seguro
+  const lineasConImagenes = await Promise.all(
+    data.lineas.map(async (l) => {
+      let b64: string | null = null;
+      if (l.imageUrl) {
+        b64 = await cargarImagenComoBase64(l.imageUrl);
+      }
+      return {
+        ...l,
+        loadedImageBase64: b64,
+      };
+    })
+  );
+
   const pageWidth = doc.internal.pageSize.getWidth();
-  let y = 15;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  let y = 14;
 
   // ── 1. Encabezado / Emisor ──
   doc.setFillColor(15, 23, 42); // Slate 900
@@ -998,32 +1027,36 @@ export function generarPedidoClientePdfDoc(data: PedidoClientePdfData): jsPDF {
 
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.text(data.emisor.nombre || "COMERCIAL DE CALZADO", 18, y + 8);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(203, 213, 225);
-  doc.text(`RUC: ${data.emisor.ruc || "1804884664001"}`, 18, y + 15);
-  doc.text(`Dirección: ${data.emisor.direccion || "Cevallos, Tungurahua, Ecuador"}`, 18, y + 20);
+  doc.setFontSize(8);
+  doc.setTextColor(52, 211, 153); // Emerald 400
+  doc.text("COMPROBANTE OFICIAL DE ENTREGA Y PEDIDO DE CALZADO", 18, y + 13.5);
+
+  doc.setFontSize(8);
+  doc.setTextColor(203, 213, 225); // Slate 300
+  doc.text(`RUC: ${data.emisor.ruc || "1804884664001"}`, 18, y + 19);
+  doc.text(`Ubicación: ${data.emisor.direccion || "Cevallos, Tungurahua, Ecuador"}`, 18, y + 24);
   if (data.emisor.telefono) {
-    doc.text(`Teléfono / Atención: ${data.emisor.telefono}`, 18, y + 25);
+    doc.text(`Contacto: ${data.emisor.telefono}`, 18, y + 29);
   }
 
   // Cuadro Número de Pedido (derecha)
   doc.setFillColor(255, 255, 255);
-  doc.roundedRect(pageWidth - 75, y + 4, 58, 26, 1.5, 1.5, "F");
+  doc.roundedRect(pageWidth - 76, y + 4, 60, 26, 1.5, 1.5, "F");
   doc.setTextColor(15, 23, 42);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text("COMPROBANTE DE PEDIDO", pageWidth - 46, y + 11, { align: "center" });
+  doc.setFontSize(9.5);
+  doc.text("COMPROBANTE DE ENTREGA", pageWidth - 46, y + 11, { align: "center" });
 
-  doc.setFontSize(9);
+  doc.setFontSize(9.5);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(5, 150, 105); // Emerald 600
   doc.text(`No. ${data.pedido.numero}`, pageWidth - 46, y + 17, { align: "center" });
 
-  doc.setFontSize(8);
+  doc.setFontSize(7.8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(71, 85, 105);
   doc.text(`Fecha: ${data.pedido.fecha}`, pageWidth - 46, y + 23, { align: "center" });
@@ -1033,12 +1066,12 @@ export function generarPedidoClientePdfDoc(data: PedidoClientePdfData): jsPDF {
   // ── 2. Datos del Cliente & Logística ──
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(12, y, pageWidth - 24, 26, 1.5, 1.5, "FD");
+  doc.roundedRect(12, y, pageWidth - 24, 25, 1.5, 1.5, "FD");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
   doc.setTextColor(51, 65, 85);
-  doc.text("DATOS DEL CLIENTE & ENTREGA", 16, y + 5);
+  doc.text("DATOS DEL CLIENTE & DESPACHO", 16, y + 5);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
@@ -1048,7 +1081,7 @@ export function generarPedidoClientePdfDoc(data: PedidoClientePdfData): jsPDF {
     doc.text(`C.I / RUC: ${data.cliente.cedula}`, 16, y + 16);
   }
   if (data.cliente.telefono) {
-    doc.text(`Teléfono: ${data.cliente.telefono}`, 16, y + 21);
+    doc.text(`Teléfono: ${data.cliente.telefono}`, 16, y + 20.5);
   }
 
   const entregaStr = data.pedido.tipoEntrega === "ENVIO"
@@ -1058,159 +1091,359 @@ export function generarPedidoClientePdfDoc(data: PedidoClientePdfData): jsPDF {
   doc.text(`Entrega: ${entregaStr}`, pageWidth / 2 + 10, y + 11);
   doc.text(`Pago: ${data.pedido.tipoPago || "Contado"}${refPago ? ` (Ref: ${refPago})` : ""}`, pageWidth / 2 + 10, y + 16);
   if (data.cliente.direccion) {
-    doc.text(`Dirección: ${data.cliente.direccion}`, pageWidth / 2 + 10, y + 21);
+    doc.text(`Dirección: ${data.cliente.direccion}`, pageWidth / 2 + 10, y + 20.5);
   }
 
-  y += 30;
+  y += 29;
 
   // ── 3. Observaciones Generales si existen ──
   if (data.pedido.observaciones && data.pedido.observaciones.trim()) {
     doc.setFillColor(254, 243, 199); // Amber 100
     doc.setDrawColor(251, 191, 36);
-    doc.roundedRect(12, y, pageWidth - 24, 11, 1.5, 1.5, "FD");
+    doc.roundedRect(12, y, pageWidth - 24, 10, 1.5, 1.5, "FD");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.5);
     doc.setTextColor(146, 64, 14);
-    doc.text("OBSERVACIONES GENERALES DEL PEDIDO:", 16, y + 4.5);
+    doc.text("OBSERVACIONES / NOTA DE ENTREGA:", 16, y + 4);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(15, 23, 42);
-    doc.text(data.pedido.observaciones.trim(), 16, y + 8.5);
-    y += 15;
+    doc.text(data.pedido.observaciones.trim(), 16, y + 7.8);
+    y += 13;
   }
 
-  // ── 4. Tabla de Artículos ──
-  doc.setFillColor(15, 23, 42);
-  doc.rect(12, y, pageWidth - 24, 7, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.setTextColor(255, 255, 255);
-  doc.text("MODELO / DETALLE DEL ARTÍCULO", 16, y + 4.5);
-  doc.text("CANTIDAD", pageWidth - 75, y + 4.5, { align: "center" });
-  doc.text("P. UNITARIO", pageWidth - 48, y + 4.5, { align: "right" });
-  doc.text("SUBTOTAL", pageWidth - 16, y + 4.5, { align: "right" });
-
-  y += 7;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(15, 23, 42);
-
-  data.lineas.forEach((line, i) => {
-    let extraLines = 0;
-    if (line.numeracion) extraLines += 4;
-    if (line.observacion && line.observacion.trim()) extraLines += 4;
-    const rowHeight = 8 + extraLines;
-
-    if (i % 2 === 1) {
-      doc.setFillColor(248, 250, 252);
-      doc.rect(12, y, pageWidth - 24, rowHeight, "F");
-    }
-    doc.setDrawColor(241, 245, 249);
-    doc.line(12, y + rowHeight, pageWidth - 12, y + rowHeight);
-
-    let currentLineY = y + 4.5;
+  // ── 4. Cabecera de Tabla de Modelos ──
+  const dibujarCabecera = (curY: number) => {
+    doc.setFillColor(15, 23, 42);
+    doc.roundedRect(12, curY, pageWidth - 24, 7.5, 1, 1, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text("MODELO DE CALZADO / CURVA DE TALLAS", 16, curY + 5);
+    doc.text("CANTIDAD", 144, curY + 5, { align: "center" });
+    doc.text("P. UNITARIO", 170, curY + 5, { align: "right" });
+    doc.text("SUBTOTAL", 194, curY + 5, { align: "right" });
+  };
+
+  dibujarCabecera(y);
+  y += 9.5;
+
+  // ── 5. Filas de Modelos (Tarjeta Estándar con Foto, Serie y Curva de Tallas) ──
+  lineasConImagenes.forEach((line, i) => {
+    const { nombreCompleto, modeloLimpio } = formatearTituloModelo(line.modelo, line.marca);
+    const colorLimpio = line.color ? line.color.trim() : "";
+    const serieLimpia = line.serie && line.serie !== "Serie Estándar" ? line.serie.trim() : "Adulto";
+    const codigoLimpio = line.codigo ? line.codigo.trim() : "";
+    const tallas = extraerTallasValidas(line.tallasDetalle, line.numeracion);
+    const obsLineaLimpia = limpiarObservacionesOrden(line.observacion);
+
+    const tieneTallas = tallas.length > 0;
+    const muchasTallas = tallas.length > 6;
+    let extraH = 0;
+    if (muchasTallas) extraH += 5;
+    if (obsLineaLimpia) extraH += 4;
+    const rowHeight = Math.max(22, 18 + extraH);
+
+    // Salto de página si excede el límite
+    if (y + rowHeight > pageHeight - 32) {
+      doc.addPage();
+      y = 15;
+      dibujarCabecera(y);
+      y += 9.5;
+    }
+
+    // Fondo y borde de tarjeta para cada modelo
+    doc.setFillColor(i % 2 === 0 ? 255 : 249, i % 2 === 0 ? 255 : 250, i % 2 === 0 ? 255 : 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(12, y, pageWidth - 24, rowHeight, 1.5, 1.5, "FD");
+
+    // Miniatura de la Imagen del Calzado (Cuadrada con bordes redondeados)
+    const imgX = 14.5;
+    const imgY = y + 2.5;
+    const imgSize = 16.5;
+
+    if (line.loadedImageBase64) {
+      try {
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(203, 213, 225);
+        doc.roundedRect(imgX, imgY, imgSize, imgSize, 1.5, 1.5, "FD");
+        doc.addImage(line.loadedImageBase64, "JPEG", imgX + 0.6, imgY + 0.6, imgSize - 1.2, imgSize - 1.2);
+      } catch {
+        dibujarPlaceholderCalzado(doc, imgX, imgY, imgSize, modeloLimpio);
+      }
+    } else {
+      dibujarPlaceholderCalzado(doc, imgX, imgY, imgSize, modeloLimpio);
+    }
+
+    // Columna Central: Nombre del Modelo + Color + Píldora de Serie
+    let nextX = 34;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
     doc.setTextColor(15, 23, 42);
-    doc.text(`${line.marca ? line.marca + " " : ""}${line.modelo}${line.color ? " - " + line.color : ""}${line.codigo ? " (" + line.codigo + ")" : ""}`, 16, currentLineY);
+    doc.text(nombreCompleto, nextX, y + 5.5);
+    nextX += doc.getTextWidth(nombreCompleto) + 2.5;
 
-    if (line.numeracion) {
-      currentLineY += 4;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
-      doc.setTextColor(51, 65, 85);
-      doc.text(`Numeración: ${line.numeracion}`, 16, currentLineY);
+    if (colorLimpio) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      doc.text(colorLimpio, nextX, y + 5.5);
+      nextX += doc.getTextWidth(colorLimpio) + 3;
     }
 
-    if (line.observacion && line.observacion.trim()) {
-      currentLineY += 4;
+    // Píldora de Serie (Verde Esmeralda estándar)
+    const serieText = `Serie: ${serieLimpia}`;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.8);
+    const badgeW = doc.getTextWidth(serieText) + 4.5;
+    const badgeH = 4.2;
+
+    if (nextX + badgeW <= 134) {
+      doc.setFillColor(236, 253, 245); // Emerald 50
+      doc.setDrawColor(167, 243, 208); // Emerald 200
+      doc.roundedRect(nextX, y + 2.3, badgeW, badgeH, 1.2, 1.2, "FD");
+      doc.setTextColor(4, 120, 87); // Emerald 700
+      doc.text(serieText, nextX + 2.2, y + 5.2);
+    }
+
+    // Código de referencia
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    const refText = codigoLimpio ? `Código: ${codigoLimpio}` : "Calzado de cuero nacional";
+    doc.text(refText, 34, y + 9.5);
+
+    // Curva de Tallas (Píldoras individuales por talla)
+    if (tieneTallas) {
+      let curTallaX = 34;
+      let curTallaY = y + 11.5;
+      tallas.forEach((t) => {
+        const tText = `T${t.talla}: ${t.cantidad}p`;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(6.8);
+        const tw = doc.getTextWidth(tText) + 3.8;
+
+        if (curTallaX + tw > 132) {
+          curTallaX = 34;
+          curTallaY += 4.5;
+        }
+
+        doc.setFillColor(241, 245, 249);
+        doc.setDrawColor(203, 213, 225);
+        doc.roundedRect(curTallaX, curTallaY, tw, 4, 1, 1, "FD");
+        doc.setTextColor(30, 41, 59);
+        doc.text(tText, curTallaX + 1.9, curTallaY + 2.9);
+        curTallaX += tw + 1.8;
+      });
+    }
+
+    // Observación de la línea si existe
+    if (obsLineaLimpia) {
       doc.setFont("helvetica", "italic");
-      doc.setFontSize(7);
+      doc.setFontSize(6.8);
       doc.setTextColor(180, 83, 9);
-      doc.text(`Nota: ${line.observacion.trim()}`, 16, currentLineY);
+      doc.text(`• Observación: ${obsLineaLimpia.substring(0, 95)}`, 34, y + rowHeight - 2.5);
     }
+
+    // Resumen Lateral Derecho
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${line.cantidadPares} pares`, 144, y + 7.5, { align: "center" });
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(15, 23, 42);
-    doc.text(`${line.cantidadPares} pares`, pageWidth - 75, y + 4.5, { align: "center" });
-    doc.text(`$${Number(line.precioUnitario).toFixed(2)}`, pageWidth - 48, y + 4.5, { align: "right" });
-    doc.setFont("helvetica", "bold");
-    doc.text(`$${Number(line.subtotal).toFixed(2)}`, pageWidth - 16, y + 4.5, { align: "right" });
+    doc.setFontSize(7.2);
+    doc.setTextColor(100, 116, 139);
+    doc.text(formatearDocenasCorto(line.cantidadPares), 144, y + 12.5, { align: "center" });
 
-    y += rowHeight;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`$${Number(line.precioUnitario).toFixed(2)}`, 170, y + 7.5, { align: "right" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.8);
+    doc.setTextColor(100, 116, 139);
+    doc.text("por par", 170, y + 12.5, { align: "right" });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.setTextColor(4, 120, 87); // Emerald 700
+    doc.text(`$${Number(line.subtotal).toFixed(2)}`, 194, y + 10, { align: "right" });
+
+    y += rowHeight + 2;
   });
 
-  y += 5;
+  // ── 6. Bloque de Devoluciones / Garantías si existen ──
+  if (data.devoluciones && data.devoluciones.length > 0) {
+    if (y + 25 > pageHeight - 35) {
+      doc.addPage();
+      y = 15;
+    }
 
-  // ── 5. Totales & Desglose de Anticipos ──
+    doc.setFillColor(254, 242, 242); // Red 50
+    doc.setDrawColor(254, 202, 202); // Red 200
+    doc.roundedRect(12, y, pageWidth - 24, 7, 1, 1, "FD");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(185, 28, 28); // Red 700
+    doc.text("DEVOLUCIONES / GARANTÍAS APLICADAS EN ESTA OPERACIÓN", 16, y + 4.8);
+    y += 9;
+
+    data.devoluciones.forEach((dev) => {
+      const devRowH = 10;
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(254, 226, 226);
+      doc.roundedRect(12, y, pageWidth - 24, devRowH, 1, 1, "FD");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(185, 28, 28);
+      const devColor = dev.color ? ` (${dev.color})` : "";
+      doc.text(`• ${dev.modelo}${devColor} — ${dev.cantidadPares} pares devueltos`, 16, y + 4.5);
+
+      if (dev.motivo) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Motivo: ${dev.motivo}`, 18, y + 8);
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(185, 28, 28);
+      doc.text(`-$${Number(dev.montoDescontado).toFixed(2)}`, 194, y + 5.5, { align: "right" });
+
+      y += devRowH + 1.5;
+    });
+
+    y += 2;
+  }
+
+  // ── 7. Totales y Desglose Financiero ──
   const startTotalsX = pageWidth - 90;
   const montoAdelanto = Number(data.totales.adelanto || 0);
+  const totalDevoluciones = Number(data.totales.totalDevoluciones || 0);
+  const totalPagar = Number(data.totales.totalPagar || 0);
   const saldoPendiente = data.totales.saldoPendiente !== undefined
     ? Number(data.totales.saldoPendiente)
-    : Math.max(0, data.totales.totalPagar - montoAdelanto);
+    : Math.max(0, totalPagar - montoAdelanto);
 
-  const boxHeight = montoAdelanto > 0 ? 32 : 20;
+  let boxHeight = 22;
+  if (montoAdelanto > 0) boxHeight += 12;
+  if (totalDevoluciones > 0) boxHeight += 6;
+
+  if (y + boxHeight + 25 > pageHeight - 15) {
+    doc.addPage();
+    y = 15;
+  } else {
+    y += 3;
+  }
 
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
   doc.roundedRect(startTotalsX, y, 78, boxHeight, 1.5, 1.5, "FD");
 
+  let subY = y + 5;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(71, 85, 105);
-  doc.text("TOTAL PARES:", startTotalsX + 4, y + 5);
+  doc.text("TOTAL PARES ENTREGADOS:", startTotalsX + 4, subY);
   doc.setFont("helvetica", "bold");
-  doc.text(`${data.totales.totalPares} pares`, startTotalsX + 74, y + 5, { align: "right" });
+  doc.text(`${data.totales.totalPares} pares (${formatearDocenasCorto(data.totales.totalPares)})`, startTotalsX + 74, subY, { align: "right" });
 
+  subY += 4;
   doc.setDrawColor(203, 213, 225);
-  doc.line(startTotalsX + 4, y + 8, startTotalsX + 74, y + 8);
+  doc.line(startTotalsX + 4, subY, startTotalsX + 74, subY);
 
+  subY += 4.5;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("VALOR TOTAL:", startTotalsX + 4, y + 13);
-  doc.setTextColor(15, 23, 42);
-  doc.text(`$${data.totales.totalPagar.toFixed(2)}`, startTotalsX + 74, y + 13, { align: "right" });
+  doc.text("VALOR TOTAL:", startTotalsX + 4, subY);
+  doc.text(`$${totalPagar.toFixed(2)}`, startTotalsX + 74, subY, { align: "right" });
+
+  if (totalDevoluciones > 0) {
+    subY += 5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(185, 28, 28);
+    doc.text("DEVOLUCIÓN APLICADA:", startTotalsX + 4, subY);
+    doc.setFont("helvetica", "bold");
+    doc.text(`-$${totalDevoluciones.toFixed(2)}`, startTotalsX + 74, subY, { align: "right" });
+  }
 
   if (montoAdelanto > 0) {
+    subY += 5;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(5, 150, 105); // Emerald 600
     const metodoStr = data.totales.metodoAdelanto || (refPago ? "TRANSFERENCIA" : "EFECTIVO");
-    doc.text(`ANTICIPO (${metodoStr}${refPago ? ` #${refPago}` : ""}):`, startTotalsX + 4, y + 19);
+    doc.text(`ANTICIPO / ABONO (${metodoStr}):`, startTotalsX + 4, subY);
     doc.setFont("helvetica", "bold");
-    doc.text(`-$${montoAdelanto.toFixed(2)}`, startTotalsX + 74, y + 19, { align: "right" });
+    doc.text(`-$${montoAdelanto.toFixed(2)}`, startTotalsX + 74, subY, { align: "right" });
 
-    doc.line(startTotalsX + 4, y + 22, startTotalsX + 74, y + 22);
+    subY += 3.5;
+    doc.setDrawColor(203, 213, 225);
+    doc.line(startTotalsX + 4, subY, startTotalsX + 74, subY);
 
+    subY += 4.5;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.setTextColor(180, 83, 9); // Amber 700
-    doc.text("SALDO PENDIENTE:", startTotalsX + 4, y + 28);
-    doc.text(`$${saldoPendiente.toFixed(2)}`, startTotalsX + 74, y + 28, { align: "right" });
+    doc.setTextColor(saldoPendiente > 0 ? 180 : 5, saldoPendiente > 0 ? 83 : 150, saldoPendiente > 0 ? 9 : 105);
+    doc.text("SALDO PENDIENTE:", startTotalsX + 4, subY);
+    doc.text(`$${saldoPendiente.toFixed(2)}`, startTotalsX + 74, subY, { align: "right" });
+  }
+
+  // ── 8. Firmas de Conformidad ──
+  const firmasY = y + boxHeight + 14;
+  if (firmasY + 18 <= pageHeight - 12) {
+    const colWidth = 65;
+    const firma1X = 25;
+    const firma2X = pageWidth - colWidth - 25;
+
+    doc.setDrawColor(148, 163, 184);
+    doc.setLineDashPattern([1.5, 1.5], 0);
+    doc.line(firma1X, firmasY, firma1X + colWidth, firmasY);
+    doc.line(firma2X, firmasY, firma2X + colWidth, firmasY);
+    doc.setLineDashPattern([], 0);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(51, 65, 85);
+    doc.text("ENTREGADO CONFORME", firma1X + colWidth / 2, firmasY + 4, { align: "center" });
+    doc.text("RECIBIDO CONFORME", firma2X + colWidth / 2, firmasY + 4, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(data.emisor.nombre || "Despacho de Bodega", firma1X + colWidth / 2, firmasY + 8, { align: "center" });
+    doc.text(capitalizarNombreCompleto(data.cliente.nombre), firma2X + colWidth / 2, firmasY + 8, { align: "center" });
   }
 
   // Footer
-  y += boxHeight + 8;
   doc.setFont("helvetica", "italic");
-  doc.setFontSize(7);
+  doc.setFontSize(6.8);
   doc.setTextColor(148, 163, 184);
-  doc.text(`Comprobante oficial de pedido emitido por ${data.emisor.nombre || "NEXORA"}`, pageWidth / 2, y, { align: "center" });
+  doc.text(
+    `Comprobante oficial de entrega y recepción emitido por ${data.emisor.nombre || "Comercial de Calzado"}`,
+    pageWidth / 2,
+    pageHeight - 6,
+    { align: "center" }
+  );
 
   return doc;
 }
 
-export function descargarPedidoClientePdf(data: PedidoClientePdfData): void {
-  const doc = generarPedidoClientePdfDoc(data);
-  const fileName = `Pedido_${data.pedido.numero}.pdf`;
+export async function descargarPedidoClientePdf(data: PedidoClientePdfData): Promise<void> {
+  const doc = await generarPedidoClientePdfDoc(data);
+  const fileName = `Comprobante_Entrega_${data.pedido.numero}.pdf`;
   doc.save(fileName);
 }
 
-export function obtenerPedidoClientePdfBlobUrl(data: PedidoClientePdfData): string {
-  const doc = generarPedidoClientePdfDoc(data);
+export async function obtenerPedidoClientePdfBlobUrl(data: PedidoClientePdfData): Promise<string> {
+  const doc = await generarPedidoClientePdfDoc(data);
   const blob = doc.output("blob");
   return URL.createObjectURL(blob);
 }

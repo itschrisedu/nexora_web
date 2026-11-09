@@ -1466,10 +1466,10 @@ export default function ComercialComponent({
     };
   };
 
-  const handleDescargarPdfPedido = (p: Pedido) => {
+  const handleDescargarPdfPedido = async (p: Pedido) => {
     try {
       const pdfData = construirPedidoPdfData(p);
-      descargarPedidoClientePdf(pdfData);
+      await descargarPedidoClientePdf(pdfData);
       showToast('Comprobante PDF de pedido descargado.', 'success');
     } catch (e) {
       showToast('No se pudo generar el comprobante PDF.', 'error');
