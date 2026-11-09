@@ -174,6 +174,58 @@ function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
   });
 }
 
+interface PrecioLineaPedidoInputProps {
+  precioInicial: number;
+  onCambioPrecio: (nuevoPrecio: number) => void;
+  disabled?: boolean;
+}
+
+function PrecioLineaPedidoInput({
+  precioInicial,
+  onCambioPrecio,
+  disabled,
+}: PrecioLineaPedidoInputProps) {
+  const [val, setVal] = useState<string>(precioInicial > 0 ? String(precioInicial) : '');
+
+  useEffect(() => {
+    setVal(precioInicial > 0 ? String(precioInicial) : '');
+  }, [precioInicial]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let raw = e.target.value.replace(',', '.');
+    if (!/^\d*\.?\d*$/.test(raw)) return;
+    setVal(raw);
+    const parsed = parseFloat(raw);
+    if (!isNaN(parsed) && parsed >= 0) {
+      onCambioPrecio(parsed);
+    }
+  };
+
+  const handleBlur = () => {
+    const parsed = parseFloat(val);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setVal(parsed.toFixed(2));
+      onCambioPrecio(parsed);
+    } else {
+      setVal(precioInicial > 0 ? precioInicial.toFixed(2) : '');
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={val}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      disabled={disabled}
+      className="w-16 px-1.5 py-0.5 text-right text-xs font-mono font-bold bg-[var(--background)] border border-[var(--border)] rounded focus:outline-none focus:border-emerald-600 text-[var(--foreground)]"
+      title="Precio unitario para esta serie de calzado"
+    />
+  );
+}
+
+
 const ESTADO_CONFIG: Record<EstadoPedido, { label: string; color: string; icon: React.ReactNode }> = {
   PENDIENTE:         { label: 'Pendiente',          color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',        icon: <Clock size={12} /> },
   EN_PREPARACION:    { label: 'En Preparación',     color: 'bg-blue-500/10 text-blue-600 border-blue-500/20',           icon: <Package size={12} /> },
@@ -5662,12 +5714,11 @@ export default function ComercialComponent({
                   <div className="space-y-2">
                     {/* Render de ítems agrupados compactos por Serie y Precio */}
                     {(() => {
-                      // Agrupar por productId, color, serieNombre, tipoVenta y precioUnitario
+                      // Agrupar por productId, color, serieNombre y tipoVenta (desacoplado de precioUnitario para evitar pérdida de foco al editar)
                       const grupos: { [key: string]: typeof lineasPedido } = {};
                       lineasPedido.forEach((l) => {
                         const serieKey = (l.serieNombre || l.serieId || '').toLowerCase().trim();
-                        const precioKey = Number(l.precioUnitario || 0).toFixed(2);
-                        const key = `${l.productId}_${l.color || ''}_${serieKey}_${l.tipoVenta}_${precioKey}`;
+                        const key = `${l.productId}_${l.color || ''}_${serieKey}_${l.tipoVenta}`;
                         if (!grupos[key]) grupos[key] = [];
                         grupos[key].push(l);
                       });
@@ -5683,8 +5734,7 @@ export default function ComercialComponent({
                           item.productId === primerItem.productId &&
                           (item.color || '') === (primerItem.color || '') &&
                           (item.serieNombre || item.serieId || '').toLowerCase().trim() === (primerItem.serieNombre || primerItem.serieId || '').toLowerCase().trim() &&
-                          item.tipoVenta === primerItem.tipoVenta &&
-                          Number(item.precioUnitario || 0).toFixed(2) === Number(primerItem.precioUnitario || 0).toFixed(2);
+                          item.tipoVenta === primerItem.tipoVenta;
 
                         return (
                           <div key={key} className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -6021,24 +6071,17 @@ export default function ComercialComponent({
                                 {puedeCambiarPrecio ? (
                                   <div className="flex items-center justify-end gap-1 my-0.5" title="Precio unitario para esta serie de calzado">
                                     <span className="text-xs font-bold text-[var(--muted-foreground)]">$</span>
-                                    <input
-                                      type="number"
-                                      step="0.25"
-                                      min="0.5"
-                                      value={primerItem.precioUnitario}
-                                      onChange={(e) => {
-                                        const nuevoPrecio = parseFloat(e.target.value);
-                                        if (!isNaN(nuevoPrecio) && nuevoPrecio >= 0) {
-                                          const nuevasLineas = lineasPedido.map((item) => {
-                                            if (matchThisGroup(item)) {
-                                              return { ...item, precioUnitario: nuevoPrecio };
-                                            }
-                                            return item;
-                                          });
-                                          setLineasPedido(nuevasLineas);
-                                        }
+                                    <PrecioLineaPedidoInput
+                                      precioInicial={primerItem.precioUnitario}
+                                      onCambioPrecio={(nuevoPrecio) => {
+                                        const nuevasLineas = lineasPedido.map((item) => {
+                                          if (matchThisGroup(item)) {
+                                            return { ...item, precioUnitario: nuevoPrecio };
+                                          }
+                                          return item;
+                                        });
+                                        setLineasPedido(nuevasLineas);
                                       }}
-                                      className="w-16 px-1.5 py-0.5 text-right text-xs font-mono font-bold bg-[var(--background)] border border-[var(--border)] rounded focus:outline-none focus:border-emerald-600 text-[var(--foreground)]"
                                     />
                                     <span className="text-[10px] text-[var(--muted-foreground)]">/ par</span>
                                   </div>
