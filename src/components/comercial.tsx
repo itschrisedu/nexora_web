@@ -27,6 +27,7 @@ import {
   Building,
   FileText,
   Edit3,
+  Tag,
   Eye,
   Download,
   CreditCard,
@@ -3740,7 +3741,8 @@ export default function ComercialComponent({
                                   onClick={() => handleAbrirEditarPedido(p)}
                                   className="px-2.5 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-semibold transition-all border border-amber-500/20 flex items-center gap-1"
                                 >
-                                  �S�️ Editar
+                                  <Edit3 size={12} />
+                                  <span>Editar</span>
                                 </button>
                                 {(p.estado === 'PENDIENTE' || p.estado === 'EN_ESPERA_STOCK') && (
                                   <button
@@ -3862,7 +3864,8 @@ export default function ComercialComponent({
                                   className="px-2.5 py-1 bg-violet-600/10 text-violet-600 hover:bg-violet-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-violet-600/20 flex items-center gap-1"
                                   title="Corregir precio de venta y ajustar notas y cuenta del cliente"
                                 >
-                                  �S�️ Editar Precio
+                                  <Tag size={12} />
+                                  <span>Editar Precio</span>
                                 </button>
                                 <button
                                   onClick={(e) => {
@@ -4162,7 +4165,8 @@ export default function ComercialComponent({
                                                   className="text-[10px] text-violet-600 dark:text-violet-400 hover:underline font-bold cursor-pointer"
                                                   title="Modificar precio de este modelo y actualizar saldos de cuenta"
                                                 >
-                                                  �S�️ Editar
+                                                  <Edit3 size={10} />
+                                                  <span>Editar</span>
                                                 </button>
                                               </div>
                                               <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
