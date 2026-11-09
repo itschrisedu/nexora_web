@@ -1009,7 +1009,7 @@ export default function ComercialComponent({
     return () => clearTimeout(timer);
   }, [busquedaCliente]);
 
-  // Consultar último precio al cliente cuando cambia el producto seleccionado o el cliente (busca a nivel de MODELO en toda la red)
+  // Consultar último precio al cliente cuando cambia el producto seleccionado, el cliente o la serie (busca a nivel de MODELO + SERIE específica en toda la red)
   useEffect(() => {
     const fetchUltimoPrecio = async () => {
       if (!clientId || !selectedProductId || !online) {
@@ -1021,17 +1021,45 @@ export default function ComercialComponent({
       try {
         const mId = productoSeleccionadoObj?.modelId || productoSeleccionadoObj?.modeloId || '';
         const mName = productoSeleccionadoObj?.modelName || '';
-        const data = await ApiService.get(
-          `/pedidos/ultimo-precio?clientId=${clientId}&productId=${selectedProductId}${mId ? `&modelId=${mId}` : ''}${mName ? `&modelName=${encodeURIComponent(mName)}` : ''}`
-        );
+        const serieActivaId = tipoVentaItem === 'SERIE_ESPECIAL'
+          ? (serieEspecialId || '')
+          : (productoSeleccionadoObj?.serieId || productoSeleccionadoObj?.serie?.id || '');
+
+        const queryParams = new URLSearchParams({
+          clientId,
+          productId: selectedProductId,
+        });
+        if (mId) queryParams.set('modelId', mId);
+        if (mName) queryParams.set('modelName', mName);
+        if (serieActivaId) queryParams.set('serieId', serieActivaId);
+
+        const data = await ApiService.get(`/pedidos/ultimo-precio?${queryParams.toString()}`);
         const precioAnterior = data.precioAnterior ? Number(data.precioAnterior) : null;
         setUltimoPrecioCliente(precioAnterior);
         setFechaUltimaVenta(data.fechaUltimaVenta ? new Date(data.fechaUltimaVenta).toLocaleDateString('es-EC') : null);
         setSucursalUltimaVenta(data.sucursalNombre || null);
-        // Auto-aplicar el último precio del cliente como precio por defecto
+
+        // Auto-aplicar precio:
+        // Si hay un precio previo específico para esta serie con este cliente, usarlo
         if (precioAnterior && precioAnterior > 0) {
           setPrecioItem(precioAnterior);
           setPrecioItemInput(String(precioAnterior));
+        } else {
+          // Si no hay historial previo en esta serie, sugerir el precio base de catálogo de esa serie específica
+          let precioBaseSugerido = Number(productoSeleccionadoObj?.salePrice) || Number(productoSeleccionadoObj?.costPrice) || 0;
+          if (tipoVentaItem === 'SERIE_ESPECIAL' && serieActivaId) {
+            const prodMismaSerie = catalogoProductos.find((p: any) =>
+              (p.modelId === mId || p.modeloId === mId || (p.modelName && mName && p.modelName.toLowerCase() === mName.toLowerCase())) &&
+              (p.serieId === serieActivaId || p.serie?.id === serieActivaId)
+            );
+            if (prodMismaSerie && (Number(prodMismaSerie.salePrice) > 0 || Number(prodMismaSerie.costPrice) > 0)) {
+              precioBaseSugerido = Number(prodMismaSerie.salePrice) || Number(prodMismaSerie.costPrice) || 0;
+            }
+          }
+          if (precioBaseSugerido > 0) {
+            setPrecioItem(precioBaseSugerido);
+            setPrecioItemInput(String(precioBaseSugerido));
+          }
         }
       } catch {
         setUltimoPrecioCliente(null);
@@ -1040,7 +1068,16 @@ export default function ComercialComponent({
       }
     };
     fetchUltimoPrecio();
-  }, [clientId, selectedProductId, productoSeleccionadoObj?.modelId, productoSeleccionadoObj?.modelName, online]);
+  }, [
+    clientId,
+    selectedProductId,
+    productoSeleccionadoObj?.modelId,
+    productoSeleccionadoObj?.modelName,
+    productoSeleccionadoObj?.serieId,
+    tipoVentaItem,
+    serieEspecialId,
+    online,
+  ]);
 
   const [businessConfig, setBusinessConfig] = useState<any | null>(null);
   const [sucursalesEmpresa, setSucursalesEmpresa] = useState<any[]>([]);
@@ -3077,7 +3114,7 @@ export default function ComercialComponent({
             className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-50"
           >
             {exportandoPendientesPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-            <span>Exportar Pendientes de Entrega</span>−</button>
+            <span>Exportar Pendientes de Entrega</span></button>
 
         <button
           onClick={() => {
@@ -3177,7 +3214,7 @@ export default function ComercialComponent({
                       isSelected ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
                     }`}>
                       {countPedidos}
-                    </span>−</button>
+                    </span></button>
                 );
               })}
             </div>
@@ -3216,7 +3253,7 @@ export default function ComercialComponent({
                 >
                   <Layers size={12} className={filtroEstadoTesis === 'TODOS' ? 'text-amber-400' : 'text-slate-400'} />
                   <span>Todos</span>
-                  <span className="text-[10px] opacity-80 font-mono">({pedidosDeSucursal.length})</span>−</button>
+                  <span className="text-[10px] opacity-80 font-mono">({pedidosDeSucursal.length})</span></button>
 
                 {/* 1. ESTADO PENDIENTE */}
                 <button
@@ -3230,7 +3267,7 @@ export default function ComercialComponent({
                 >
                   <Clock size={12} className="text-amber-500" />
                   <span>1. Pendiente</span>
-                  <span className="text-[10px] opacity-80 font-mono">({countPendiente})</span>−</button>
+                  <span className="text-[10px] opacity-80 font-mono">({countPendiente})</span></button>
 
                 {/* 2. ESTADO EN PREPARACI�N */}
                 <button
@@ -3247,7 +3284,7 @@ export default function ComercialComponent({
                 >
                   <ShoppingBag size={12} className="text-blue-500" />
                   <span>2. En Preparación</span>
-                  <span className="text-[10px] opacity-80 font-mono">({countEnPreparacion})</span>−</button>
+                  <span className="text-[10px] opacity-80 font-mono">({countEnPreparacion})</span></button>
 
                 {/* 3. ESTADO ENTREGADO */}
                 <button
@@ -3264,7 +3301,7 @@ export default function ComercialComponent({
                 >
                   <CheckCircle size={12} className="text-emerald-500" />
                   <span>3. Entregado</span>
-                  <span className="text-[10px] opacity-80 font-mono">({countEntregado})</span>−</button>
+                  <span className="text-[10px] opacity-80 font-mono">({countEntregado})</span></button>
 
                 {/* 4. ESTADO CANCELADO */}
                 <button
@@ -3278,7 +3315,7 @@ export default function ComercialComponent({
                 >
                   <XCircle size={12} className="text-red-500" />
                   <span>4. Cancelado</span>
-                  <span className="text-[10px] opacity-80 font-mono">({countCancelado})</span>−</button>
+                  <span className="text-[10px] opacity-80 font-mono">({countCancelado})</span></button>
               </div>
 
               {/* Sub-filtros Operativos Dinámicos para 'EN_PREPARACION' */}
@@ -3631,7 +3668,7 @@ export default function ComercialComponent({
                                 title={Number(p.adelanto || 0) > 0 ? `Modificar anticipo registrado ($${Number(p.adelanto).toFixed(2)})` : 'Registrar anticipo o abono de dinero'}
                               >
                                 <DollarSign size={12} />
-                                <span>{Number(p.adelanto || 0) > 0 ? `Anticipo: $${Number(p.adelanto).toFixed(2)}` : '+ Adelanto'}</span>−</button>
+                                <span>{Number(p.adelanto || 0) > 0 ? `Anticipo: $${Number(p.adelanto).toFixed(2)}` : '+ Adelanto'}</span></button>
                             )}
 
                             {isUpdating ? (
@@ -3828,7 +3865,7 @@ export default function ComercialComponent({
                                   className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shrink-0 flex items-center gap-1"
                                 >
                                   <Truck size={13} />
-                                  <span>Modificar Envío / Guía</span>−</button>
+                                  <span>Modificar Envío / Guía</span></button>
                               </div>
 
                               {/* Tarjeta de Anticipo Registrado / Botón para Gestionar Anticipo */}
@@ -3890,7 +3927,7 @@ export default function ComercialComponent({
                                       }`}
                                     >
                                       <DollarSign size={13} />
-                                      <span>{Number(p.adelanto || 0) > 0 ? 'Modificar Anticipo' : '+ Registrar Anticipo'}</span>−</button>
+                                      <span>{Number(p.adelanto || 0) > 0 ? 'Modificar Anticipo' : '+ Registrar Anticipo'}</span></button>
                                   )}
                                 </div>
                               </div>
@@ -3923,7 +3960,7 @@ export default function ComercialComponent({
                                     title="Notificar recepción del pedido al cliente por WhatsApp"
                                   >
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                                    <span>Notificar por WhatsApp</span>−</button>
+                                    <span>Notificar por WhatsApp</span></button>
                                 )}
                               </div>
                               {/* Tarjetas compactas agrupadas por modelo / variante con foto y pastillas de tallas */}
@@ -4204,7 +4241,7 @@ export default function ComercialComponent({
                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer transition-all"
                                   >
                                     <ExternalLink size={13} />
-                                    <span>Ver / Añadir a este pedido existente</span>−</button>
+                                    <span>Ver / Añadir a este pedido existente</span></button>
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -4267,7 +4304,7 @@ export default function ComercialComponent({
                             title="Registrar nuevo cliente"
                           >
                             <UserPlus size={14} />
-                            <span className="hidden sm:inline">Nuevo</span>−</button>
+                            <span className="hidden sm:inline">Nuevo</span></button>
                         </div>
 
                         {showDropdownCliente && busquedaCliente.trim().length > 0 && (
@@ -4309,7 +4346,7 @@ export default function ComercialComponent({
                                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] border ${repItem.badgeClass}`}>
                                       <span>{repItem.icon}</span>
                                       <span>{repItem.label}</span>
-                                    </span>−</button>
+                                    </span></button>
                                 );
                               })}
                             {busquedaDebounced.trim().length > 0 &&
@@ -4336,7 +4373,7 @@ export default function ComercialComponent({
                                     className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-xs cursor-pointer"
                                   >
                                     <UserPlus size={14} />
-                                    <span>Registrar a "{busquedaCliente}" como Nuevo Cliente</span>−</button>
+                                    <span>Registrar a "{busquedaCliente}" como Nuevo Cliente</span></button>
                                 </div>
                               )}
                           </div>
@@ -4366,7 +4403,7 @@ export default function ComercialComponent({
                         }`}
                       >
                         <DollarSign size={13} />
-                        <span>Contado</span>−</button>
+                        <span>Contado</span></button>
                       {(() => {
                         const clienteSinCredito = !clienteSeleccionado || !clienteSeleccionado.nivelCredito || clienteSeleccionado.nivelCredito === 'SIN_CREDITO' || Number(clienteSeleccionado.limiteCredito || 0) <= 0;
                         return (
@@ -4646,7 +4683,7 @@ export default function ComercialComponent({
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-[var(--border)] text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:border-[#0F172A] hover:bg-[var(--card)] transition-all cursor-pointer"
                       >
                         <FileText size={13} />
-                        <span>+ Agregar Observación General del Pedido</span>−</button>
+                        <span>+ Agregar Observación General del Pedido</span></button>
                     ) : (
                       <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl space-y-2 animate-in fade-in duration-150">
                         <div className="flex items-center justify-between">
@@ -4742,7 +4779,7 @@ export default function ComercialComponent({
                                   <span>{formatearNombreSerie(ser)}</span>
                                   <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${isActiva ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'}`}>
                                     {count}
-                                  </span>−</button>
+                                  </span></button>
                               );
                             })}
                           </div>
@@ -4768,7 +4805,7 @@ export default function ComercialComponent({
                               title="Tocar para ampliar foto"
                             >
                               <img src={productoSeleccionadoObj.imageUrl} alt="" className="w-12 h-12 object-cover rounded-lg border border-[var(--border)] group-hover:scale-105 transition-transform" />
-                              <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[10px] transition-opacity">�x�</span>−</button>
+                              <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[10px] transition-opacity">�x�</span></button>
                           ) : (
                             <div className="w-12 h-12 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0">�xx</div>
                           )}
@@ -4909,7 +4946,7 @@ export default function ComercialComponent({
                                           />
                                           <span className="absolute inset-0 bg-black/30 opacity-0 group-hover/zoom:opacity-100 rounded-xl flex items-center justify-center text-white text-[9px] transition-opacity">
                                             �x�
-                                          </span>−</button>
+                                          </span></button>
                                       ) : (
                                         <div className="w-10 h-10 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">
                                           �xx
@@ -4988,7 +5025,7 @@ export default function ComercialComponent({
                         }`}
                       >
                         <span>�x�</span>
-                        <span>Serie Completa (Docena / ½ Doc.)</span>−</button>
+                        <span>Serie Completa (Docena / ½ Doc.)</span></button>
                       <button
                         type="button"
                         onClick={() => {
@@ -5009,7 +5046,7 @@ export default function ComercialComponent({
                         }`}
                       >
                         <span>�xx</span>
-                        <span>Por Talla (Numeración)</span>−</button>
+                        <span>Por Talla (Numeración)</span></button>
                       <button
                         type="button"
                         onClick={() => {
@@ -5028,7 +5065,7 @@ export default function ComercialComponent({
                         }`}
                       >
                         <span>⭐</span>
-                        <span>Pedido Especial / Otra Serie</span>−</button>
+                        <span>Pedido Especial / Otra Serie</span></button>
                     </div>
                   </div>
 
@@ -5060,7 +5097,7 @@ export default function ComercialComponent({
                                 onClick={() => handleAgregarInterSucursal(res)}
                                 className="px-3 py-1.5 bg-[#0F172A] hover:bg-black text-white text-xs font-bold rounded-lg transition-colors shrink-0 shadow-xs flex items-center justify-center gap-1 cursor-pointer"
                               >
-                                <span>�x� Despachar de {res.sucursalNombre}</span>−</button>
+                                <span>�x� Despachar de {res.sucursalNombre}</span></button>
                             </div>
                           ))}
                         </div>
@@ -5126,7 +5163,7 @@ export default function ComercialComponent({
                                   title="Tocar para ampliar foto en alta resolución"
                                 >
                                   <img src={prodObj.imageUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] group-hover:scale-105 transition-transform" />
-                                  <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center text-white text-xs transition-opacity">�x�</span>−</button>
+                                  <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center text-white text-xs transition-opacity">�x�</span></button>
                               ) : (
                                 <div className="w-12 h-12 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0 border border-[var(--border)]">
                                   �xx
@@ -5455,7 +5492,7 @@ export default function ComercialComponent({
                                         className="text-[11px] font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:underline flex items-center gap-1 cursor-pointer"
                                       >
                                         <Plus size={11} />
-                                        <span>Agregar observación a este modelo</span>−</button>
+                                        <span>Agregar observación a este modelo</span></button>
                                     ) : (
                                       <div className="flex items-center gap-2 p-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
                                         <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase shrink-0">
@@ -5522,7 +5559,7 @@ export default function ComercialComponent({
                                 {ultimoPrecioCliente !== null && (
                                   <div className="mt-1 flex flex-col items-start lg:items-end gap-0.5">
                                     <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-[10px] font-black shadow-2xs">
-                                      <span>�x� Vendido antes: ${ultimoPrecioCliente.toFixed(2)}/par</span>
+                                      <span>�x� Vendido antes ({serieNombreDisplay}): ${ultimoPrecioCliente.toFixed(2)}/par</span>
                                       {sucursalUltimaVenta && (
                                         <span className="font-semibold text-[9px] text-amber-700 dark:text-amber-300">({sucursalUltimaVenta})</span>
                                       )}
@@ -5537,7 +5574,7 @@ export default function ComercialComponent({
                                         className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer flex items-center gap-0.5"
                                         title="Re-aplicar el precio al que se le vendió anteriormente este modelo"
                                       >
-                                        <span>�x0 Usar ${ultimoPrecioCliente.toFixed(2)} sugerido</span>−</button>
+                                        <span>�x0 Usar ${ultimoPrecioCliente.toFixed(2)} sugerido</span></button>
                                     )}
                                   </div>
                                 )}
@@ -5553,7 +5590,7 @@ export default function ComercialComponent({
                                 disabled={totalParesConfig === 0}
                                 className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                               >
-                                <span>Agregar al Pedido</span>−</button>
+                                <span>Agregar al Pedido</span></button>
                             </div>
                           </div>
 
@@ -5564,7 +5601,7 @@ export default function ComercialComponent({
                                 <span className="text-emerald-600 text-sm shrink-0">�x�</span>
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <span className="font-bold text-emerald-800 dark:text-emerald-200">
-                                    �altimo precio a este cliente:
+                                    �Último precio a este cliente ({serieNombreDisplay}):
                                   </span>
                                   <span className="font-black text-emerald-700 dark:text-emerald-300 font-mono text-sm">
                                     ${ultimoPrecioCliente.toFixed(2)}
@@ -5667,7 +5704,7 @@ export default function ComercialComponent({
                                   title="Tocar para ampliar foto"
                                 >
                                   <img src={primerItem.imageUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] group-hover:scale-105 transition-transform" />
-                                  <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center text-white text-xs transition-opacity">�x�</span>−</button>
+                                  <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center text-white text-xs transition-opacity">�x�</span></button>
                               ) : (
                                 <div className="w-12 h-12 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0">�xx</div>
                               )}
@@ -5969,7 +6006,7 @@ export default function ComercialComponent({
                                         className="text-[10px] font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:underline flex items-center gap-1 cursor-pointer"
                                       >
                                         <Plus size={10} />
-                                        <span>Agregar observación a este modelo</span>−</button>
+                                        <span>Agregar observación a este modelo</span></button>
                                     </div>
                                   )}
                                 </div>
@@ -6074,7 +6111,7 @@ export default function ComercialComponent({
                           className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1 shadow-xs cursor-pointer"
                         >
                           {validandoCupon ? <Loader2 size={12} className="animate-spin" /> : null}
-                          <span>Aplicar</span>−</button>
+                          <span>Aplicar</span></button>
                       </div>
 
                       {showSugerenciasCupon && promocionesActivas.length > 0 && (
@@ -6109,7 +6146,7 @@ export default function ComercialComponent({
                                   {c.tipoDescuento === 'PORCENTAJE'
                                     ? `${Number(c.valorDescuento)}% OFF`
                                     : `$${Number(c.valorDescuento || 0).toFixed(2)} OFF`}
-                                </span>−</button>
+                                </span></button>
                             ))}
                           {promocionesActivas.filter(
                             (c) =>
@@ -6183,7 +6220,7 @@ export default function ComercialComponent({
                         : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
                     }`}
                   >
-                    <span>�x�� Entrega Presencial (Local)</span>−</button>
+                    <span>�x�� Entrega Presencial (Local)</span></button>
                   <button
                     type="button"
                     onClick={() => setTipoEntrega('ENVIO')}
@@ -6194,7 +6231,7 @@ export default function ComercialComponent({
                     }`}
                   >
                     <Truck size={14} />
-                    <span>�xaa Envío a Domicilio / Encomienda</span>−</button>
+                    <span>�xaa Envío a Domicilio / Encomienda</span></button>
                 </div>
 
                 {tipoEntrega === 'ENVIO' && (
@@ -6414,7 +6451,7 @@ export default function ComercialComponent({
                       {creatingOrder
                         ? (editingOrderId ? 'Guardando Cambios...' : 'Creando Pedido...')
                         : (editingOrderId ? 'Guardar Cambios del Pedido' : 'Guardar Pedido Completo')}
-                    </span>−</button>
+                    </span></button>
                 ) : (
                   <button
                     type="button"
@@ -6512,7 +6549,7 @@ export default function ComercialComponent({
                     }`}
                   >
                     <Package size={13} />
-                    <span>Serie Completa / Curva</span>−</button>
+                    <span>Serie Completa / Curva</span></button>
                   <button
                     type="button"
                     onClick={() => setSupplierOrderModalType('NUMERACION')}
@@ -6522,7 +6559,7 @@ export default function ComercialComponent({
                         : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-purple-500'
                     }`}
                   >
-                    <span>�xx Por Numeración</span>−</button>
+                    <span>�xx Por Numeración</span></button>
                 </div>
               </div>
 
@@ -6714,7 +6751,7 @@ export default function ComercialComponent({
                   className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {savingSupplierOrder ? <Loader2 size={15} className="animate-spin" /> : <Truck size={15} />}
-                  <span>Enviar Orden al Proveedor</span>−</button>
+                  <span>Enviar Orden al Proveedor</span></button>
               </div>
             </form>
           </div>
@@ -6778,7 +6815,7 @@ export default function ComercialComponent({
                         : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
                     }`}
                   >
-                    <span>�x�� Entrega Presencial (Local)</span>−</button>
+                    <span>�x�� Entrega Presencial (Local)</span></button>
                   <button
                     type="button"
                     onClick={() => setEnvioModalTipoEntrega('ENVIO')}
@@ -6789,7 +6826,7 @@ export default function ComercialComponent({
                     }`}
                   >
                     <Truck size={14} />
-                    <span>�xaa Envío / Encomienda</span>−</button>
+                    <span>�xaa Envío / Encomienda</span></button>
                 </div>
               </div>
 
@@ -6970,7 +7007,7 @@ export default function ComercialComponent({
                   className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {savingEnvioModal ? <Loader2 size={15} className="animate-spin" /> : <Truck size={15} />}
-                  <span>Guardar Logística de Entrega</span>−</button>
+                  <span>Guardar Logística de Entrega</span></button>
               </div>
             </form>
           </div>
@@ -7174,7 +7211,7 @@ export default function ComercialComponent({
                   className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {savingAdelantoModal ? <Loader2 size={15} className="animate-spin" /> : <DollarSign size={15} />}
-                  <span>Guardar Anticipo</span>−</button>
+                  <span>Guardar Anticipo</span></button>
               </div>
             </form>
           </div>
@@ -7245,7 +7282,7 @@ export default function ComercialComponent({
                   className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {guardandoTransporte ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
-                  <span>Guardar Transporte</span>−</button>
+                  <span>Guardar Transporte</span></button>
               </div>
             </form>
           </div>
@@ -7952,7 +7989,7 @@ export default function ComercialComponent({
                 className="flex-1 sm:flex-none px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
               >
                 {procesandoEntrega ? <Loader2 size={15} className="animate-spin" /> : <PackageCheck size={15} />}
-                <span>Confirmar y Despachar</span>−</button>
+                <span>Confirmar y Despachar</span></button>
             </div>
           </div>
         </div>
@@ -8280,7 +8317,7 @@ export default function ComercialComponent({
                     className="flex-1 sm:flex-none px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                   >
                     {procesandoReversion ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
-                    <span>Sí, Proceder con la Reversión</span>−</button>
+                    <span>Sí, Proceder con la Reversión</span></button>
                 </>
               ) : (
                 <>
@@ -8313,7 +8350,7 @@ export default function ComercialComponent({
                     className="flex-1 sm:flex-none px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                   >
                     <RotateCcw size={15} />
-                    <span>Continuar a Confirmación</span>−</button>
+                    <span>Continuar a Confirmación</span></button>
                 </>
               )}
             </div>
@@ -8746,7 +8783,7 @@ export default function ComercialComponent({
                     className="flex-1 sm:flex-none px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                   >
                     {procesandoDevolucion ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
-                    <span>Confirmar Devolución Definitiva</span>−</button>
+                    <span>Confirmar Devolución Definitiva</span></button>
                 </>
               ) : (
                 <>
@@ -8779,7 +8816,7 @@ export default function ComercialComponent({
                     className="flex-1 sm:flex-none px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                   >
                     <RotateCcw size={15} />
-                    <span>Continuar a Confirmación</span>−</button>
+                    <span>Continuar a Confirmación</span></button>
                 </>
               )}
             </div>
