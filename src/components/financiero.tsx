@@ -2826,56 +2826,87 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     const montoAbono = ultimoAbono ? ultimoAbono.monto : 0;
 
-    // Saldo anterior real antes de este abono
+    // 3. Detectar si hoy hubo entrega de mercadería para este cliente
+    const cobrosCliente = cobros.filter((c) => c.clientId === cartera.clientId);
+    const cobrosHoy = cobrosCliente.filter((c) => esMismoDia(c.createdAt));
+    const montoEntregaHoy = cobrosHoy.reduce(
+      (sum, c) => sum + Number(c.montoOriginal ?? c.montoTotal ?? c.saleNote?.total ?? 0),
+      0
+    );
 
-    const saldoAnterior = montoAbono > 0 ? Math.round((saldoActual + montoAbono) * 100) / 100 : saldoActual;
+    const lineasHoy = cobrosHoy.flatMap((c) =>
+      c.lines && c.lines.length > 0 ? c.lines : c.saleNote?.lines || []
+    );
+    const gruposEntregaHoy = agruparLineasPorModelo(lineasHoy, catalogoProductos);
 
+    let lineasEntregaTexto = '';
+    if (gruposEntregaHoy.length > 0) {
+      lineasEntregaTexto = gruposEntregaHoy
+        .map((g) => {
+          let cantTexto = '';
+          if (g.etiquetaVolumen) {
+            cantTexto = g.etiquetaVolumen.includes(' (')
+              ? g.etiquetaVolumen.split(' (')[0]
+              : g.etiquetaVolumen;
+          } else {
+            cantTexto = `${g.totalPares} ${g.totalPares === 1 ? 'par' : 'pares'}`;
+          }
+          const colorTexto = g.color ? ` (${g.color})` : '';
+          return `📦 *Entrega:* ${cantTexto} ${g.modelName}${colorTexto} — *$${g.subtotal.toFixed(2)}*`;
+        })
+        .join('\n');
+    } else if (montoEntregaHoy > 0) {
+      lineasEntregaTexto = `📦 *Entrega:* Mercadería de Calzado — *$${montoEntregaHoy.toFixed(2)}*`;
+    }
 
+    // 4. Cálculo matemático de saldo anterior y nuevo saldo
+    let saldoAnterior = saldoActual;
+    let nuevoSaldo = saldoActual;
+
+    if (montoEntregaHoy > 0) {
+      saldoAnterior = Math.max(0, Math.round((saldoActual + montoAbono - montoEntregaHoy) * 100) / 100);
+      nuevoSaldo = Math.round((saldoAnterior + montoEntregaHoy) * 100) / 100;
+    } else if (montoAbono > 0) {
+      saldoAnterior = Math.round((saldoActual + montoAbono) * 100) / 100;
+      nuevoSaldo = saldoAnterior;
+    }
 
     let msg = `Estimado/a *${capitalizarNombreCompleto(cartera.clienteNombre)}*,\n\n`;
-
     msg += `Le saludamos de *${negocioNombre}*. Le compartimos el estado actual de su cuenta:\n\n`;
-
     msg += `📅 *Fecha:* ${hoyLegible}\n`;
 
-
-
-    if (montoAbono > 0) {
-
+    if (montoEntregaHoy > 0) {
       msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
-
       msg += `💵 *Saldo Anterior:* $${saldoAnterior.toFixed(2)}\n`;
-
-      msg += `✅ *Abono Recibido:* -$${montoAbono.toFixed(2)} (${ultimoAbono?.metodo || 'EFECTIVO'})\n`;
-
+      msg += `${lineasEntregaTexto}\n`;
+      msg += `💵 *Nuevo Saldo:* $${nuevoSaldo.toFixed(2)}\n`;
+      if (montoAbono > 0) {
+        msg += `✅ *Abono Recibido:* -$${montoAbono.toFixed(2)} (${ultimoAbono?.metodo || 'EFECTIVO'})\n`;
+      }
       if (saldoActual <= 0) {
-
         msg += `🎉 *SALDO PENDIENTE ACTUAL: $0.00 (CUENTA SALDADA)*\n`;
-
       } else {
-
         msg += `📌 *SALDO PENDIENTE ACTUAL: $${saldoActual.toFixed(2)}*\n`;
-
       }
-
       msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
-
-    } else {
-
+    } else if (montoAbono > 0) {
       msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
-
+      msg += `💵 *Saldo Anterior:* $${saldoAnterior.toFixed(2)}\n`;
+      msg += `✅ *Abono Recibido:* -$${montoAbono.toFixed(2)} (${ultimoAbono?.metodo || 'EFECTIVO'})\n`;
       if (saldoActual <= 0) {
-
-        msg += `🎉 *SALDO PENDIENTE ACTUAL: $0.00 (SIN DEUDA PENDIENTE)*\n`;
-
+        msg += `🎉 *SALDO PENDIENTE ACTUAL: $0.00 (CUENTA SALDADA)*\n`;
       } else {
-
         msg += `📌 *SALDO PENDIENTE ACTUAL: $${saldoActual.toFixed(2)}*\n`;
-
       }
-
       msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
-
+    } else {
+      msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
+      if (saldoActual <= 0) {
+        msg += `🎉 *SALDO PENDIENTE ACTUAL: $0.00 (SIN DEUDA PENDIENTE)*\n`;
+      } else {
+        msg += `📌 *SALDO PENDIENTE ACTUAL: $${saldoActual.toFixed(2)}*\n`;
+      }
+      msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
     }
 
 

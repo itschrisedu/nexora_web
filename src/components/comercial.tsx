@@ -1868,13 +1868,13 @@ export default function ComercialComponent({
       },
     });
 
-    const estadoTexto = esEntregaTotal ? '�✅ *ENTREGA COMPLETADA (100%)*' : '�x� *ENTREGA PARCIAL REALIZADA*';
+    const estadoTexto = esEntregaTotal ? '✅ *ENTREGA COMPLETADA (100%)*' : '📦 *ENTREGA PARCIAL REALIZADA*';
     const pendienteTexto = !esEntregaTotal ? `\n⏳ *Pares pendientes por entregar:* ${Math.max(0, totalParesPedidoGeneral - totalParesEntregadosGeneral)} pares` : '';
 
-    const contactoSucursal = emisorData.telefono ? `\n�x~ *Contacto / WhatsApp:* ${emisorData.telefono}` : '';
-    const direccionSucursal = emisorData.direccion ? `\n�x� *Ubicación:* ${emisorData.direccion}` : '';
+    const contactoSucursal = emisorData.telefono ? `\n📞 *Contacto / WhatsApp:* ${emisorData.telefono}` : '';
+    const direccionSucursal = emisorData.direccion ? `\n📍 *Ubicación:* ${emisorData.direccion}` : '';
 
-    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*.\n\nLe notificamos que se ha registrado la entrega de su pedido:\n\n${estadoTexto}\n📋 *PEDIDO ${numPedido}*\n📅 *Fecha de Entrega:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}\n\n👟 *DETALLE DE CALZADO ENTREGADO:*${desgloseTexto || '\n⬢ ' + (p.lines?.length || 1) + ' ítems'}\n\n📦 *Total pares entregados acumulados:* ${totalParesEntregadosGeneral} de ${totalParesPedidoGeneral} pares${pendienteTexto}\n💰 *Total pedido:* $${Number(p.montoTotal).toFixed(2)}\n\n📥 *Descarga aquí tu comprobante oficial de entrega en PDF:*\n🔗 ${urlComprobante}\n\n¡Muchas gracias por su preferencia!\n*${negocioNombre}*${contactoSucursal}${direccionSucursal}`;
+    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*.\n\nLe notificamos que se ha registrado la entrega de su pedido:\n\n${estadoTexto}\n📋 *PEDIDO ${numPedido}*\n📅 *Fecha de Entrega:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}\n\n👟 *DETALLE DE CALZADO ENTREGADO:*\n\n📦 *Total pares entregados acumulados:* ${totalParesEntregadosGeneral} de ${totalParesPedidoGeneral} pares${pendienteTexto}\n💰 *Total pedido:* $${Number(p.montoTotal).toFixed(2)}\n\n📥 *Descarga aquí tu comprobante oficial de entrega en PDF:*\n🔗 ${urlComprobante}\n\n¡Muchas gracias por su preferencia!\n*${negocioNombre}*${contactoSucursal}${direccionSucursal}`;
 
     const autoEmailLocal = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') : null;
     const autoEmail = autoEmailLocal !== null ? autoEmailLocal === 'true' : (businessConfig?.autoEmailHabilitado ?? false);
