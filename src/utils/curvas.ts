@@ -327,7 +327,11 @@ export const detectarMejorCurvaSegunStock = (
   if (evalDisp.recomendacion === 'SOLO_B') return 'MEDIA_B';
   if (evalDisp.recomendacion === 'SOLO_A') return 'MEDIA_A';
 
-  // Si ambas están disponibles, comparar stock de tallas clave
+  // Si ambas están disponibles, priorizar la serie que rinda mayor cantidad de medias docenas en bodega
+  if (evalDisp.maxMediasB > evalDisp.maxMediasA) return 'MEDIA_B';
+  if (evalDisp.maxMediasA > evalDisp.maxMediasB) return 'MEDIA_A';
+
+  // Si ambas rinden igual número de medias, comparar déficit
   const curvaA = calcularCurvaParaTallas(serieName, tallas, 'MEDIA_A');
   const curvaB = calcularCurvaParaTallas(serieName, tallas, 'MEDIA_B');
 

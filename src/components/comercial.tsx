@@ -5335,12 +5335,20 @@ export default function ComercialComponent({
 
                                     return (
                                       <div className="space-y-1.5 pt-0.5">
-                                        {/* Banner informativo de alternancia inteligente (Fase 5.1) */}
-                                        {curvaSugeridaInfo && (
+                                        {/* Banner informativo de auto-selección inteligente por stock físico (Fase 5) */}
+                                        {curvaSugeridaInfo && !esCurvaUniforme6Tallas(tallasList) && (
                                           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-200 text-[11px] font-semibold">
                                             <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                             <span>
-                                              Curva <strong>{curvaSugeridaInfo.tipo === 'MEDIA_A' ? '½ Media Docena Serie A' : '½ Media Docena Serie B'}</strong> preseleccionada automáticamente {curvaSugeridaInfo.alternada ? '(alternando con el pedido anterior)' : '(por balance de stock en bodega)'}.
+                                              Curva <strong>{curvaSugeridaInfo.tipo === 'MEDIA_A' ? '½ Docena Serie A' : '½ Docena Serie B'}</strong> preseleccionada automáticamente{' '}
+                                              {curvaSugeridaInfo.razon === 'MAYOR_STOCK_A' || curvaSugeridaInfo.razon === 'MAYOR_STOCK_B'
+                                                ? `(por mayor disponibilidad en bodega: ${curvaSugeridaInfo.tipo === 'MEDIA_A' ? (evalStock?.maxMediasA ?? 'mayor') : (evalStock?.maxMediasB ?? 'mayor')} disp.)`
+                                                : curvaSugeridaInfo.razon === 'STOCK_DISPONIBLE'
+                                                ? '(única con stock suficiente en bodega)'
+                                                : curvaSugeridaInfo.alternada
+                                                ? '(alternando con el pedido anterior del cliente)'
+                                                : '(por balance de stock en bodega)'}
+                                              .
                                             </span>
                                           </div>
                                         )}
@@ -5440,7 +5448,7 @@ export default function ComercialComponent({
                                                 )}
                                                 {curvaSugeridaInfo?.tipo === 'MEDIA_A' ? (
                                                   <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.5 rounded uppercase font-black tracking-wide">
-                                                    {curvaSugeridaInfo.alternada ? 'Serie A (Alternada)' : 'Serie A (Auto)'}
+                                                    {curvaSugeridaInfo.razon === 'MAYOR_STOCK_A' ? '⭐ Más Stock' : curvaSugeridaInfo.alternada ? 'Alternada' : 'Auto'}
                                                   </span>
                                                 ) : evalStock?.recomendacion === 'SOLO_A' ? (
                                                   <span className="text-[9px] bg-emerald-600 text-white px-1 rounded uppercase font-black">
@@ -5484,7 +5492,7 @@ export default function ComercialComponent({
                                                 )}
                                                 {curvaSugeridaInfo?.tipo === 'MEDIA_B' ? (
                                                   <span className="text-[9px] bg-teal-600 text-white px-1.5 py-0.5 rounded uppercase font-black tracking-wide">
-                                                    {curvaSugeridaInfo.alternada ? 'Serie B (Alternada)' : 'Serie B (Auto)'}
+                                                    {curvaSugeridaInfo.razon === 'MAYOR_STOCK_B' ? '⭐ Más Stock' : curvaSugeridaInfo.alternada ? 'Alternada' : 'Auto'}
                                                   </span>
                                                 ) : evalStock?.recomendacion === 'SOLO_B' ? (
                                                   <span className="text-[9px] bg-teal-600 text-white px-1 rounded uppercase font-black">
@@ -5506,8 +5514,7 @@ export default function ComercialComponent({
                                                 }}
                                                 className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                               >
-                                                �� ½ Doc A
-                                              </button>
+                                                �� ½ Doc A</button>
 
                                               <button
                                                 type="button"
@@ -5896,8 +5903,7 @@ export default function ComercialComponent({
                                             }}
                                             className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                           >
-                                            + � Doc A
-                                          </button>
+                                            + � Doc A</button>
                                           <button
                                             type="button"
                                             onClick={() => {
@@ -5936,8 +5942,7 @@ export default function ComercialComponent({
                                             }}
                                             className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                           >
-                                             � Doc A
-                                          </button>
+                                             � Doc A</button>
                                           <button
                                             type="button"
                                             onClick={() => {
@@ -7826,8 +7831,7 @@ export default function ComercialComponent({
                                             }}
                                             className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                           >
-                                            + � Doc A
-                                          </button>
+                                            + � Doc A</button>
                                           <button
                                             type="button"
                                             onClick={() => {
@@ -7867,8 +7871,7 @@ export default function ComercialComponent({
                                             }}
                                             className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                           >
-                                             � Doc A
-                                          </button>
+                                             � Doc A</button>
                                           <button
                                             type="button"
                                             onClick={() => {
