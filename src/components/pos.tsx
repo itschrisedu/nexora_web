@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ApiService } from "@/services/api.service";
 import { useToast } from "./ui/toast";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
@@ -55,6 +55,7 @@ import {
   Mail,
   MessageCircle,
   Phone,
+  Tag,
 } from "lucide-react";
 
 interface CajaEstado {
@@ -77,6 +78,8 @@ interface ProductoBusqueda {
   color: string;
   costPrice?: number;
   salePrice: number;
+  recargoParPos?: number;
+  salePricePos?: number;
   serieNombre: string;
   serieId: string;
   imageUrl?: string;
@@ -526,8 +529,21 @@ export default function PosComponent() {
     }
   };
 
+  const recargoParPosGlobal = Number(negocioInfo?.recargoParPos ?? estrategia?.recargoParPos ?? 0);
+
+  const getPrecioParPos = useCallback(
+    (prod: { salePrice: number; salePricePos?: number; recargoParPos?: number }) => {
+      if (prod.salePricePos !== undefined && prod.salePricePos > 0) return prod.salePricePos;
+      const extra = prod.recargoParPos !== undefined && prod.recargoParPos > 0 ? prod.recargoParPos : recargoParPosGlobal;
+      return Number((Number(prod.salePrice || 0) + extra).toFixed(2));
+    },
+    [recargoParPosGlobal]
+  );
+
   const handleAgregarItem = (prod: ProductoBusqueda, talla: { tallaId: string; numero: number; cantidad: number }) => {
     if (talla.cantidad <= 0) return;
+
+    const precioPar = getPrecioParPos(prod);
 
     const existente = itemsVenta.findIndex(
       (i) => i.productId === prod.id && i.tallaId === talla.tallaId
@@ -550,7 +566,7 @@ export default function PosComponent() {
           color: prod.color,
           imageUrl: prod.imageUrl,
           cantidad: 1,
-          precioUnitario: prod.salePrice,
+          precioUnitario: precioPar,
           costPrice: prod.costPrice,
         },
       ]);
@@ -1593,6 +1609,20 @@ export default function PosComponent() {
                     </div>
                   )}
 
+                  {recargoParPosGlobal > 0 && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-2 rounded-xl flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Tag className="text-emerald-600 dark:text-emerald-400 shrink-0" size={14} />
+                        <span className="text-[11px] text-[var(--muted-foreground)]">
+                          <strong className="text-emerald-700 dark:text-emerald-400">Venta por Pares en Mostrador:</strong> Valor extra configurado de <strong className="text-emerald-600 dark:text-emerald-400 font-mono">+${recargoParPosGlobal.toFixed(2)}</strong> sobre el precio base de catálogo.
+                        </span>
+                      </div>
+                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[10px] font-bold font-mono shrink-0">
+                        +${recargoParPosGlobal.toFixed(2)} / par
+                      </span>
+                    </div>
+                  )}
+
                   <div className="relative">
                     <Search className="absolute left-3.5 top-3 text-[var(--muted-foreground)]" size={16} />
                     <input
@@ -1674,8 +1704,16 @@ export default function PosComponent() {
                                   </h4>
                                   <div className="text-right shrink-0">
                                     <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm font-mono block">
-                                      ${prodActivo.salePrice.toFixed(2)}
+                                      ${getPrecioParPos(prodActivo).toFixed(2)}
                                     </span>
+                                    {recargoParPosGlobal > 0 && (
+                                      <span
+                                        className="text-[9px] text-emerald-600 dark:text-emerald-400 font-mono font-bold block"
+                                        title={`Precio catálogo base: $${prodActivo.salePrice.toFixed(2)} + Recargo por par: $${recargoParPosGlobal.toFixed(2)}`}
+                                      >
+                                        +${recargoParPosGlobal.toFixed(2)} par
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                                 <p className="text-xs text-[var(--muted-foreground)] flex items-center gap-1.5 mt-0.5 truncate">
@@ -1744,7 +1782,7 @@ export default function PosComponent() {
                                               : "bg-slate-500/10 text-slate-400"
                                           }`}
                                         >
-                                          ${s.salePrice.toFixed(2)}
+                                          ${getPrecioParPos(s).toFixed(2)}
                                         </span>
                                         <span
                                           className={`text-[9px] px-1 py-0.2 rounded-full font-mono ${

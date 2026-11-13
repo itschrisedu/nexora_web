@@ -93,6 +93,7 @@ interface BusinessConfig {
   descuentoTemporadaBaja?: number;
   diasRotacionTemporadaBaja?: number;
   politicaDescuentoVenta?: string;
+  recargoParPos?: number;
 }
 
 type TabType = "general" | "estrategia" | "credito" | "operaciones" | "catalogo" | "seguridad";
@@ -393,6 +394,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     descuentoTemporadaBaja: 10,
     diasRotacionTemporadaBaja: 30,
     politicaDescuentoVenta: "LIBRE",
+    recargoParPos: 0,
   });
 
   const [nivelesCredito, setNivelesCredito] = useState<CreditLevelConfigItem[]>([
@@ -607,6 +609,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             descuentoTemporadaBaja: data.descuentoTemporadaBaja !== undefined ? Number(data.descuentoTemporadaBaja) : 10,
             diasRotacionTemporadaBaja: data.diasRotacionTemporadaBaja !== undefined ? Number(data.diasRotacionTemporadaBaja) : 30,
             politicaDescuentoVenta: data.politicaDescuentoVenta || "LIBRE",
+            recargoParPos: data.recargoParPos !== undefined ? Number(data.recargoParPos) : 0,
           };
 
           setConfig(loadedConfig);
@@ -778,6 +781,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         descuentoTemporadaBaja: Number(config.descuentoTemporadaBaja ?? 10),
         diasRotacionTemporadaBaja: Number(config.diasRotacionTemporadaBaja ?? 30),
         politicaDescuentoVenta: config.politicaDescuentoVenta || "LIBRE",
+        recargoParPos: Number(config.recargoParPos) || 0,
         autoWhatsAppHabilitado: autoWhatsAppAbono,
         autoEmailHabilitado: autoEmailComprobante,
       };
@@ -1506,6 +1510,66 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 <span>
                   <strong>Independencia del Catálogo:</strong> El Catálogo de Modelos se mantiene siempre editable por el administrador para ajustar precios de venta, costos y series. Esta política rige exclusivamente para los vendedores en mostrador (POS) y toma de pedidos comerciales.
                 </span>
+              </div>
+            </div>
+
+            {/* DIFERENCIACIÓN DE PRECIOS: VENTA AL POR MENOR EN POS (POR PARES) */}
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
+                <DollarSign className="text-emerald-500" size={18} />
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--foreground)]">Diferenciación de Precio: Venta por Pares en Mostrador (POS)</h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Configura el valor extra que se suma al precio base de catálogo cuando se vende por pares individuales en el POS (venta minorista vs. por mayor).
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                <div className="space-y-2 p-4 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
+                  <label className="block text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">
+                    Valor Extra por Par en Mostrador ($)
+                  </label>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Monto adicional que se suma automáticamente sobre el precio del catálogo al vender pares sueltos en mostrador.
+                  </p>
+                  <div className="flex items-center gap-2 max-w-xs">
+                    <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 font-mono">+$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.50"
+                      placeholder="0.00"
+                      value={config.recargoParPos ?? 0}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setConfig((prev) => ({ ...prev, recargoParPos: isNaN(val) || val < 0 ? 0 : val }));
+                      }}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm font-bold text-center focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                    <span className="text-xs font-bold text-slate-400">USD / par</span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-2 text-xs">
+                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
+                    <Info size={16} />
+                    <span>Ejemplo Operativo en el POS</span>
+                  </div>
+                  <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
+                    Si el calzado tiene precio base de catálogo de <strong className="text-[var(--foreground)]">$16.00</strong> (media docena / por mayor) y fijas un valor extra de <strong className="text-emerald-600 dark:text-emerald-400">+${(config.recargoParPos ?? 0).toFixed(2)}</strong>:
+                  </p>
+                  <div className="flex items-center justify-between p-2.5 bg-[var(--card)] border border-emerald-500/30 rounded-lg font-mono">
+                    <span className="text-slate-500">Precio de venta en POS:</span>
+                    <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">
+                      ${(16 + (config.recargoParPos ?? 0)).toFixed(2)} / par
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    * El valor configurado por el Administrador General o de Sucursal se aplica automáticamente a todos los vendedores que ingresen al POS.
+                  </p>
+                </div>
               </div>
             </div>
 
