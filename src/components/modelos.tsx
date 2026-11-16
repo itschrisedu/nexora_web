@@ -242,11 +242,45 @@ const getNombreSerie = (s: SerieConfig | string | null | undefined, seriesList?:
 };
 
 // Curvas estándar de distribución por serie
-const getCurvaDocena = (serieName: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B'): Record<number, number> => {
-  const name = (serieName || '').toUpperCase();
-  if (name.includes('ADULTO') || name.includes('CABALLERO') || name.includes('HOMBRE') || name === 'TALLA_GRANDE') {
+const getCurvaDocena = (
+  serie: string | SerieConfig,
+  tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' = 'DOCENA',
+  tallasExplicit?: number[],
+): Record<number, number> => {
+  const sObj = typeof serie === 'object' && serie !== null ? serie : null;
+  const name = (sObj ? sObj.nombre : String(serie || '')).toUpperCase();
+
+  // Obtener números reales de tallas
+  let nums: number[] = [];
+  if (tallasExplicit && tallasExplicit.length > 0) {
+    nums = [...tallasExplicit].sort((a, b) => a - b);
+  } else if (sObj && sObj.tallas && sObj.tallas.length > 0) {
+    nums = sObj.tallas.map((t: any) => t.numero).sort((a: number, b: number) => a - b);
+  }
+
+  const n = nums.length;
+  const has38 = nums.includes(38);
+  const has42 = nums.includes(42);
+  const has43 = nums.includes(43);
+  const isAdulto = name.includes('ADULTO') || name.includes('CABALLERO') || name.includes('HOMBRE') || name === 'TALLA_GRANDE' || has38;
+
+  // 1. Adulto: si incluye talla 43 (ej. 38 a 43, 6 tallas) -> 2 pares cada talla = 12 pares exactos
+  if (isAdulto && has38 && has43 && (n === 6 || nums[nums.length - 1] >= 43)) {
+    if (tipo === 'DOCENA') return { 38: 2, 39: 2, 40: 2, 41: 2, 42: 2, 43: 2 };
+    if (tipo === 'MEDIA_A') return { 38: 1, 39: 1, 40: 1, 41: 1, 42: 1, 43: 1 };
+    return { 38: 1, 39: 1, 40: 1, 41: 1, 42: 1, 43: 1 };
+  }
+
+  // 2. Adulto: si va de 38 a 42 (5 tallas sin la 43) -> 38:2, 39:3, 40:3, 41:2, 42:2 = 12 pares exactos (repetidas 39 y 40)
+  if (isAdulto && has38 && has42 && !has43 && (n === 5 || nums[nums.length - 1] === 42)) {
+    if (tipo === 'DOCENA') return { 38: 2, 39: 3, 40: 3, 41: 2, 42: 2 };
+    if (tipo === 'MEDIA_A') return { 38: 1, 39: 2, 40: 1, 41: 1, 42: 1 };
+    return { 38: 1, 39: 1, 40: 2, 41: 1, 42: 1 };
+  }
+
+  // Si no se pasaron tallas explícitas, fallback por nombre de serie:
+  if (isAdulto) {
     if (name.includes('43') || name.includes('38-43') || name.includes('38 A 43')) {
-      // 38 al 43 (6 tallas estándar Cevallos: 2 pares c/u = 12 pares)
       if (tipo === 'DOCENA') return { 38: 2, 39: 2, 40: 2, 41: 2, 42: 2, 43: 2 };
       if (tipo === 'MEDIA_A') return { 38: 1, 39: 1, 40: 1, 41: 1, 42: 1, 43: 1 };
       return { 38: 1, 39: 1, 40: 1, 41: 1, 42: 1, 43: 1 };
@@ -255,7 +289,14 @@ const getCurvaDocena = (serieName: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B
     if (tipo === 'MEDIA_A') return { 38: 1, 39: 2, 40: 1, 41: 1, 42: 1 };
     return { 38: 1, 39: 1, 40: 2, 41: 1, 42: 1 };
   }
-  if (name.includes('DAMA') || name.includes('MUJER')) {
+
+  // Dama / Mujer
+  if (name.includes('DAMA') || name.includes('MUJER') || nums.includes(35)) {
+    if (nums.includes(34) && nums.includes(39)) {
+      if (tipo === 'DOCENA') return { 34: 1, 35: 2, 36: 3, 37: 3, 38: 2, 39: 1 };
+      if (tipo === 'MEDIA_A') return { 34: 1, 35: 1, 36: 2, 37: 1, 38: 1, 39: 0 };
+      return { 34: 0, 35: 1, 36: 1, 37: 2, 38: 1, 39: 1 };
+    }
     if (name.includes('34') || name.includes('39')) {
       if (tipo === 'DOCENA') return { 34: 1, 35: 2, 36: 3, 37: 3, 38: 2, 39: 1 };
       if (tipo === 'MEDIA_A') return { 34: 1, 35: 1, 36: 2, 37: 1, 38: 1, 39: 0 };
@@ -265,11 +306,21 @@ const getCurvaDocena = (serieName: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B
     if (tipo === 'MEDIA_A') return { 35: 1, 36: 2, 37: 1, 38: 1, 39: 1 };
     return { 35: 1, 36: 1, 37: 2, 38: 1, 39: 1 };
   }
-  if (name.includes('JUVENIL')) {
+
+  // Juvenil
+  if (name.includes('JUVENIL') || (nums.includes(34) && nums.includes(38))) {
     if (tipo === 'DOCENA') return { 34: 2, 35: 3, 36: 3, 37: 2, 38: 2 };
     if (tipo === 'MEDIA_A') return { 34: 1, 35: 2, 36: 1, 37: 1, 38: 1 };
     return { 34: 1, 35: 1, 36: 2, 37: 1, 38: 1 };
   }
+
+  // Si tiene exactamente 6 tallas, 2 pares cada una
+  if (n === 6) {
+    const res: Record<number, number> = {};
+    nums.forEach(num => { res[num] = tipo === 'DOCENA' ? 2 : 1; });
+    return res;
+  }
+
   return {};
 };
 
@@ -277,34 +328,53 @@ const getCurvaDocena = (serieName: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B
 const getDocenaBaseParaSerie = (sObj?: SerieConfig | null): Record<number, number> => {
   if (!sObj || !sObj.tallas || sObj.tallas.length === 0) return {};
   const sorted = [...sObj.tallas].sort((a, b) => a.numero - b.numero);
-  const n = sorted.length;
+  const nums = sorted.map(t => t.numero);
+  const n = nums.length;
   const result: Record<number, number> = {};
 
-  // Caso estándar 6 tallas (ej. 38 a 43 en Adulto, 34 a 39 en Dama): 2 pares por cada talla = 12 pares exactos
-  if (n === 6) {
-    sorted.forEach(t => { result[t.numero] = 2; });
+  // Caso Adulto con talla 43 (38 al 43, 6 tallas): 2 pares por cada talla = 12 pares exactos
+  if (nums.includes(38) && nums.includes(43) && n === 6) {
+    nums.forEach(num => { result[num] = 2; });
     return result;
   }
 
-  // Verificar si las tallas del modelo coinciden exactamente con la plantilla estándar por nombre
-  const std = getCurvaDocena(sObj.nombre || '', 'DOCENA');
-  const tallasNumeros = sorted.map(t => t.numero);
-  const stdKeys = Object.keys(std).map(Number).sort((a, b) => a - b);
-  const coincideExacto = stdKeys.length > 0 &&
-    tallasNumeros.length === stdKeys.length &&
-    tallasNumeros.every((num, idx) => num === stdKeys[idx]);
+  // Caso Adulto sin talla 43 (38 al 42, 5 tallas): repetidas 39 y 40 con 3 pares cada una = 12 pares
+  if (nums.includes(38) && nums.includes(42) && !nums.includes(43) && n === 5) {
+    return { 38: 2, 39: 3, 40: 3, 41: 2, 42: 2 };
+  }
 
-  if (coincideExacto) return std;
+  // Obtener plantilla estándar con tallas reales
+  const std = getCurvaDocena(sObj, 'DOCENA', nums);
+  if (Object.keys(std).length > 0) {
+    const stdSum = Object.values(std).reduce((a, b) => a + b, 0);
+    if (stdSum === 12) return std;
+  }
 
-  // Distribución proporcional si la serie tiene otra cantidad de tallas
+  // Caso estándar 6 tallas: 2 pares por cada talla = 12 pares exactos
+  if (n === 6) {
+    nums.forEach(num => { result[num] = 2; });
+    return result;
+  }
+
+  // Caso 5 tallas general: extremos 2, intermedias 3 (2+3+3+2+2 = 12)
+  if (n === 5) {
+    result[nums[0]] = 2;
+    result[nums[1]] = 3;
+    result[nums[2]] = 3;
+    result[nums[3]] = 2;
+    result[nums[4]] = 2;
+    return result;
+  }
+
+  // Distribución proporcional si la serie tiene otra cantidad de tallas para sumar siempre 12 pares
   if (n > 0) {
     const base = Math.floor(12 / n);
     let rem = 12 % n;
     const startRem = Math.floor((n - rem) / 2);
-    sorted.forEach((t, i) => {
+    nums.forEach((num, i) => {
       const extra = (i >= startRem && rem > 0) ? 1 : 0;
       if (extra) rem--;
-      result[t.numero] = Math.max(1, base + extra);
+      result[num] = Math.max(1, base + extra);
     });
   }
   return result;
