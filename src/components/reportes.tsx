@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -150,7 +150,7 @@ export default function ReportesComponent({
   const [tabActiva, setTabActiva] = useState<TabReporte>('resumen');
   const [negocioInfo, setNegocioInfo] = useState<any>(null);
 
-  // Estados especÃ­ficos para Reporte Punto de Venta (POS)
+  // Estados específicos para Reporte Punto de Venta (POS)
   const [loadingPos, setLoadingPos] = useState(false);
   const [posData, setPosData] = useState<any>(null);
   const [filtroPosMetodo, setFiltroPosMetodo] = useState('TODOS');
@@ -159,20 +159,20 @@ export default function ReportesComponent({
   const [generandoPosPdf, setGenerandoPosPdf] = useState(false);
   const [ventaPosDetalle, setVentaPosDetalle] = useState<any | null>(null);
 
-  // Estados especÃ­ficos para Reporte Rendimiento de Sucursales
+  // Estados específicos para Reporte Rendimiento de Sucursales
   const [loadingSucursales, setLoadingSucursales] = useState(false);
   const [sucursalesReporteData, setSucursalesReporteData] = useState<any>(null);
   const [filtroSucursalModeloTexto, setFiltroSucursalModeloTexto] = useState('');
   const [filtroSucursalOrden, setFiltroSucursalOrden] = useState<'VENTAS_DESC' | 'PARES_DESC' | 'PRECIO_DESC'>('VENTAS_DESC');
   const [generandoSucursalPdf, setGenerandoSucursalPdf] = useState(false);
 
-  // Filtros especÃ­ficos para Productividad por Trabajador
+  // Filtros específicos para Productividad por Trabajador
   const [filtroTrabajadorTexto, setFiltroTrabajadorTexto] = useState('');
   const [filtroTrabajadorRol, setFiltroTrabajadorRol] = useState('TODOS');
   const [filtroTrabajadorOrden, setFiltroTrabajadorOrden] = useState<'VENTAS_DESC' | 'PARES_DESC' | 'PEDIDOS_DESC' | 'VENTAS_ASC'>('VENTAS_DESC');
   const [filtroAbonosFinanzasTexto, setFiltroAbonosFinanzasTexto] = useState('');
 
-  // Filtros especÃ­ficos para RotaciÃ³n de Calzado & Modelos (CatÃ¡logo Completo)
+  // Filtros específicos para Rotación de Calzado & Modelos (Catálogo Completo)
   const [filtroRotacionTexto, setFiltroRotacionTexto] = useState('');
   const [filtroRotacionSerie, setFiltroRotacionSerie] = useState('TODAS');
   const [filtroRotacionEstado, setFiltroRotacionEstado] = useState<'TODOS' | 'ALTA' | 'MEDIA' | 'BAJA' | 'SIN_MOVIMIENTO' | 'CON_STOCK' | 'SIN_STOCK'>('TODOS');
@@ -192,13 +192,13 @@ export default function ReportesComponent({
   const [filtroScoreDeudor, setFiltroScoreDeudor] = useState('TODOS');
   const [clienteExpandidoId, setClienteExpandidoId] = useState<string | null>(null);
 
-  // Estado de Reporte de CampaÃ±as
+  // Estado de Reporte de Campañas
   const [loadingCampanas, setLoadingCampanas] = useState(false);
   const [campanasData, setCampanasData] = useState<any>(null);
   const [filtroCampanaEstado, setFiltroCampanaEstado] = useState('TODAS');
   const [busquedaCampana, setBusquedaCampana] = useState('');
 
-  // Estado de ProyecciÃ³n ML
+  // Estado de Proyección ML
   const [loadingMl, setLoadingMl] = useState(false);
   const [proyeccionMl, setProyeccionMl] = useState<any>(null);
 
@@ -209,7 +209,7 @@ export default function ReportesComponent({
   const [filtroProveedorSolvencia, setFiltroProveedorSolvencia] = useState('TODOS');
   const [generandoProveedoresPdf, setGenerandoProveedoresPdf] = useState(false);
 
-  // Estado de Reporte de Inventario con ValoraciÃ³n FIFO
+  // Estado de Reporte de Inventario con Valoración FIFO
   const [loadingInventarioFifo, setLoadingInventarioFifo] = useState(false);
   const [inventarioFifoData, setInventarioFifoData] = useState<any>(null);
   const [filtroFifoSerie, setFiltroFifoSerie] = useState('TODAS');
@@ -228,14 +228,14 @@ export default function ReportesComponent({
   const [generandoEntregasPdf, setGenerandoEntregasPdf] = useState(false);
   const [liquidandoPedidoId, setLiquidandoPedidoId] = useState<string | null>(null);
 
-  // Estado del Modal de PrevisualizaciÃ³n de PDF Universal
+  // Estado del Modal de Previsualización de PDF Universal
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [pdfDocPreview, setPdfDocPreview] = useState<jsPDF | null>(null);
-  const [previewTitulo, setPreviewTitulo] = useState('PrevisualizaciÃ³n de Documento');
+  const [previewTitulo, setPreviewTitulo] = useState('Previsualización de Documento');
   const [previewNombreArchivo, setPreviewNombreArchivo] = useState('reporte-nexora.pdf');
   const [generandoGeneralPdf, setGenerandoGeneralPdf] = useState(false);
 
-  // Estados especÃ­ficos para Reportes de Ventas Detalladas y Consolidadas
+  // Estados específicos para Reportes de Ventas Detalladas y Consolidadas
   const [categoriaActiva, setCategoriaActiva] = useState<'comercial' | 'inventario' | 'clientes' | 'estrategia'>('comercial');
   const [loadingVentasDetalladas, setLoadingVentasDetalladas] = useState(false);
   const [ventasDetalladasData, setVentasDetalladasData] = useState<any>(null);
@@ -246,7 +246,7 @@ export default function ReportesComponent({
   const [clienteDetalleExpandidoId, setClienteDetalleExpandidoId] = useState<string | null>(null);
   const [vistaModelosConsolidados, setVistaModelosConsolidados] = useState<'tabla' | 'tarjetas'>('tabla');
 
-  // InicializaciÃ³n de usuario y permisos por rol
+  // Inicialización de usuario y permisos por rol
   useEffect(() => {
     let activeUser = propUser;
     if (!activeUser && typeof window !== 'undefined') {
@@ -346,7 +346,7 @@ export default function ReportesComponent({
     }
   }, [tabActiva]);
 
-  // Sincronizar automÃ¡ticamente la categorÃ­a superior al cambiar tabActiva
+  // Sincronizar automáticamente la categoría superior al cambiar tabActiva
   useEffect(() => {
     if (['ventas_cliente', 'ventas_modelos_foto', 'pos', 'entregas_pedidos'].includes(tabActiva)) {
       setCategoriaActiva('comercial');
@@ -527,8 +527,8 @@ export default function ReportesComponent({
       const data = await ApiService.get(`/reportes/campanas?${params.toString()}`);
       setCampanasData(data);
     } catch (err: any) {
-      console.error('Error al cargar reporte de campaÃ±as:', err);
-      showToast('Error al obtener reporte de campaÃ±as promocionales.', 'warning');
+      console.error('Error al cargar reporte de campañas:', err);
+      showToast('Error al obtener reporte de campañas promocionales.', 'warning');
     } finally {
       setLoadingCampanas(false);
     }
@@ -539,9 +539,9 @@ export default function ReportesComponent({
     try {
       const data = await ApiService.get('/reportes/proyeccion-ml?horizonteDias=30');
       setProyeccionMl(data);
-      showToast('ProyecciÃ³n de demanda generada exitosamente con Inteligencia Artificial.', 'success');
+      showToast('Proyección de demanda generada exitosamente con Inteligencia Artificial.', 'success');
     } catch (err: any) {
-      showToast('Error al conectar con el motor de predicciÃ³n ML.', 'warning');
+      showToast('Error al conectar con el motor de predicción ML.', 'warning');
     } finally {
       setLoadingMl(false);
     }
@@ -653,7 +653,7 @@ export default function ReportesComponent({
   };
 
   const handleLiquidarEntrega = async (pedidoId: string) => {
-    if (!confirm('Â¿Confirma registrar la entrega completa de los pares restantes de este pedido?')) return;
+    if (!confirm('¿Confirma registrar la entrega completa de los pares restantes de este pedido?')) return;
     setLiquidandoPedidoId(pedidoId);
     try {
       await ApiService.post(`/pedidos/${pedidoId}/confirmar-entrega`, {});
@@ -698,7 +698,7 @@ export default function ReportesComponent({
         showToast('Reporte de inventario FIFO descargado correctamente.', 'success');
       } else {
         setPdfDocPreview(doc);
-        setPreviewTitulo('Reporte de Inventario con ValoraciÃ³n FIFO');
+        setPreviewTitulo('Reporte de Inventario con Valoración FIFO');
         setPreviewNombreArchivo(`reporte-inventario-fifo-${new Date().toISOString().split('T')[0]}.pdf`);
         setPreviewModalOpen(true);
       }
@@ -749,7 +749,7 @@ export default function ReportesComponent({
     }
   };
 
-  // â”€â”€ Cargador de Ventas Detalladas y Consolidadas â”€â”€
+  // ── Cargador de Ventas Detalladas y Consolidadas ──
   const cargarReporteVentasDetalladas = async () => {
     setLoadingVentasDetalladas(true);
     try {
@@ -792,7 +792,7 @@ export default function ReportesComponent({
     }
   };
 
-  // â”€â”€ Generador PDF: Ventas Detalladas por Cliente â”€â”€
+  // ── Generador PDF: Ventas Detalladas por Cliente ──
   const handleReporteVentasPorClientePdf = async (modo: 'preview' | 'download') => {
     if (!ventasDetalladasData) {
       showToast('No hay datos disponibles para generar el PDF.', 'warning');
@@ -818,7 +818,7 @@ export default function ReportesComponent({
 
       if (modo === 'preview') {
         setPdfDocPreview(doc);
-        setPreviewTitulo('Reporte de Ventas por Cliente & TransacciÃ³n');
+        setPreviewTitulo('Reporte de Ventas por Cliente & Transacción');
         setPreviewNombreArchivo(nombreArchivo);
         setPreviewModalOpen(true);
       } else {
@@ -833,7 +833,7 @@ export default function ReportesComponent({
     }
   };
 
-  // â”€â”€ Generador PDF: Consolidado de Modelos con Fotos â”€â”€
+  // ── Generador PDF: Consolidado de Modelos con Fotos ──
   const handleReporteConsolidadoModelosPdf = async (modo: 'preview' | 'download') => {
     if (!ventasDetalladasData) {
       showToast('No hay datos disponibles para generar el PDF.', 'warning');
@@ -864,7 +864,7 @@ export default function ReportesComponent({
         setPreviewModalOpen(true);
       } else {
         doc.save(nombreArchivo);
-        showToast('Reporte consolidado con fotografÃ­as descargado exitosamente.', 'success');
+        showToast('Reporte consolidado con fotografías descargado exitosamente.', 'success');
       }
     } catch (err: any) {
       console.error('Error generando PDF consolidado de modelos:', err);
@@ -882,9 +882,9 @@ export default function ReportesComponent({
     primaryColor: negocioInfo?.primaryColor || '#0EA5E9',
   });
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════════════════════
   // GENERADORES DE PDF PARA TODAS LAS SECCIONES
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════════════════════
 
   // 1. INFORME GENERAL CONSOLIDADO (UNIFICA TODO EL NEGOCIO)
   const handleReporteGeneralIntegral = async (modo: 'preview' | 'download') => {
@@ -958,7 +958,7 @@ export default function ReportesComponent({
 
       if (modo === 'preview') {
         setPdfDocPreview(doc);
-        setPreviewTitulo('Informe General Consolidado â€” Business Intelligence');
+        setPreviewTitulo('Informe General Consolidado — Business Intelligence');
         setPreviewNombreArchivo(nombre);
         setPreviewModalOpen(true);
       } else {
@@ -1001,7 +1001,7 @@ export default function ReportesComponent({
     }
   };
 
-  // 3. ROTACIÃ“N DE CALZADO & MODELOS
+  // 3. ROTACIÓN DE CALZADO & MODELOS
   const handleReporteModelosPdf = (modo: 'preview' | 'download') => {
     const modelosGrafica = (modelosMargenData?.topModelosGrafica && modelosMargenData.topModelosGrafica.length > 0)
       ? modelosMargenData.topModelosGrafica
@@ -1033,12 +1033,12 @@ export default function ReportesComponent({
 
     if (modo === 'preview') {
       setPdfDocPreview(doc);
-      setPreviewTitulo('Reporte de RotaciÃ³n de Calzado & Modelos');
+      setPreviewTitulo('Reporte de Rotación de Calzado & Modelos');
       setPreviewNombreArchivo(nombre);
       setPreviewModalOpen(true);
     } else {
       doc.save(nombre);
-      showToast('Reporte de RotaciÃ³n de Calzado descargado exitosamente.', 'success');
+      showToast('Reporte de Rotación de Calzado descargado exitosamente.', 'success');
     }
   };
 
@@ -1089,7 +1089,7 @@ export default function ReportesComponent({
 
     if (modo === 'preview') {
       setPdfDocPreview(doc);
-      setPreviewTitulo('Reporte de Cobranzas â€” Clientes Deudores');
+      setPreviewTitulo('Reporte de Cobranzas — Clientes Deudores');
       setPreviewNombreArchivo(nombre);
       setPreviewModalOpen(true);
     } else {
@@ -1098,10 +1098,10 @@ export default function ReportesComponent({
     }
   };
 
-  // 6. CAMPAÃ‘AS Y PROMOCIONES
+  // 6. CAMPAÑAS Y PROMOCIONES
   const handleReporteCampanasPdf = (modo: 'preview' | 'download') => {
     if (!campanasData || !campanasData.campanas) {
-      showToast('No hay datos de campaÃ±as disponibles para generar el PDF.', 'warning');
+      showToast('No hay datos de campañas disponibles para generar el PDF.', 'warning');
       return;
     }
 
@@ -1117,22 +1117,22 @@ export default function ReportesComponent({
 
     if (modo === 'preview') {
       setPdfDocPreview(doc);
-      setPreviewTitulo('Reporte de Rendimiento de CampaÃ±as y Promociones');
+      setPreviewTitulo('Reporte de Rendimiento de Campañas y Promociones');
       setPreviewNombreArchivo(nombre);
       setPreviewModalOpen(true);
     } else {
       doc.save(nombre);
-      showToast('Reporte de campaÃ±as descargado exitosamente.', 'success');
+      showToast('Reporte de campañas descargado exitosamente.', 'success');
     }
   };
 
-  // 7. FINANZAS & MÃ‰TODOS DE PAGO
+  // 7. FINANZAS & MÉTODOS DE PAGO
   const handleReporteFinanzasPdf = (modo: 'preview' | 'download') => {
     const vObj = vendedores.find((v) => v.id === vendedorSeleccionado);
     const canalLabels: Record<string, string> = {
       MANUAL: 'POS Mostrador / Venta Directa',
       WHATSAPP: 'Pedidos WhatsApp / Comercial',
-      CATALOGO: 'CatÃ¡logo Digital Web',
+      CATALOGO: 'Catálogo Digital Web',
     };
     const payload = {
       negocio: obtenerNegocioPayload(),
@@ -1154,7 +1154,7 @@ export default function ReportesComponent({
 
     if (modo === 'preview') {
       setPdfDocPreview(doc);
-      setPreviewTitulo('Reporte de Finanzas & MÃ©todos de RecaudaciÃ³n');
+      setPreviewTitulo('Reporte de Finanzas & Métodos de Recaudación');
       setPreviewNombreArchivo(nombre);
       setPreviewModalOpen(true);
     } else {
@@ -1163,7 +1163,7 @@ export default function ReportesComponent({
     }
   };
 
-  // 8. PROYECCIÃ“N IA / MACHINE LEARNING
+  // 8. PROYECCIÓN IA / MACHINE LEARNING
   const handleReporteProyeccionMlPdf = (modo: 'preview' | 'download') => {
     if (!proyeccionMl) {
       showToast('Por favor calcula la inferencia IA antes de previsualizar el reporte.', 'warning');
@@ -1181,12 +1181,12 @@ export default function ReportesComponent({
 
     if (modo === 'preview') {
       setPdfDocPreview(doc);
-      setPreviewTitulo('Reporte de PronÃ³stico de Demanda Inteligente (Nexora ML)');
+      setPreviewTitulo('Reporte de Pronóstico de Demanda Inteligente (Nexora ML)');
       setPreviewNombreArchivo(nombre);
       setPreviewModalOpen(true);
     } else {
       doc.save(nombre);
-      showToast('Reporte de ProyecciÃ³n IA descargado exitosamente.', 'success');
+      showToast('Reporte de Proyección IA descargado exitosamente.', 'success');
     }
   };
 
@@ -1215,7 +1215,7 @@ export default function ReportesComponent({
 
       if (modo === 'preview') {
         setPdfDocPreview(doc);
-        setPreviewTitulo(`Reporte Punto de Venta â€” ${sucursalNombre}`);
+        setPreviewTitulo(`Reporte Punto de Venta — ${sucursalNombre}`);
         setPreviewNombreArchivo(nombre);
         setPreviewModalOpen(true);
       } else {
@@ -1253,7 +1253,7 @@ export default function ReportesComponent({
 
       if (modo === 'preview') {
         setPdfDocPreview(doc);
-        setPreviewTitulo(`Rendimiento Comercial â€” ${sucursalesReporteData.sucursalSeleccionada?.nombre}`);
+        setPreviewTitulo(`Rendimiento Comercial — ${sucursalesReporteData.sucursalSeleccionada?.nombre}`);
         setPreviewNombreArchivo(nombre);
         setPreviewModalOpen(true);
       } else {
@@ -1329,9 +1329,9 @@ export default function ReportesComponent({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-16">
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* ════════════════════════════════════════════════════════════════ */}
       {/* CABECERA PRINCIPAL & ACCIONES                                    */}
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* ════════════════════════════════════════════════════════════════ */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--card)] p-6 rounded-3xl border border-[var(--border)] shadow-xs">
         <div className="flex items-center gap-3.5">
           <div className="p-3 bg-[#0F172A] text-white rounded-2xl shadow-sm">
@@ -1342,7 +1342,7 @@ export default function ReportesComponent({
               Reportes & Business Intelligence
             </h1>
             <p className="text-xs text-[var(--muted-foreground)]">
-              AnÃ¡lisis multi-filtro de ventas, rendimiento por trabajador, rotaciÃ³n de calzado y cobranzas de la sucursal
+              Análisis multi-filtro de ventas, rendimiento por trabajador, rotación de calzado y cobranzas de la sucursal
             </p>
           </div>
         </div>
@@ -1374,7 +1374,7 @@ export default function ReportesComponent({
             onClick={() => handleReporteGeneralIntegral('download')}
             disabled={generandoGeneralPdf || loading}
             className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
-            title="Descargar PDF consolidado con todas las Ã¡reas del negocio"
+            title="Descargar PDF consolidado con todas las áreas del negocio"
           >
             <Download size={14} />
             <span>Descargar PDF</span>
@@ -1382,14 +1382,14 @@ export default function ReportesComponent({
         </div>
       </div>
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* ════════════════════════════════════════════════════════════════ */}
       {/* PANEL DE CONTROL: MULTI-FILTRO AVANZADO                          */}
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* ════════════════════════════════════════════════════════════════ */}
       <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
         <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
           <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
             <Filter size={14} className="text-[#0F172A]" />
-            <span>Filtros de AnÃ¡lisis</span>
+            <span>Filtros de Análisis</span>
           </span>
           <span className="text-[11px] text-[var(--muted-foreground)] font-semibold">
             {periodo === 'PERSONALIZADO' ? 'Rango personalizado' : `Vista: ${periodo}`}
@@ -1418,7 +1418,7 @@ export default function ReportesComponent({
                   {p === 'SEMANAL' && 'Sem.'}
                   {p === 'MENSUAL' && 'Mes'}
                   {p === 'TRIMESTRAL' && 'Trim.'}
-                  {p === 'ANUAL' && 'AÃ±o'}
+                  {p === 'ANUAL' && 'Año'}
                   {p === 'PERSONALIZADO' && 'Personal.'}
                 </button>
               ))}
@@ -1462,10 +1462,10 @@ export default function ReportesComponent({
                     onChange={(e) => setSucursalSeleccionada(e.target.value)}
                     className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
                   >
-                    <option value="TODAS">ðŸ¢ Todas las Sucursales (Consolidado)</option>
+                    <option value="TODAS">Todas las Sucursales (Consolidado)</option>
                     {sucursales.map((s) => (
                       <option key={s.id} value={s.id}>
-                        ðŸ“ {s.name || s.nombre} {s.isMatriz ? '(Matriz)' : ''}
+                        {s.name || s.nombre} {s.isMatriz ? '(Matriz)' : ''}
                       </option>
                     ))}
                   </select>
@@ -1473,14 +1473,14 @@ export default function ReportesComponent({
                 </>
               ) : (
                 <div className="w-full px-3.5 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] flex items-center justify-between">
-                  <span>ðŸ“ {sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.name || sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.nombre || 'Sucursal Asignada'}</span>
+                  <span>{sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.name || sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.nombre || 'Sucursal Asignada'}</span>
                   <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">Sede Local</span>
                 </div>
               )}
             </div>
             <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
               {isGlobalAdmin
-                ? 'Filtra por sucursal especÃ­fica o visualiza la red completa.'
+                ? 'Filtra por sucursal específica o visualiza la red completa.'
                 : 'Reporte delimitado exclusivamente a tu local comercial asignado.'}
             </p>
           </div>
@@ -1493,7 +1493,7 @@ export default function ReportesComponent({
             <div className="relative">
               {isVendedor ? (
                 <div className="w-full px-3.5 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] flex items-center justify-between">
-                  <span>ðŸ‘¤ {currentUser?.nombre ? capitalizarNombreCompleto(currentUser.nombre) : (currentUser?.email || 'Mis Ventas')}</span>
+                  <span>{currentUser?.nombre ? capitalizarNombreCompleto(currentUser.nombre) : (currentUser?.email || 'Mis Ventas')}</span>
                   <span className="text-[10px] font-semibold text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded-full">Vendedor</span>
                 </div>
               ) : (
@@ -1506,7 +1506,7 @@ export default function ReportesComponent({
                     <option value="TODOS">Todos los Trabajadores</option>
                     {vendedores.map((v) => (
                       <option key={v.id} value={v.id}>
-                        ðŸ‘¤ {capitalizarNombreCompleto(v.nombre)} ({v.rol.replace('ROL_', '')})
+                        {capitalizarNombreCompleto(v.nombre)} ({v.rol.replace('ROL_', '')})
                       </option>
                     ))}
                   </select>
@@ -1530,11 +1530,11 @@ export default function ReportesComponent({
                 onChange={(e) => setCanalSeleccionado(e.target.value)}
                 className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
               >
-                <option value="TODOS">ðŸ›ï¸ Todos los Canales (POS + Pedidos)</option>
-                <option value="POS">ðŸª Solo Punto de Venta Mostrador (POS)</option>
-                <option value="PEDIDOS">ðŸ“¦ Solo Pedidos por Encargo / Mayoristas</option>
-                <option value="WHATSAPP">ðŸ’¬ Solo WhatsApp / Comercial</option>
-                <option value="CATALOGO">ðŸ“± Solo CatÃ¡logo Digital</option>
+                <option value="TODOS">Todos los Canales (POS + Pedidos)</option>
+                <option value="POS">Solo Punto de Venta Mostrador (POS)</option>
+                <option value="PEDIDOS">Solo Pedidos por Encargo / Mayoristas</option>
+                <option value="WHATSAPP">Solo WhatsApp / Comercial</option>
+                <option value="CATALOGO">Solo Catálogo Digital Web</option>
               </select>
               <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
             </div>
@@ -1545,11 +1545,11 @@ export default function ReportesComponent({
         </div>
       </div>
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-      {/* NAVEGACIÃ“N ESTRUCTURADA POR CATEGORÃAS TEMÃTICAS                  */}
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* NAVEGACIÓN ESTRUCTURADA POR CATEGORÍAS TEMÁTICAS                  */}
+      {/* ════════════════════════════════════════════════════════════════ */}
       <div className="space-y-3">
-        {/* Nivel 1: Selector de CategorÃ­a Principal */}
+        {/* Nivel 1: Selector de Categoría Principal */}
         <div className="flex flex-wrap items-center gap-2 p-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl">
           {[
             {
@@ -1561,7 +1561,7 @@ export default function ReportesComponent({
             },
             {
               id: 'inventario' as const,
-              label: 'Inventario & AlmacÃ©n',
+              label: 'Inventario & Almacén',
               badge: '3 reportes',
               icon: <Boxes size={15} />,
               color: 'text-blue-500',
@@ -1588,7 +1588,7 @@ export default function ReportesComponent({
                 type="button"
                 onClick={() => {
                   setCategoriaActiva(cat.id);
-                  // Si la tab activa actual no pertenece a esta categorÃ­a, seleccionar la primera
+                  // Si la tab activa actual no pertenece a esta categoría, seleccionar la primera
                   if (cat.id === 'comercial' && !['ventas_cliente', 'ventas_modelos_foto', 'pos', 'entregas_pedidos'].includes(tabActiva)) {
                     setTabActiva('ventas_cliente');
                     if (!ventasDetalladasData) cargarReporteVentasDetalladas();
@@ -1624,7 +1624,7 @@ export default function ReportesComponent({
           })}
         </div>
 
-        {/* Nivel 2: Sub-reportes de la CategorÃ­a Seleccionada */}
+        {/* Nivel 2: Sub-reportes de la Categoría Seleccionada */}
         <div className="flex flex-wrap gap-2 pt-1 pb-2 border-b border-[var(--border)]">
           {(() => {
             const reportesVisibles: Array<{
@@ -1639,7 +1639,7 @@ export default function ReportesComponent({
               reportesVisibles.push(
                 {
                   id: 'ventas_cliente',
-                  label: 'Ventas por Cliente & TransacciÃ³n',
+                  label: 'Ventas por Cliente & Transacción',
                   icon: <Users size={14} />,
                   badge: 'Agrupado',
                   badgeColor: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25',
@@ -1660,18 +1660,20 @@ export default function ReportesComponent({
                   id: 'entregas_pedidos',
                   label: 'Entregas & Pedidos Pendientes',
                   icon: <Truck size={14} />,
+                  badge: 'Pendientes',
+                  badgeColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25',
                 }
               );
             } else if (categoriaActiva === 'inventario') {
               reportesVisibles.push(
                 {
                   id: 'modelos',
-                  label: 'RotaciÃ³n de Calzado & Modelos',
+                  label: 'Rotación de Calzado & Modelos',
                   icon: <Flame size={14} />,
                 },
                 {
                   id: 'inventario_fifo',
-                  label: 'Inventario & ValoraciÃ³n FIFO',
+                  label: 'Inventario & Valoración FIFO',
                   icon: <Boxes size={14} />,
                 },
                 {
@@ -1689,7 +1691,7 @@ export default function ReportesComponent({
                 },
                 {
                   id: 'campanas',
-                  label: 'Rendimiento de CampaÃ±as & Promos',
+                  label: 'Rendimiento de Campañas & Promos',
                   icon: <Megaphone size={14} />,
                 },
                 {
@@ -1707,7 +1709,7 @@ export default function ReportesComponent({
                 },
                 {
                   id: 'finanzas',
-                  label: 'Finanzas & MÃ©todos de Pago',
+                  label: 'Finanzas & Métodos de Pago',
                   icon: <DollarSign size={14} />,
                 },
                 {
@@ -1717,7 +1719,7 @@ export default function ReportesComponent({
                 },
                 {
                   id: 'proyeccion_ml',
-                  label: 'ProyecciÃ³n IA / Machine Learning',
+                  label: 'Proyección IA / Machine Learning',
                   icon: <BrainCircuit size={14} />,
                 }
               );
@@ -1779,9 +1781,9 @@ export default function ReportesComponent({
         </div>
       ) : (
         <>
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {/* TAB 1: RESUMEN EJECUTIVO & KPIs                                */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'resumen' && (
             <div className="space-y-6">
               {/* Encabezado y Acciones de PDF para Resumen */}
@@ -1795,7 +1797,7 @@ export default function ReportesComponent({
                       Resumen Ejecutivo & Indicadores Clave (KPIs)
                     </h3>
                     <p className="text-xs text-[var(--muted-foreground)]">
-                      FacturaciÃ³n total, volumen de calzado, margen bruto y comportamiento de ventas
+                      Facturación total, volumen de calzado, margen bruto y comportamiento de ventas
                     </p>
                   </div>
                 </div>
@@ -1888,11 +1890,11 @@ export default function ReportesComponent({
                   </div>
                 </div>
 
-                {/* 4. RecaudaciÃ³n de Cobros */}
+                {/* 4. Recaudación de Cobros */}
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      RecaudaciÃ³n Cobros
+                      Recaudación Cobros
                     </span>
                     <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
                       <Receipt size={18} />
@@ -1909,7 +1911,7 @@ export default function ReportesComponent({
                 </div>
               </div>
 
-              {/* GrÃ¡fico de EvoluciÃ³n Temporal Profesional */}
+              {/* Gráfico de Evolución Temporal Profesional */}
               <GraficoCurvaTendencia
                 puntos={
                   reporteData?.serieTemporal?.map((t: any) => ({
@@ -1920,16 +1922,16 @@ export default function ReportesComponent({
                     valor2Formateado: `${t.pares || 0} pares`,
                   })) || []
                 }
-                titulo="Curva de EvoluciÃ³n Temporal de Ingresos & Volumen de Pares"
-                subtitulo="Comportamiento dinÃ¡mico de la facturaciÃ³n y despacho fÃ­sico en el periodo seleccionado"
+                titulo="Curva de Evolución Temporal de Ingresos & Volumen de Pares"
+                subtitulo="Comportamiento dinámico de la facturación y despacho físico en el periodo seleccionado"
                 primaryColor={negocioInfo?.primaryColor || '#0EA5E9'}
                 secondaryColor="#10B981"
-                serie1Nombre="FacturaciÃ³n ($)"
+                serie1Nombre="Facturación ($)"
                 serie2Nombre="Pares Vendidos"
                 emptyMessage="No hay movimientos registrados para el filtro de fechas seleccionado."
               />
 
-              {/* DistribuciÃ³n por Canales y Formas de Pago */}
+              {/* Distribución por Canales y Formas de Pago */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Canales de Venta */}
                 <GraficoDonutCircular
@@ -1947,14 +1949,14 @@ export default function ReportesComponent({
                       subtexto: `${reporteData?.distribucionCanales?.WHATSAPP?.pares || 0} pares (${reporteData?.distribucionCanales?.WHATSAPP?.count || 0} pedidos)`,
                     },
                     {
-                      label: 'CatÃ¡logo Digital Web',
+                      label: 'Catálogo Digital Web',
                       valor: reporteData?.distribucionCanales?.CATALOGO?.monto || 0,
                       color: '#6366F1',
                       subtexto: `${reporteData?.distribucionCanales?.CATALOGO?.pares || 0} pares (${reporteData?.distribucionCanales?.CATALOGO?.count || 0} pedidos)`,
                     },
                   ]}
                   titulo="Ventas por Canal de Entrada"
-                  subtitulo="Desglose de ingresos segÃºn el origen del pedido"
+                  subtitulo="Desglose de ingresos según el origen del pedido"
                   valorCentro={kpis.totalIngresos > 0 ? `$${kpis.totalIngresos.toFixed(0)}` : '$0'}
                   etiquetaCentro="Total Facturado"
                 />
@@ -1969,13 +1971,13 @@ export default function ReportesComponent({
                       subtexto: `${reporteData?.distribucionFormasPago?.CONTADO?.count || 0} transacciones cobradas`,
                     },
                     {
-                      label: 'Ventas a CrÃ©dito',
+                      label: 'Ventas a Crédito',
                       valor: reporteData?.distribucionFormasPago?.CREDITO?.monto || 0,
                       color: '#3B82F6',
                       subtexto: `${reporteData?.distribucionFormasPago?.CREDITO?.count || 0} notas con saldo diferido`,
                     },
                   ]}
-                  titulo="DistribuciÃ³n Contado vs CrÃ©dito"
+                  titulo="Distribución Contado vs Crédito"
                   subtitulo="Estructura de cobro de las transacciones comerciales"
                   valorCentro={
                     kpis.totalIngresos > 0 && reporteData?.distribucionFormasPago?.CONTADO?.monto
@@ -1986,7 +1988,7 @@ export default function ReportesComponent({
                 />
               </div>
 
-              {/* MÃ©tricas de Eficiencia Comercial */}
+              {/* Métricas de Eficiencia Comercial */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
                   <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
@@ -1996,7 +1998,7 @@ export default function ReportesComponent({
                     ${kpis.totalPedidos > 0 ? (kpis.totalIngresos / kpis.totalPedidos).toFixed(2) : '0.00'}
                   </div>
                   <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5 block">
-                    FacturaciÃ³n media por cada transacciÃ³n
+                    Facturación media por cada transacción
                   </span>
                 </div>
 
@@ -2037,14 +2039,14 @@ export default function ReportesComponent({
                     <div>
                       <h4 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
                         <ShoppingBag size={16} className="text-blue-500" />
-                        Top Modelos MÃ¡s Vendidos
+                        Top Modelos Más Vendidos
                       </h4>
                       <p className="text-[11px] text-[var(--muted-foreground)]">
-                        Calzado con mayor rotaciÃ³n en el periodo
+                        Calzado con mayor rotación en el periodo
                       </p>
                     </div>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600">
-                      CatÃ¡logo
+                      Catálogo
                     </span>
                   </div>
 
@@ -2159,12 +2161,12 @@ export default function ReportesComponent({
             </div>
           )}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-          {/* TAB: VENTAS POR CLIENTE & TRANSACCIÃ“N                          */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB: VENTAS POR CLIENTE & TRANSACCIÓN                          */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'ventas_cliente' && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Cabecera del MÃ³dulo */}
+              {/* Cabecera del Módulo */}
               <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
@@ -2177,10 +2179,10 @@ export default function ReportesComponent({
                   </div>
                   <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
                     <Users size={18} className="text-emerald-600" />
-                    <span>Ventas Detalladas por Cliente & TransacciÃ³n</span>
+                    <span>Ventas Detalladas por Cliente & Transacción</span>
                   </h3>
                   <p className="text-xs text-[var(--muted-foreground)]">
-                    Revisa exactamente quÃ© comprÃ³ cada cliente en el periodo: fecha, comprobante, modelos, serie y curvas de tallas fÃ­sicas entregadas.
+                    Revisa exactamente qué compró cada cliente en el periodo: fecha, comprobante, modelos, serie y curvas de tallas físicas entregadas.
                   </p>
                 </div>
 
@@ -2288,13 +2290,13 @@ export default function ReportesComponent({
                 </div>
               </div>
 
-              {/* Barra de BÃºsqueda y Filtros de Cliente */}
+              {/* Barra de Búsqueda y Filtros de Cliente */}
               <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
                 <div className="relative flex-1">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
                   <input
                     type="text"
-                    placeholder="Buscar cliente por nombre, cÃ©dula o telÃ©fono..."
+                    placeholder="Buscar cliente por nombre, cédula o teléfono..."
                     value={filtroVentasClienteBusqueda}
                     onChange={(e) => setFiltroVentasClienteBusqueda(e.target.value)}
                     className="w-full pl-9 pr-3.5 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
@@ -2383,13 +2385,13 @@ export default function ReportesComponent({
                                       <Phone size={11} /> {cli.telefono}
                                     </span>
                                   )}
-                                  <span>â€¢</span>
+                                  <span>•</span>
                                   <span>{cli.totalTransacciones} compra(s)</span>
                                 </div>
                               </div>
                             </div>
 
-                            {/* Resumen numÃ©rico a la derecha */}
+                            {/* Resumen numérico a la derecha */}
                             <div className="flex items-center gap-4">
                               <div className="text-right">
                                 <div className="text-xs font-extrabold text-[var(--foreground)]">
@@ -2414,15 +2416,15 @@ export default function ReportesComponent({
                                   key={tx.orderId || tIdx}
                                   className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-3"
                                 >
-                                  {/* Cabecera de la TransacciÃ³n */}
+                                  {/* Cabecera de la Transacción */}
                                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)] pb-2.5 text-xs">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className="font-bold text-[var(--foreground)]">
                                         Comprobante: {tx.comprobanteNumero}
                                       </span>
-                                      <span className="text-[var(--muted-foreground)]">â€¢</span>
+                                      <span className="text-[var(--muted-foreground)]">•</span>
                                       <span className="text-[var(--muted-foreground)]">{tx.fechaFormateada}</span>
-                                      <span className="text-[var(--muted-foreground)]">â€¢</span>
+                                      <span className="text-[var(--muted-foreground)]">•</span>
                                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                         tx.canal === 'POS'
                                           ? 'bg-blue-500/10 text-blue-600'
@@ -2465,7 +2467,7 @@ export default function ReportesComponent({
                                           )}
                                           <div>
                                             <div className="font-extrabold uppercase text-[var(--foreground)]">
-                                              {it.modelName} {it.color ? `Â· ${it.color}` : ''}
+                                              {it.modelName} {it.color ? `· ${it.color}` : ''}
                                             </div>
                                             <div className="text-[11px] font-bold text-emerald-600">
                                               Serie: {formatearNombreSerie(it.serieNombre)}
@@ -2487,7 +2489,7 @@ export default function ReportesComponent({
                                             {it.totalPares} pares <span className="text-emerald-600 font-bold">({it.docenasLabel})</span>
                                           </div>
                                           <div className="text-xs text-[var(--muted-foreground)]">
-                                            ${it.precioUnitario.toFixed(2)} / par â€¢ <span className="font-extrabold text-emerald-600">${it.subtotal.toFixed(2)}</span>
+                                            ${it.precioUnitario.toFixed(2)} / par • <span className="font-extrabold text-emerald-600">${it.subtotal.toFixed(2)}</span>
                                           </div>
                                         </div>
                                       </div>
@@ -2506,17 +2508,17 @@ export default function ReportesComponent({
             </div>
           )}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-          {/* TAB: CONSOLIDADO DE CALZADO VENDIDO CON FOTOGRAFÃA             */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB: CONSOLIDADO DE CALZADO VENDIDO CON FOTOGRAFÍA             */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'ventas_modelos_foto' && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Cabecera del MÃ³dulo */}
+              {/* Cabecera del Módulo */}
               <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25">
-                      TOTALIZACIÃ“N GENERAL CON FOTOGRAFÃA
+                      TOTALIZACIÓN GENERAL CON FOTOGRAFÍA
                     </span>
                     <span className="text-xs text-[var(--muted-foreground)] font-mono">
                       {canalSeleccionado === 'POS' ? 'Canal: Solo POS Mostrador' : canalSeleccionado === 'PEDIDOS' ? 'Canal: Solo Pedidos / Mayoristas' : 'Canal: Todos los Canales'}
@@ -2524,10 +2526,10 @@ export default function ReportesComponent({
                   </div>
                   <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
                     <Package size={18} className="text-blue-600" />
-                    <span>Consolidado de Calzado Vendido con FotografÃ­a</span>
+                    <span>Consolidado de Calzado Vendido con Fotografía</span>
                   </h3>
                   <p className="text-xs text-[var(--muted-foreground)]">
-                    Todos los modelos vendidos agrupados en un solo consolidado con su fotografÃ­a real, serie, desglose exacto de tallas fÃ­sicas y total de docenas.
+                    Todos los modelos vendidos agrupados en un solo consolidado con su fotografía real, serie, desglose exacto de tallas físicas y total de docenas.
                   </p>
                 </div>
 
@@ -2620,7 +2622,7 @@ export default function ReportesComponent({
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      RecaudaciÃ³n Total
+                      Recaudación Total
                     </span>
                     <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
                       <DollarSign size={16} />
@@ -2691,7 +2693,7 @@ export default function ReportesComponent({
               {loadingVentasDetalladas ? (
                 <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
                   <Loader2 size={32} className="animate-spin text-blue-600" />
-                  <span className="text-xs font-bold">Cargando consolidado de calzado vendido con fotografÃ­a...</span>
+                  <span className="text-xs font-bold">Cargando consolidado de calzado vendido con fotografía...</span>
                 </div>
               ) : (
                 (() => {
@@ -2739,7 +2741,7 @@ export default function ReportesComponent({
                                   {mod.modelName}
                                 </div>
                                 <div className="text-xs text-[var(--muted-foreground)]">
-                                  {mod.color || 'Color estÃ¡ndar'}
+                                  {mod.color || 'Color estándar'}
                                 </div>
                                 <div className="text-[11px] font-bold text-emerald-600 mt-0.5">
                                   Serie: {formatearNombreSerie(mod.serieNombre)}
@@ -2802,7 +2804,7 @@ export default function ReportesComponent({
                               <th className="py-3 px-3.5">Curva de Tallas Vendidas</th>
                               <th className="py-3 px-3.5 text-right">Volumen Total</th>
                               <th className="py-3 px-3.5 text-right">P. Promedio</th>
-                              <th className="py-3 px-3.5 text-right">RecaudaciÃ³n</th>
+                              <th className="py-3 px-3.5 text-right">Recaudación</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-[var(--border)]">
@@ -2826,10 +2828,10 @@ export default function ReportesComponent({
                                     {mod.modelName}
                                   </div>
                                   <div className="text-[11px] text-[var(--muted-foreground)]">
-                                    {mod.color || 'Color estÃ¡ndar'}
+                                    {mod.color || 'Color estándar'}
                                   </div>
                                   <div className="text-[10px] text-[var(--muted-foreground)]/70">
-                                    {mod.clientesCount || 1} cliente(s) â€¢ {mod.transaccionesCount || 1} pedido(s)
+                                    {mod.clientesCount || 1} cliente(s) • {mod.transaccionesCount || 1} pedido(s)
                                   </div>
                                 </td>
                                 <td className="py-2.5 px-3.5">
@@ -2887,9 +2889,9 @@ export default function ReportesComponent({
             </div>
           )}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {/* TAB POS: REPORTE DEL PUNTO DE VENTA (MOSTRADOR / CAJA)          */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'pos' && (
             <div className="space-y-6">
               {/* Encabezado y Acciones de PDF para POS */}
@@ -2903,7 +2905,7 @@ export default function ReportesComponent({
                       Reporte de Punto de Venta & Caja Mostrador
                     </h3>
                     <p className="text-xs text-[var(--muted-foreground)]">
-                      Registro y control de ventas directas por par, recaudaciÃ³n en efectivo, tarjetas y transferencias por sucursal
+                      Registro y control de ventas directas por par, recaudación en efectivo, tarjetas y transferencias por sucursal
                     </p>
                   </div>
                 </div>
@@ -2961,7 +2963,7 @@ export default function ReportesComponent({
                         ${posData.metricas?.totalRecaudado?.toFixed(2) || '0.00'}
                       </div>
                       <div className="text-[11px] text-[var(--muted-foreground)]">
-                        Cobros en mostrador del perÃ­odo
+                        Cobros en mostrador del período
                       </div>
                     </div>
 
@@ -3011,9 +3013,9 @@ export default function ReportesComponent({
                     </div>
                   </div>
 
-                  {/* GrÃ¡ficas EstadÃ­sticas del Punto de Venta */}
+                  {/* Gráficas Estadísticas del Punto de Venta */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Donut de MÃ©todos de RecaudaciÃ³n en Caja */}
+                    {/* Donut de Métodos de Recaudación en Caja */}
                     <GraficoDonutCircular
                       items={[
                         {
@@ -3035,13 +3037,13 @@ export default function ReportesComponent({
                           subtexto: `${posData.metricas?.desgloseMetodosPago?.transferencia?.cantidad || 0} comprobantes`,
                         },
                       ]}
-                      titulo="DistribuciÃ³n de Cobros en Caja"
-                      subtitulo="ParticipaciÃ³n de ingresos por mÃ©todo de recaudaciÃ³n directa"
+                      titulo="Distribución de Cobros en Caja"
+                      subtitulo="Participación de ingresos por método de recaudación directa"
                       valorCentro={`$${(posData.metricas?.totalRecaudado || 0).toFixed(0)}`}
                       etiquetaCentro="Total Caja"
                     />
 
-                    {/* Barras de Modelos MÃ¡s Vendidos en Mostrador */}
+                    {/* Barras de Modelos Más Vendidos en Mostrador */}
                     <GraficoBarrasModerno
                       items={
                         (posData.metricas?.topModelos || []).slice(0, 5).map((m: any, idx: number) => ({
@@ -3053,7 +3055,7 @@ export default function ReportesComponent({
                         }))
                       }
                       titulo="Top Calzado Vendido en Mostrador"
-                      subtitulo="Variantes con mayor rotaciÃ³n directa en tienda"
+                      subtitulo="Variantes con mayor rotación directa en tienda"
                       unidad="pares"
                       emptyMessage="No se registran modelos vendidos en este rango de fechas."
                     />
@@ -3084,16 +3086,16 @@ export default function ReportesComponent({
                           />
                         </div>
 
-                        {/* Filtro MÃ©todo */}
+                        {/* Filtro Método */}
                         <select
                           value={filtroPosMetodo}
                           onChange={(e) => setFiltroPosMetodo(e.target.value)}
                           className="px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                         >
-                          <option value="TODOS">Todos los MÃ©todos</option>
-                          <option value="EFECTIVO">ðŸ’µ Efectivo</option>
-                          <option value="TARJETA">ðŸ’³ Tarjeta</option>
-                          <option value="TRANSFERENCIA">ðŸ¦ Transferencia</option>
+                          <option value="TODOS">Todos los Métodos</option>
+                          <option value="EFECTIVO">Efectivo</option>
+                          <option value="TARJETA">Tarjeta</option>
+                          <option value="TRANSFERENCIA">Transferencia</option>
                         </select>
                       </div>
                     </div>
@@ -3113,10 +3115,10 @@ export default function ReportesComponent({
                               <th className="py-3 px-4 font-bold">Sucursal</th>
                               <th className="py-3 px-4 font-bold">Cliente</th>
                               <th className="py-3 px-4 font-bold">Vendedor</th>
-                              <th className="py-3 px-4 font-bold">ArtÃ­culos Vendidos</th>
-                              <th className="py-3 px-4 font-bold">MÃ©todo de Pago</th>
+                              <th className="py-3 px-4 font-bold">Artículos Vendidos</th>
+                              <th className="py-3 px-4 font-bold">Método de Pago</th>
                               <th className="py-3 px-4 font-bold text-right">Total</th>
-                              <th className="py-3 px-4 font-bold text-center">AcciÃ³n</th>
+                              <th className="py-3 px-4 font-bold text-center">Acción</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-[var(--border)] bg-[var(--card)] text-[var(--foreground)]">
@@ -3203,9 +3205,9 @@ export default function ReportesComponent({
             </div>
           )}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {/* TAB SUCURSALES: RENDIMIENTO DE SUCURSALES & VENTAS POR MODELO   */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'sucursales' && (
             <div className="space-y-6">
               {/* Encabezado y Acciones de PDF para Rendimiento de Sucursales */}
@@ -3292,7 +3294,7 @@ export default function ReportesComponent({
                         {sucursalesReporteData.totalesSucursalSeleccionada?.pares || 0} pares
                       </div>
                       <div className="text-[11px] text-[var(--muted-foreground)]">
-                        Volumen fÃ­sico despachado
+                        Volumen físico despachado
                       </div>
                     </div>
 
@@ -3313,7 +3315,7 @@ export default function ReportesComponent({
 
                     <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
                       <div className="flex items-center justify-between text-[var(--muted-foreground)]">
-                        <span className="text-[11px] font-bold uppercase">Modelos en RotaciÃ³n</span>
+                        <span className="text-[11px] font-bold uppercase">Modelos en Rotación</span>
                         <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
                           <Award size={16} />
                         </div>
@@ -3322,15 +3324,15 @@ export default function ReportesComponent({
                         {sucursalesReporteData.totalesSucursalSeleccionada?.totalModelosVendidos || 0} modelos
                       </div>
                       <div className="text-[11px] text-[var(--muted-foreground)]">
-                        CatÃ¡logo activo con ventas
+                        Catálogo activo con ventas
                       </div>
                     </div>
                   </div>
 
-                  {/* GrÃ¡ficas EstadÃ­sticas de Sucursales */}
+                  {/* Gráficas Estadísticas de Sucursales */}
                   {sucursalesReporteData.sucursales && sucursalesReporteData.sucursales.length > 0 && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {/* Donut de ParticipaciÃ³n de Sucursales */}
+                      {/* Donut de Participación de Sucursales */}
                       <GraficoDonutCircular
                         items={sucursalesReporteData.sucursales.map((s: any, idx: number) => {
                           const paleta = ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'];
@@ -3341,8 +3343,8 @@ export default function ReportesComponent({
                             subtexto: `${s.totalPares} pares (${s.porcentajeEmpresa}%)`,
                           };
                         })}
-                        titulo="AportaciÃ³n a Ventas de la Empresa"
-                        subtitulo="ParticipaciÃ³n porcentual de ingresos por punto de venta"
+                        titulo="Aportación a Ventas de la Empresa"
+                        subtitulo="Participación porcentual de ingresos por punto de venta"
                         valorCentro={`$${(sucursalesReporteData.totalesEmpresa?.ingresos || 0).toFixed(0)}`}
                         etiquetaCentro="Total Red"
                       />
@@ -3356,7 +3358,7 @@ export default function ReportesComponent({
                           subtexto: `Ticket prom: $${s.ticketPromedio?.toFixed(2) || '0.00'}`,
                           color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'][idx % 5],
                         }))}
-                        titulo="Volumen FÃ­sico de Pares por Local"
+                        titulo="Volumen Físico de Pares por Local"
                         subtitulo="Calzado comercializado en cada establecimiento"
                         unidad="pares"
                       />
@@ -3372,7 +3374,7 @@ export default function ReportesComponent({
                             Comparativa Comercial entre Sucursales de la Empresa
                           </h4>
                           <p className="text-[11px] text-[var(--muted-foreground)]">
-                            ParticipaciÃ³n de cada punto de venta en la facturaciÃ³n consolidada
+                            Participación de cada punto de venta en la facturación consolidada
                           </p>
                         </div>
                         <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 dark:bg-slate-800 dark:text-slate-200 px-3 py-1 rounded-xl">
@@ -3407,7 +3409,7 @@ export default function ReportesComponent({
                                   ${suc.totalVentas?.toFixed(2)}
                                 </span>
                                 <span className="text-xs text-[var(--muted-foreground)] font-bold">
-                                  {suc.totalPares} pares Â· {suc.totalPedidos} pedidos
+                                  {suc.totalPares} pares · {suc.totalPedidos} pedidos
                                 </span>
                               </div>
                               <div className="w-full bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
@@ -3420,7 +3422,7 @@ export default function ReportesComponent({
                     </div>
                   )}
 
-                  {/* SECCIÃ“N PRINCIPAL: Ventas de Cada Modelo en la Sucursal */}
+                  {/* SECCIÓN PRINCIPAL: Ventas de Cada Modelo en la Sucursal */}
                   <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-5 shadow-xs">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
                       <div>
@@ -3452,8 +3454,8 @@ export default function ReportesComponent({
                           onChange={(e: any) => setFiltroSucursalOrden(e.target.value)}
                           className="px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                         >
-                          <option value="VENTAS_DESC">Mayor FacturaciÃ³n ($)</option>
-                          <option value="PARES_DESC">MÃ¡s Pares Vendidos</option>
+                          <option value="VENTAS_DESC">Mayor Facturación ($)</option>
+                          <option value="PARES_DESC">Más Pares Vendidos</option>
                           <option value="PRECIO_DESC">Mayor Precio Promedio</option>
                         </select>
                       </div>
@@ -3463,7 +3465,7 @@ export default function ReportesComponent({
                     {sucursalesReporteData.top5Modelos?.length > 0 && (
                       <div className="space-y-2">
                         <div className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase">
-                          â­ Top 5 Modelos Estrella de la Sucursal
+                           Top 5 Modelos Estrella de la Sucursal
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                           {sucursalesReporteData.top5Modelos.map((m: any, idx: number) => {
@@ -3504,7 +3506,7 @@ export default function ReportesComponent({
                                       {m.modelName}
                                     </div>
                                     <div className="text-[10px] text-[var(--muted-foreground)] truncate">
-                                      {m.color} Â· {formatearNombreSerie(m.serieNombre)}
+                                      {m.color} · {formatearNombreSerie(m.serieNombre)}
                                     </div>
                                   </div>
                                 </div>
@@ -3543,7 +3545,7 @@ export default function ReportesComponent({
                       if (lista.length === 0) {
                         return (
                           <div className="p-12 text-center text-xs text-[var(--muted-foreground)] italic">
-                            No se encontraron modelos con los criterios de bÃºsqueda.
+                            No se encontraron modelos con los criterios de búsqueda.
                           </div>
                         );
                       }
@@ -3557,10 +3559,10 @@ export default function ReportesComponent({
                                 <th className="py-3 px-4 font-bold">Modelo de Calzado</th>
                                 <th className="py-3 px-4 font-bold">Variante / Serie</th>
                                 <th className="py-3 px-4 font-bold text-center">Pares Vendidos</th>
-                                <th className="py-3 px-4 font-bold text-right">FacturaciÃ³n ($)</th>
+                                <th className="py-3 px-4 font-bold text-right">Facturación ($)</th>
                                 <th className="py-3 px-4 font-bold text-right">Precio Prom.</th>
                                 <th className="py-3 px-4 font-bold text-center">Pedidos</th>
-                                <th className="py-3 px-4 font-bold">ContribuciÃ³n (%)</th>
+                                <th className="py-3 px-4 font-bold">Contribución (%)</th>
                                 <th className="py-3 px-4 font-bold text-center">Stock Actual</th>
                               </tr>
                             </thead>
@@ -3589,7 +3591,7 @@ export default function ReportesComponent({
                                         </div>
                                         {m.baseCode && (
                                           <div className="text-[10px] text-[var(--muted-foreground)] font-mono">
-                                            CÃ³d: {m.baseCode}
+                                            Cód: {m.baseCode}
                                           </div>
                                         )}
                                       </div>
@@ -3654,12 +3656,12 @@ export default function ReportesComponent({
             </div>
           )}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-          {/* TAB 2: ROTACIÃ“N DE CALZADO & MODELOS                           */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-          {/* TAB 2: ROTACIÃ“N DE CALZADO & MODELOS                           */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 2: ROTACIÓN DE CALZADO & MODELOS                           */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 2: ROTACIÓN DE CALZADO & MODELOS                           */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'modelos' && (() => {
             const catalogoOriginal = (reporteData?.catalogoProductosCompleto as any[]) || [];
             const rotResumen = reporteData?.rotacionResumen || {
@@ -3679,7 +3681,7 @@ export default function ReportesComponent({
 
             const seriesDisponibles = (reporteData?.seriesDisponibles as { id: string; nombre: string }[]) || [];
 
-            // Filtrado dinÃ¡mico
+            // Filtrado dinámico
             const catalogoFiltrado = catalogoOriginal.filter((p: any) => {
               if (filtroRotacionTexto.trim()) {
                 const query = normalizarParaBusqueda(filtroRotacionTexto);
@@ -3738,10 +3740,10 @@ export default function ReportesComponent({
                     </div>
                     <div>
                       <h3 className="font-extrabold text-base text-[var(--foreground)]">
-                        Reporte Profesional de RotaciÃ³n de Calzado & Modelos
+                        Reporte Profesional de Rotación de Calzado & Modelos
                       </h3>
                       <p className="text-xs text-[var(--muted-foreground)]">
-                        AuditorÃ­a completa de catÃ¡logo: artÃ­culos estrella, rotaciÃ³n regular y calzado inmÃ³vil con capital estancado
+                        Auditoría completa de catálogo: artículos estrella, rotación regular y calzado inmóvil con capital estancado
                       </p>
                     </div>
                   </div>
@@ -3757,7 +3759,7 @@ export default function ReportesComponent({
                             ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs'
                             : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
                         }`}
-                        title="Vista en tabla analÃ­tica"
+                        title="Vista en tabla analítica"
                       >
                         <List size={14} />
                         <span>Tabla</span>
@@ -3777,7 +3779,7 @@ export default function ReportesComponent({
                       </button>
                     </div>
 
-                    {/* BotÃ³n Preview PDF */}
+                    {/* Botón Preview PDF */}
                     <button
                       type="button"
                       onClick={() => handleReporteModelosPdf('preview')}
@@ -3788,7 +3790,7 @@ export default function ReportesComponent({
                       <span>Previsualizar PDF</span>
                     </button>
 
-                    {/* BotÃ³n Descargar PDF */}
+                    {/* Botón Descargar PDF */}
                     <button
                       type="button"
                       onClick={() => handleReporteModelosPdf('download')}
@@ -3817,7 +3819,7 @@ export default function ReportesComponent({
 
                   <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
                     <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
-                      FacturaciÃ³n Total
+                      Facturación Total
                     </span>
                     <div className="text-xl font-black text-[var(--foreground)]">
                       ${(modelosMargenData?.metricas?.totalIngresos ?? 0).toFixed(2)}
@@ -3864,7 +3866,7 @@ export default function ReportesComponent({
                   </div>
                 </div>
 
-                {/* 1.2 FASE 8: GrÃ¡ficas Comparativas (Barras Modernas + Donut de ParticipaciÃ³n %) */}
+                {/* 1.2 FASE 8: Gráficas Comparativas (Barras Modernas + Donut de Participación %) */}
                 {(() => {
                   const modelosGrafica = (modelosMargenData?.topModelosGrafica && modelosMargenData.topModelosGrafica.length > 0)
                     ? modelosMargenData.topModelosGrafica
@@ -3880,14 +3882,14 @@ export default function ReportesComponent({
 
                   return (
                     <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-                      {/* GrÃ¡fica de Barras Combinada: Volumen vs Margen % */}
+                      {/* Gráfica de Barras Combinada: Volumen vs Margen % */}
                       <div className="xl:col-span-7">
                         <GraficoBarrasModerno
                           items={modelosGrafica.map((m: any, idx: number) => ({
                             label: m.nombre,
                             valor: m.paresVendidos,
                             valorFormateado: `${m.paresVendidos} pares`,
-                            subtexto: `Margen: ${m.margenPorcentual}% â€¢ Utilidad: +$${Math.round(m.gananciaNeta || 0)}`,
+                            subtexto: `Margen: ${m.margenPorcentual}% • Utilidad: +$${Math.round(m.gananciaNeta || 0)}`,
                             color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899', '#8B5CF6', '#14B8A6', '#F97316'][idx % 8],
                           }))}
                           titulo="Modelos con Mayor Demanda y Margen Real"
@@ -3896,7 +3898,7 @@ export default function ReportesComponent({
                         />
                       </div>
 
-                      {/* GrÃ¡fica Circular / ParticipaciÃ³n Porcentual SVG */}
+                      {/* Gráfica Circular / Participación Porcentual SVG */}
                       <div className="xl:col-span-5">
                         <GraficoDonutCircular
                           items={modelosGrafica.slice(0, 5).map((m: any, idx: number) => {
@@ -3907,8 +3909,8 @@ export default function ReportesComponent({
                               color: paleta[idx % paleta.length],
                             };
                           })}
-                          titulo="ParticipaciÃ³n por Modelo"
-                          subtitulo="DistribuciÃ³n porcentual del volumen de calzado comercializado"
+                          titulo="Participación por Modelo"
+                          subtitulo="Distribución porcentual del volumen de calzado comercializado"
                           valorCentro={`${modelosMargenData?.metricas?.totalPares || reporteData?.totalParesVendidos || rotResumen.totalConVentas || 0}`}
                           etiquetaCentro="Pares Totales"
                           size={160}
@@ -3918,9 +3920,9 @@ export default function ReportesComponent({
                   );
                 })()}
 
-                {/* 2. CuadrÃ­cula de MÃ©tricas y KPIs de RotaciÃ³n */}
+                {/* 2. Cuadrícula de Métricas y KPIs de Rotación */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Tarjeta 1: Total ArtÃ­culos Analizados */}
+                  {/* Tarjeta 1: Total Artículos Analizados */}
                   <div
                     onClick={() => setFiltroRotacionEstado('TODOS')}
                     className={`p-4 bg-[var(--card)] border rounded-2xl transition-all cursor-pointer shadow-xs hover:border-blue-500/50 ${
@@ -3928,7 +3930,7 @@ export default function ReportesComponent({
                     }`}
                   >
                     <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
-                      <span className="text-xs font-bold uppercase tracking-wider">CatÃ¡logo Total</span>
+                      <span className="text-xs font-bold uppercase tracking-wider">Catálogo Total</span>
                       <Package size={16} className="text-blue-500" />
                     </div>
                     <div className="text-2xl font-black text-[var(--foreground)]">
@@ -3937,7 +3939,7 @@ export default function ReportesComponent({
                     </div>
                     <div className="flex items-center gap-2 mt-2 text-[11px] text-[var(--muted-foreground)]">
                       <span className="text-emerald-600 font-bold">{rotResumen.totalConStock} con stock</span>
-                      <span>â€¢</span>
+                      <span>•</span>
                       <span className="text-slate-400">{rotResumen.totalSinStock} agotados</span>
                     </div>
                   </div>
@@ -3961,9 +3963,9 @@ export default function ReportesComponent({
                     </div>
                     <div className="flex items-center gap-2 mt-2 text-[11px] text-[var(--muted-foreground)]">
                       <span className="text-emerald-600 font-bold">{rotResumen.totalRotacionAlta} Alta</span>
-                      <span>â€¢</span>
+                      <span>•</span>
                       <span className="text-blue-600 font-bold">{rotResumen.totalRotacionMedia} Media</span>
-                      <span>â€¢</span>
+                      <span>•</span>
                       <span className="text-amber-600 font-bold">{rotResumen.totalRotacionBaja} Baja</span>
                     </div>
                   </div>
@@ -3995,7 +3997,7 @@ export default function ReportesComponent({
                       setFiltroRotacionOrden('STOCK_DESC');
                     }}
                     className="p-4 bg-[var(--card)] border border-rose-500/30 rounded-2xl transition-all cursor-pointer shadow-xs hover:border-rose-500"
-                    title="Click para ver artÃ­culos estancados ordenados por stock"
+                    title="Click para ver artículos estancados ordenados por stock"
                   >
                     <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
                       <span className="text-xs font-bold uppercase tracking-wider text-rose-600">Capital en Riesgo</span>
@@ -4005,14 +4007,14 @@ export default function ReportesComponent({
                       ${rotResumen.capitalEnRiesgo.toFixed(2)}
                     </div>
                     <div className="text-[11px] text-[var(--muted-foreground)] mt-2">
-                      Costo retenido en {rotResumen.totalSinMovimiento} modelos sin rotaciÃ³n
+                      Costo retenido en {rotResumen.totalSinMovimiento} modelos sin rotación
                     </div>
                   </div>
                 </div>
 
-                {/* 3. Barra de Filtros, Series y BÃºsqueda */}
+                {/* 3. Barra de Filtros, Series y Búsqueda */}
                 <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-3 shadow-xs">
-                  {/* Fila 1: BÃºsqueda */}
+                  {/* Fila 1: Búsqueda */}
                   <div className="relative w-full">
                     <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
                     <input
@@ -4033,7 +4035,7 @@ export default function ReportesComponent({
                     )}
                   </div>
 
-                  {/* Fila 2: Filtros en lÃ­nea con wrap */}
+                  {/* Fila 2: Filtros en línea con wrap */}
                   <div className="flex flex-wrap items-center gap-3">
                     {/* Filtro por Serie */}
                     <div className="flex items-center gap-2">
@@ -4055,7 +4057,7 @@ export default function ReportesComponent({
                       </select>
                     </div>
 
-                    {/* Filtro por CategorÃ­a / Material */}
+                    {/* Filtro por Categoría / Material */}
                     {(() => {
                       const categoriasDelCatalogo = Array.from(new Set(
                         catalogoOriginal.map((p: any) => p.categoria || p.material || '').filter((c: string) => c && c !== 'General' && c.trim())
@@ -4064,14 +4066,14 @@ export default function ReportesComponent({
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
                             <Tag size={14} />
-                            CategorÃ­a:
+                            Categoría:
                           </span>
                           <select
                             value={filtroCategoriaModelo}
                             onChange={(e) => setFiltroCategoriaModelo(e.target.value)}
                             className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
                           >
-                            <option value="TODAS">Todas las CategorÃ­as</option>
+                            <option value="TODAS">Todas las Categorías</option>
                             {categoriasDelCatalogo.map((cat: string) => (
                               <option key={cat} value={cat}>
                                 {cat}
@@ -4082,11 +4084,11 @@ export default function ReportesComponent({
                       ) : null;
                     })()}
 
-                    {/* Filtro por Estado / Nivel de RotaciÃ³n */}
+                    {/* Filtro por Estado / Nivel de Rotación */}
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
                         <Filter size={14} />
-                        RotaciÃ³n:
+                        Rotación:
                       </span>
                       <select
                         value={filtroRotacionEstado}
@@ -4094,16 +4096,16 @@ export default function ReportesComponent({
                         className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
                       >
                         <option value="TODOS">Todos los Estados</option>
-                        <option value="ALTA">Alta RotaciÃ³n (Estrella)</option>
-                        <option value="MEDIA">RotaciÃ³n Media</option>
-                        <option value="BAJA">Baja RotaciÃ³n</option>
+                        <option value="ALTA">Alta Rotación (Estrella)</option>
+                        <option value="MEDIA">Rotación Media</option>
+                        <option value="BAJA">Baja Rotación</option>
                         <option value="SIN_MOVIMIENTO">Sin Movimiento (0 Ventas)</option>
-                        <option value="CON_STOCK">Solo con Stock FÃ­sico</option>
+                        <option value="CON_STOCK">Solo con Stock Físico</option>
                         <option value="SIN_STOCK">Solo Agotados</option>
                       </select>
                     </div>
 
-                    {/* OrdenaciÃ³n */}
+                    {/* Ordenación */}
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap">
                         Ordenar:
@@ -4113,16 +4115,16 @@ export default function ReportesComponent({
                         onChange={(e) => setFiltroRotacionOrden(e.target.value as any)}
                         className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer max-w-[220px]"
                       >
-                        <option value="VENTAS_DESC">Mayor Demanda (MÃ¡s vendidos)</option>
+                        <option value="VENTAS_DESC">Mayor Demanda (Más vendidos)</option>
                         <option value="VENTAS_ASC">Menor Demanda (Menos vendidos)</option>
                         <option value="STOCK_DESC">Mayor Stock en Bodega</option>
                         <option value="STOCK_ASC">Menor Stock en Bodega</option>
-                        <option value="INGRESOS_DESC">Mayor FacturaciÃ³n</option>
+                        <option value="INGRESOS_DESC">Mayor Facturación</option>
                         <option value="MARGEN_DESC">Mayor Margen Estimado</option>
                       </select>
                     </div>
 
-                    {/* BotÃ³n Reset */}
+                    {/* Botón Reset */}
                     {hayFiltrosActivos && (
                       <button
                         type="button"
@@ -4146,7 +4148,7 @@ export default function ReportesComponent({
                   <div className="flex items-center justify-between text-xs text-[var(--muted-foreground)] pt-2 border-t border-[var(--border)]">
                     <span>
                       Mostrando <strong className="text-[var(--foreground)]">{catalogoFiltrado.length}</strong> de{' '}
-                      <strong>{catalogoOriginal.length}</strong> artÃ­culos del catÃ¡logo
+                      <strong>{catalogoOriginal.length}</strong> artículos del catálogo
                     </span>
                     {filtroRotacionSerie !== 'TODAS' && (
                       <span className="text-blue-600 font-bold bg-blue-500/10 px-2 py-0.5 rounded-md">
@@ -4185,7 +4187,7 @@ export default function ReportesComponent({
                                 <Package size={36} className="mx-auto mb-2 opacity-40" />
                                 <p className="font-bold text-sm">No se encontraron modelos con los filtros seleccionados</p>
                                 <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                                  Prueba cambiando los criterios de serie, rotaciÃ³n o el texto de bÃºsqueda.
+                                  Prueba cambiando los criterios de serie, rotación o el texto de búsqueda.
                                 </p>
                               </td>
                             </tr>
@@ -4206,7 +4208,7 @@ export default function ReportesComponent({
                                           />
                                         ) : (
                                           <div className="w-11 h-11 rounded-xl bg-[var(--muted)] flex items-center justify-center text-lg shrink-0 border border-[var(--border)]">
-                                            ðŸ‘ž
+                                            
                                           </div>
                                         )}
                                         <div className="min-w-0">
@@ -4277,7 +4279,7 @@ export default function ReportesComponent({
                                       })()}
                                     </td>
 
-                                    {/* Stock FÃ­sico */}
+                                    {/* Stock Físico */}
                                     <td className="py-3 px-3 text-center">
                                       {p.stockTotal <= 0 ? (
                                         <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
@@ -4336,7 +4338,7 @@ export default function ReportesComponent({
                                     </td>
                                   </tr>
 
-                                  {/* Fila expandida con desglose de tallas y diagnÃ³stico */}
+                                  {/* Fila expandida con desglose de tallas y diagnóstico */}
                                   {expandido && (
                                     <tr className="bg-[var(--muted)]/30 border-b border-[var(--border)]">
                                       <td colSpan={10} className="p-4">
@@ -4347,15 +4349,15 @@ export default function ReportesComponent({
                                                 Desglose de Curva de Tallas & Stock en Bodega: {p.modelName} ({p.color})
                                               </span>
                                               <span className="text-[11px] text-[var(--muted-foreground)] block">
-                                                Serie: <strong className="text-emerald-600">{formatearNombreSerie(p.serieNombre)}</strong> â€¢ Margen estimado: <strong className="text-emerald-600">{p.margen}%</strong>
+                                                Serie: <strong className="text-emerald-600">{formatearNombreSerie(p.serieNombre)}</strong> • Margen estimado: <strong className="text-emerald-600">{p.margen}%</strong>
                                               </span>
                                             </div>
 
-                                            {/* DiagnÃ³stico Operativo */}
+                                            {/* Diagnóstico Operativo */}
                                             {p.rotacion === 'SIN_MOVIMIENTO' && p.stockTotal > 0 && (
                                               <div className="px-3 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-600 rounded-xl text-xs font-bold flex items-center gap-1.5">
                                                 <AlertTriangle size={14} />
-                                                <span>Candidato a promociÃ³n de liquidaciÃ³n / combo</span>
+                                                <span>Candidato a promoción de liquidación / combo</span>
                                               </div>
                                             )}
                                             {p.rotacion === 'ALTA' && p.tallasAgotadas?.length > 0 && (
@@ -4417,7 +4419,7 @@ export default function ReportesComponent({
                         <Package size={40} className="mx-auto mb-2 opacity-40" />
                         <p className="font-bold text-sm">No se encontraron modelos con los filtros seleccionados</p>
                         <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                          Prueba cambiando los criterios de serie, rotaciÃ³n o el texto de bÃºsqueda.
+                          Prueba cambiando los criterios de serie, rotación o el texto de búsqueda.
                         </p>
                       </div>
                     ) : (
@@ -4429,7 +4431,7 @@ export default function ReportesComponent({
                               key={p.productId}
                               className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between gap-3 relative overflow-hidden"
                             >
-                              {/* Header: Miniatura, Modelo en negrita mayÃºscula, Color y Serie (Regla 7) */}
+                              {/* Header: Miniatura, Modelo en negrita mayúscula, Color y Serie (Regla 7) */}
                               <div className="flex items-start gap-3">
                                 {p.imageUrl ? (
                                   <img
@@ -4439,7 +4441,7 @@ export default function ReportesComponent({
                                   />
                                 ) : (
                                   <div className="w-12 h-12 rounded-xl bg-[var(--muted)] flex items-center justify-center text-xl shrink-0 border border-[var(--border)]">
-                                    ðŸ‘ž
+                                    
                                   </div>
                                 )}
 
@@ -4448,7 +4450,7 @@ export default function ReportesComponent({
                                     <h4 className="font-black uppercase text-xs text-[var(--foreground)] truncate">
                                       {p.modelName}
                                     </h4>
-                                    {/* Badge RotaciÃ³n */}
+                                    {/* Badge Rotación */}
                                     {p.rotacion === 'ALTA' && (
                                       <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shrink-0">
                                         ALTA
@@ -4472,7 +4474,7 @@ export default function ReportesComponent({
                                   </div>
 
                                   <div className="text-[11px] text-[var(--muted-foreground)] truncate mt-0.5">
-                                    Color: <strong className="text-[var(--foreground)]">{p.color}</strong> â€¢{' '}
+                                    Color: <strong className="text-[var(--foreground)]">{p.color}</strong> •{' '}
                                     <span className="text-emerald-600 font-bold">
                                       Serie: {formatearNombreSerie(p.serieNombre)}
                                     </span>
@@ -4480,7 +4482,7 @@ export default function ReportesComponent({
                                 </div>
                               </div>
 
-                              {/* Curva de Tallas (Regla 7): PÃ­ldoras para cada talla con cantidades */}
+                              {/* Curva de Tallas (Regla 7): Píldoras para cada talla con cantidades */}
                               <div className="bg-[var(--muted)]/30 p-2.5 rounded-xl border border-[var(--border)]">
                                 <div className="text-[10px] font-bold text-[var(--muted-foreground)] mb-1.5 flex items-center justify-between">
                                   <span>Curva de Tallas & Stock Bodega:</span>
@@ -4536,10 +4538,10 @@ export default function ReportesComponent({
                                 </div>
                               </div>
 
-                              {/* Alerta de mercaderÃ­a sin rotaciÃ³n pero con stock */}
+                              {/* Alerta de mercadería sin rotación pero con stock */}
                               {p.rotacion === 'SIN_MOVIMIENTO' && p.stockTotal > 0 && (
                                 <div className="px-2.5 py-1.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-[10px] text-rose-600 font-bold flex items-center justify-between">
-                                  <span>MercaderÃ­a InmÃ³vil</span>
+                                  <span>Mercadería Inmóvil</span>
                                   <span>${p.capitalRetenido.toFixed(2)} en costo</span>
                                 </div>
                               )}
@@ -4554,9 +4556,9 @@ export default function ReportesComponent({
             );
           })()}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {/* TAB 3: PRODUCTIVIDAD POR TRABAJADOR                            */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'vendedores' && (
             <div className="space-y-6">
               {/* Encabezado y Acciones de PDF para Productividad */}
@@ -4570,7 +4572,7 @@ export default function ReportesComponent({
                       Reporte de Productividad por Trabajador
                     </h3>
                     <p className="text-xs text-[var(--muted-foreground)]">
-                      Rendimiento individual, pedidos atendidos, pares comercializados y contribuciÃ³n al local
+                      Rendimiento individual, pedidos atendidos, pares comercializados y contribución al local
                     </p>
                   </div>
                 </div>
@@ -4606,7 +4608,7 @@ export default function ReportesComponent({
                     type="text"
                     value={filtroTrabajadorTexto}
                     onChange={(e) => setFiltroTrabajadorTexto(e.target.value)}
-                    placeholder="Buscar trabajador por nombre o correo electrÃ³nico..."
+                    placeholder="Buscar trabajador por nombre o correo electrónico..."
                     className="w-full pl-9 pr-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
@@ -4621,7 +4623,7 @@ export default function ReportesComponent({
                     <option value="ADMIN">Administrador</option>
                     <option value="VENDEDOR">Vendedor</option>
                     <option value="BODEGUERO">Bodeguero</option>
-                    <option value="PRODUCCION">ProducciÃ³n</option>
+                    <option value="PRODUCCION">Producción</option>
                   </select>
                 </div>
 
@@ -4631,18 +4633,18 @@ export default function ReportesComponent({
                     onChange={(e) => setFiltroTrabajadorOrden(e.target.value as any)}
                     className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                   >
-                    <option value="VENTAS_DESC">Mayor FacturaciÃ³n ($)</option>
-                    <option value="PARES_DESC">MÃ¡s Pares Vendidos</option>
-                    <option value="PEDIDOS_DESC">MÃ¡s Pedidos Atendidos</option>
-                    <option value="VENTAS_ASC">Menor FacturaciÃ³n ($)</option>
+                    <option value="VENTAS_DESC">Mayor Facturación ($)</option>
+                    <option value="PARES_DESC">Más Pares Vendidos</option>
+                    <option value="PEDIDOS_DESC">Más Pedidos Atendidos</option>
+                    <option value="VENTAS_ASC">Menor Facturación ($)</option>
                   </select>
                 </div>
               </div>
 
-              {/* GrÃ¡ficas EstadÃ­sticas de Productividad de Vendedores */}
+              {/* Gráficas Estadísticas de Productividad de Vendedores */}
               {reporteData?.rankingVendedores && reporteData.rankingVendedores.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Barras de FacturaciÃ³n por Trabajador */}
+                  {/* Barras de Facturación por Trabajador */}
                   <GraficoBarrasModerno
                     items={reporteData.rankingVendedores.slice(0, 6).map((v: any, idx: number) => ({
                       label: capitalizarNombreCompleto(v.nombre),
@@ -4651,7 +4653,7 @@ export default function ReportesComponent({
                       subtexto: `${v.paresVendidos} pares (${v.pedidosCount} pedidos)`,
                       color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899', '#8B5CF6'][idx % 6],
                     }))}
-                    titulo="FacturaciÃ³n Individual por Trabajador"
+                    titulo="Facturación Individual por Trabajador"
                     subtitulo="Monto total facturado por cada colaborador en el periodo"
                     unidad="$"
                   />
@@ -4667,8 +4669,8 @@ export default function ReportesComponent({
                         subtexto: `${v.paresVendidos} pares despachados`,
                       };
                     })}
-                    titulo="ParticipaciÃ³n en Volumen de Pares"
-                    subtitulo="DistribuciÃ³n porcentual de calzado comercializado por vendedor"
+                    titulo="Participación en Volumen de Pares"
+                    subtitulo="Distribución porcentual de calzado comercializado por vendedor"
                     valorCentro={`${kpis.totalParesVendidos || 0}`}
                     etiquetaCentro="Pares Totales"
                   />
@@ -4696,12 +4698,12 @@ export default function ReportesComponent({
                   <table className="w-full text-xs text-left">
                     <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
                       <tr>
-                        <th className="px-4 py-3">PosiciÃ³n / Trabajador</th>
+                        <th className="px-4 py-3">Posición / Trabajador</th>
                         <th className="px-4 py-3 text-center">Rol</th>
                         <th className="px-4 py-3 text-center">Pedidos Realizados</th>
                         <th className="px-4 py-3 text-center">Pares Vendidos</th>
                         <th className="px-4 py-3 text-right">Monto Total Facturado</th>
-                        <th className="px-4 py-3 text-right">% ContribuciÃ³n Sucursal</th>
+                        <th className="px-4 py-3 text-right">% Contribución Sucursal</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)]">
@@ -4728,7 +4730,7 @@ export default function ReportesComponent({
                           return (
                             <tr>
                               <td colSpan={6} className="p-8 text-center text-xs text-[var(--muted-foreground)]">
-                                No se encontraron colaboradores que coincidan con los filtros de bÃºsqueda.
+                                No se encontraron colaboradores que coincidan con los filtros de búsqueda.
                               </td>
                             </tr>
                           );
@@ -4787,9 +4789,9 @@ export default function ReportesComponent({
             </div>
           )}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-          {/* TAB: REPORTE DE COBRANZAS â€” CLIENTES QUE DEBEN                */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB: REPORTE DE COBRANZAS — CLIENTES QUE DEBEN                */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'cobranzas' && (
             <div className="space-y-6">
               {/* Encabezado y Acciones de PDF */}
@@ -4800,10 +4802,10 @@ export default function ReportesComponent({
                   </div>
                   <div>
                     <h3 className="font-extrabold text-sm text-[var(--foreground)]">
-                      Reporte de Cobranzas â€” Clientes Deudores
+                      Reporte de Cobranzas — Clientes Deudores
                     </h3>
                     <p className="text-xs text-[var(--muted-foreground)]">
-                      Detalle nominal de clientes con saldo pendiente, notas de entrega a crÃ©dito y antigÃ¼edad de deuda
+                      Detalle nominal de clientes con saldo pendiente, notas de entrega a crédito y antigüedad de deuda
                     </p>
                   </div>
                 </div>
@@ -4856,7 +4858,7 @@ export default function ReportesComponent({
                   <div className="text-2xl font-black text-[var(--foreground)]">
                     {cobranzasData?.totalClientes || 0}
                   </div>
-                  <p className="text-[10px] text-[var(--muted-foreground)]">Clientes con notas o crÃ©ditos pendientes</p>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Clientes con notas o créditos pendientes</p>
                 </div>
 
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
@@ -4876,10 +4878,10 @@ export default function ReportesComponent({
                 </div>
               </div>
 
-              {/* GrÃ¡ficos EstadÃ­sticos de Cartera y RecuperaciÃ³n */}
+              {/* Gráficos Estadísticos de Cartera y Recuperación */}
               {cobranzasData && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Donut de RecuperaciÃ³n vs Cartera */}
+                  {/* Donut de Recuperación vs Cartera */}
                   <GraficoDonutCircular
                     items={[
                       {
@@ -4895,7 +4897,7 @@ export default function ReportesComponent({
                         subtexto: `${cobranzasData.totalClientes || 0} compradores con saldo pendiente`,
                       },
                     ]}
-                    titulo="Ratio de RecuperaciÃ³n de Liquidez"
+                    titulo="Ratio de Recuperación de Liquidez"
                     subtitulo="Comparativa entre abonos recaudados y saldo deudor activo"
                     valorCentro={
                       (kpis.totalRecaudadoCobros + (cobranzasData.totalCartera || 0)) > 0
@@ -4909,7 +4911,7 @@ export default function ReportesComponent({
                     etiquetaCentro="Recuperado"
                   />
 
-                  {/* Barras de ExposiciÃ³n por Nivel de Riesgo Crediticio */}
+                  {/* Barras de Exposición por Nivel de Riesgo Crediticio */}
                   {(() => {
                     const niveles: Record<string, { cant: number; deuda: number }> = {
                       EXCELENTE: { cant: 0, deuda: 0 },
@@ -4951,14 +4953,14 @@ export default function ReportesComponent({
                         color: '#0EA5E9',
                       },
                       {
-                        label: 'Regular (En ObservaciÃ³n)',
+                        label: 'Regular (En Observación)',
                         valor: niveles.REGULAR.deuda,
                         valorFormateado: `$${niveles.REGULAR.deuda.toFixed(2)}`,
                         subtexto: `${niveles.REGULAR.cant} clientes`,
                         color: '#F59E0B',
                       },
                       {
-                        label: 'CrÃ­tico (Mora / Alto Riesgo)',
+                        label: 'Crítico (Mora / Alto Riesgo)',
                         valor: niveles.CRITICO.deuda,
                         valorFormateado: `$${niveles.CRITICO.deuda.toFixed(2)}`,
                         subtexto: `${niveles.CRITICO.cant} clientes`,
@@ -4969,8 +4971,8 @@ export default function ReportesComponent({
                     return (
                       <GraficoBarrasModerno
                         items={barItems}
-                        titulo="ExposiciÃ³n de Cartera por Nivel de Riesgo"
-                        subtitulo="Monto total adeudado segÃºn el scoring y comportamiento de pago"
+                        titulo="Exposición de Cartera por Nivel de Riesgo"
+                        subtitulo="Monto total adeudado según el scoring y comportamiento de pago"
                         unidad="$"
                         emptyMessage="Sin deudas pendientes registradas."
                       />
@@ -4979,7 +4981,7 @@ export default function ReportesComponent({
                 </div>
               )}
 
-              {/* Filtros de bÃºsqueda de deudores */}
+              {/* Filtros de búsqueda de deudores */}
               <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row items-center gap-3 shadow-xs">
                 <div className="relative flex-1 w-full">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
@@ -4987,7 +4989,7 @@ export default function ReportesComponent({
                     type="text"
                     value={filtroDeudor}
                     onChange={(e) => setFiltroDeudor(e.target.value)}
-                    placeholder="Buscar por nombre, cÃ©dula o telÃ©fono..."
+                    placeholder="Buscar por nombre, cédula o teléfono..."
                     className="w-full pl-9 pr-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
@@ -5003,7 +5005,7 @@ export default function ReportesComponent({
                     <option value="BUENO">Nivel Bueno</option>
                     <option value="REGULAR">Nivel Regular</option>
                     <option value="RIESGO">Nivel Riesgo</option>
-                    <option value="CRITICO">Nivel CrÃ­tico</option>
+                    <option value="CRITICO">Nivel Crítico</option>
                   </select>
                 </div>
               </div>
@@ -5020,12 +5022,12 @@ export default function ReportesComponent({
                     <table className="w-full text-xs text-left">
                       <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
                         <tr>
-                          <th className="px-4 py-3">Cliente / IdentificaciÃ³n</th>
+                          <th className="px-4 py-3">Cliente / Identificación</th>
                           <th className="px-4 py-3 text-center">Nivel / Score</th>
                           <th className="px-4 py-3 text-center">Notas Pendientes</th>
                           <th className="px-4 py-3 text-right">Saldo Deudor Total</th>
-                          <th className="px-4 py-3 text-center">Ãšltimo Abono</th>
-                          <th className="px-4 py-3 text-center">AcciÃ³n</th>
+                          <th className="px-4 py-3 text-center">Último Abono</th>
+                          <th className="px-4 py-3 text-center">Acción</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--border)]">
@@ -5063,7 +5065,7 @@ export default function ReportesComponent({
                                     </div>
                                     <div className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-2 mt-0.5">
                                       <span>C.I./RUC: {c.cedula}</span>
-                                      {c.telefono && <span>â€¢ Tel: {c.telefono}</span>}
+                                      {c.telefono && <span>• Tel: {c.telefono}</span>}
                                     </div>
                                   </td>
 
@@ -5114,7 +5116,7 @@ export default function ReportesComponent({
                                         <ChevronDown size={12} className={`transition-transform ${expandido ? 'rotate-180' : ''}`} />
                                       </button>
                                     ) : (
-                                      <span className="text-[10px] text-[var(--muted-foreground)]">â€”</span>
+                                      <span className="text-[10px] text-[var(--muted-foreground)]">—</span>
                                     )}
                                   </td>
                                 </tr>
@@ -5163,9 +5165,9 @@ export default function ReportesComponent({
             </div>
           )}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-          {/* TAB: REPORTE DE CAMPAÃ‘AS Y PROMOCIONES                        */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB: REPORTE DE CAMPAÑAS Y PROMOCIONES                        */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'campanas' && (
             <div className="space-y-6">
               {/* Encabezado y Acciones de PDF */}
@@ -5176,10 +5178,10 @@ export default function ReportesComponent({
                   </div>
                   <div>
                     <h3 className="font-extrabold text-sm text-[var(--foreground)]">
-                      Reporte de CampaÃ±as & Promociones
+                      Reporte de Campañas & Promociones
                     </h3>
                     <p className="text-xs text-[var(--muted-foreground)]">
-                      MÃ©tricas de efectividad, cupones canjeados, volumen de calzado comercializado y ROI
+                      Métricas de efectividad, cupones canjeados, volumen de calzado comercializado y ROI
                     </p>
                   </div>
                 </div>
@@ -5217,10 +5219,10 @@ export default function ReportesComponent({
                 </div>
               </div>
 
-              {/* KPIs de CampaÃ±as */}
+              {/* KPIs de Campañas */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Total CampaÃ±as Registradas</span>
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Total Campañas Registradas</span>
                   <div className="text-2xl font-black text-[var(--foreground)]">
                     {campanasData?.totalCampanas || 0}
                   </div>
@@ -5228,7 +5230,7 @@ export default function ReportesComponent({
                 </div>
 
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">CampaÃ±as Activas</span>
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Campañas Activas</span>
                   <div className="text-2xl font-black text-purple-600">
                     {campanasData?.campanasActivas || 0}
                   </div>
@@ -5248,14 +5250,14 @@ export default function ReportesComponent({
                   <div className="text-2xl font-black text-emerald-600">
                     ${(campanasData?.montoGeneradoTotal || 0).toFixed(2)}
                   </div>
-                  <p className="text-[10px] text-[var(--muted-foreground)]">FacturaciÃ³n generada con campaÃ±as</p>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Facturación generada con campañas</p>
                 </div>
               </div>
 
-              {/* GrÃ¡ficas EstadÃ­sticas de CampaÃ±as */}
+              {/* Gráficas Estadísticas de Campañas */}
               {campanasData?.campanas && campanasData.campanas.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Barras de FacturaciÃ³n por CampaÃ±a */}
+                  {/* Barras de Facturación por Campaña */}
                   <GraficoBarrasModerno
                     items={campanasData.campanas.slice(0, 5).map((c: any, idx: number) => ({
                       label: c.titulo,
@@ -5264,8 +5266,8 @@ export default function ReportesComponent({
                       subtexto: `${c.canjesUsados} canjes (${c.paresVendidos} pares)`,
                       color: ['#8B5CF6', '#10B981', '#0EA5E9', '#F59E0B', '#EC4899'][idx % 5],
                     }))}
-                    titulo="FacturaciÃ³n Generada por CampaÃ±a"
-                    subtitulo="Ingresos brutos atribuibles a cada cupÃ³n o descuento aplicado"
+                    titulo="Facturación Generada por Campaña"
+                    subtitulo="Ingresos brutos atribuibles a cada cupón o descuento aplicado"
                     unidad="$"
                   />
 
@@ -5288,11 +5290,11 @@ export default function ReportesComponent({
                             label: 'Cupos Disponibles',
                             valor: disponibles,
                             color: '#8B5CF6',
-                            subtexto: `${disponibles} canjes aÃºn por redimir`,
+                            subtexto: `${disponibles} canjes aún por redimir`,
                           },
                         ]}
                         titulo="Eficiencia y Consumo de Cupos"
-                        subtitulo="ProporciÃ³n de beneficios comerciales consumidos vs capacidad"
+                        subtitulo="Proporción de beneficios comerciales consumidos vs capacidad"
                         valorCentro={totalCupos > 0 ? `${((totalCanjes / totalCupos) * 100).toFixed(0)}%` : '100%'}
                         etiquetaCentro="Tasa de Uso"
                       />
@@ -5301,7 +5303,7 @@ export default function ReportesComponent({
                 </div>
               )}
 
-              {/* Filtros de campaÃ±as */}
+              {/* Filtros de campañas */}
               <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row items-center gap-3 shadow-xs">
                 <div className="relative flex-1 w-full">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
@@ -5309,7 +5311,7 @@ export default function ReportesComponent({
                     type="text"
                     value={busquedaCampana}
                     onChange={(e) => setBusquedaCampana(e.target.value)}
-                    placeholder="Buscar por cÃ³digo promocional o tÃ­tulo..."
+                    placeholder="Buscar por código promocional o título..."
                     className="w-full pl-9 pr-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
@@ -5327,21 +5329,21 @@ export default function ReportesComponent({
                 </div>
               </div>
 
-              {/* Tabla de Rendimiento de CampaÃ±as */}
+              {/* Tabla de Rendimiento de Campañas */}
               <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
                 {loadingCampanas ? (
                   <div className="p-14 text-center text-xs text-[var(--muted-foreground)] flex flex-col items-center justify-center gap-2">
                     <Loader2 size={30} className="animate-spin text-purple-600" />
-                    <span>Analizando mÃ©tricas de campaÃ±as y canjes...</span>
+                    <span>Analizando métricas de campañas y canjes...</span>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left">
                       <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
                         <tr>
-                          <th className="px-4 py-3">CampaÃ±a / CÃ³digo</th>
+                          <th className="px-4 py-3">Campaña / Código</th>
                           <th className="px-4 py-3 text-center">Tipo de Descuento</th>
-                          <th className="px-4 py-3 text-center">Canjes / LÃ­mite</th>
+                          <th className="px-4 py-3 text-center">Canjes / Límite</th>
                           <th className="px-4 py-3 text-center">Efectividad</th>
                           <th className="px-4 py-3 text-right">Venta Generada</th>
                           <th className="px-4 py-3 text-center">Estado</th>
@@ -5365,7 +5367,7 @@ export default function ReportesComponent({
                             return (
                               <tr>
                                 <td colSpan={6} className="p-10 text-center text-xs text-[var(--muted-foreground)]">
-                                  No se encontraron campaÃ±as promocionales con los filtros seleccionados.
+                                  No se encontraron campañas promocionales con los filtros seleccionados.
                                 </td>
                               </tr>
                             );
@@ -5401,7 +5403,7 @@ export default function ReportesComponent({
                                 <td className="px-4 py-3.5 text-center">
                                   <div className="space-y-1">
                                     <div className="font-bold text-xs">
-                                      {c.canjesUsados} / {c.maximoCanjes > 0 ? c.maximoCanjes : 'âˆž'}
+                                      {c.canjesUsados} / {c.maximoCanjes > 0 ? c.maximoCanjes : '∞'}
                                     </div>
                                     {c.maximoCanjes > 0 && (
                                       <div className="w-20 mx-auto bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
@@ -5421,11 +5423,11 @@ export default function ReportesComponent({
                                         ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                                         : 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300'
                                     }`}>
-                                      {usoPct >= 50 ? 'ðŸ”¥ Alta Efectividad' : 'âš¡ DesempeÃ±o Positivo'}
+                                      {usoPct >= 50 ? 'Alta Efectividad' : 'Desempeño Positivo'}
                                     </span>
                                   ) : (
                                     <span className="px-2 py-0.5 bg-slate-500/15 text-slate-600 dark:text-slate-400 rounded-md font-bold text-[10px]">
-                                      âšª Sin Canjes
+                                      Sin Canjes
                                     </span>
                                   )}
                                 </td>
@@ -5460,9 +5462,9 @@ export default function ReportesComponent({
             </div>
           )}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-          {/* TAB 4: FINANZAS & MÃ‰TODOS DE PAGO                              */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 4: FINANZAS & MÉTODOS DE PAGO                              */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'finanzas' && (
             <div className="space-y-6">
               {/* Encabezado y Acciones de PDF para Finanzas */}
@@ -5473,10 +5475,10 @@ export default function ReportesComponent({
                   </div>
                   <div>
                     <h3 className="font-extrabold text-sm text-[var(--foreground)]">
-                      Reporte Financiero & Canales de RecaudaciÃ³n
+                      Reporte Financiero & Canales de Recaudación
                     </h3>
                     <p className="text-xs text-[var(--muted-foreground)]">
-                      Desglose de liquidez por mÃ©todo de abono, efectivo, transferencias bancarias y cartera pendiente
+                      Desglose de liquidez por método de abono, efectivo, transferencias bancarias y cartera pendiente
                     </p>
                   </div>
                 </div>
@@ -5511,20 +5513,20 @@ export default function ReportesComponent({
                   <span>Filtros Activos:</span>
                 </span>
                 <span className="px-2.5 py-1 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg font-bold">
-                  ðŸ“… {periodo} {periodo === 'PERSONALIZADO' && `(${fechaDesde || 'Inicio'} a ${fechaHasta || 'Fin'})`}
+                   {periodo} {periodo === 'PERSONALIZADO' && `(${fechaDesde || 'Inicio'} a ${fechaHasta || 'Fin'})`}
                 </span>
                 <span className="px-2.5 py-1 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg font-bold">
-                  ðŸ¢ {sucursalSeleccionada === 'TODAS' ? 'Todas las Sucursales' : (sucursales.find(s => s.id === sucursalSeleccionada)?.name || 'Sucursal Seleccionada')}
+                  {sucursalSeleccionada === 'TODAS' ? 'Todas las Sucursales' : (sucursales.find(s => s.id === sucursalSeleccionada)?.name || 'Sucursal Seleccionada')}
                 </span>
                 <span className={`px-2.5 py-1 rounded-lg font-bold border ${
                   vendedorSeleccionado !== 'TODOS' ? 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-300' : 'bg-[var(--muted)]/50 border-[var(--border)]'
                 }`}>
-                  ðŸ‘¤ {vendedorSeleccionado === 'TODOS' ? 'Todos los Trabajadores' : capitalizarNombreCompleto(vendedores.find(v => v.id === vendedorSeleccionado)?.nombre || 'Trabajador')}
+                  {vendedorSeleccionado === 'TODOS' ? 'Todos los Trabajadores' : capitalizarNombreCompleto(vendedores.find(v => v.id === vendedorSeleccionado)?.nombre || 'Trabajador')}
                 </span>
                 <span className={`px-2.5 py-1 rounded-lg font-bold border ${
                   canalSeleccionado !== 'TODOS' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300' : 'bg-[var(--muted)]/50 border-[var(--border)]'
                 }`}>
-                  ðŸ“¡ {canalSeleccionado === 'TODOS' ? 'Todos los Canales' : canalSeleccionado === 'MANUAL' ? 'POS Mostrador' : canalSeleccionado === 'WHATSAPP' ? 'Pedidos WhatsApp' : 'CatÃ¡logo Digital'}
+                  canalSeleccionado === 'TODOS' ? 'Todos los Canales' : canalSeleccionado === 'MANUAL' ? 'POS Mostrador' : canalSeleccionado === 'WHATSAPP' ? 'Pedidos WhatsApp' : 'Catálogo Digital'
                 </span>
                 {(vendedorSeleccionado !== 'TODOS' || canalSeleccionado !== 'TODOS' || sucursalSeleccionada !== 'TODAS') && (
                   <button
@@ -5543,14 +5545,14 @@ export default function ReportesComponent({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Donut de MÃ©todos de Abono y Cobro */}
+                {/* Donut de Métodos de Abono y Cobro */}
                 <GraficoDonutCircular
                   items={Object.entries(reporteData?.distribucionMetodosAbono || {}).map(([met, d]: [string, any], idx: number) => {
                     const paleta = ['#10B981', '#0EA5E9', '#6366F1', '#F59E0B', '#EC4899'];
                     const labelTexto =
                       met === 'EFECTIVO' ? 'Efectivo en Caja'
                       : met === 'TRANSFERENCIA' ? 'Transferencia Bancaria'
-                      : met === 'DEPOSITO' ? 'DepÃ³sito Bancario'
+                      : met === 'DEPOSITO' ? 'Depósito Bancario'
                       : met === 'CHEQUE' ? 'Cheque / Documento'
                       : met.replace('_', ' ');
 
@@ -5561,16 +5563,16 @@ export default function ReportesComponent({
                       subtexto: `${d.count} abonos recibidos`,
                     };
                   })}
-                  titulo="RecaudaciÃ³n por MÃ©todo de Abono"
-                  subtitulo="Flujo de liquidez cobrado en el periodo segÃºn la forma de pago"
+                  titulo="Recaudación por Método de Abono"
+                  subtitulo="Flujo de liquidez cobrado en el periodo según la forma de pago"
                   valorCentro={`$${kpis.totalRecaudadoCobros.toFixed(0)}`}
                   etiquetaCentro="Total Cobrado"
                 />
 
-                {/* Resumen de Cartera e Ãndices Financieros */}
+                {/* Resumen de Cartera e Índices Financieros */}
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs flex flex-col justify-between">
                   <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
-                    Ãndices Financieros & Cartera de Clientes
+                    Índices Financieros & Cartera de Clientes
                   </h3>
 
                   <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl space-y-1">
@@ -5579,35 +5581,35 @@ export default function ReportesComponent({
                       ${kpis.saldoCarteraTotal.toFixed(2)}
                     </div>
                     <p className="text-[10px] text-red-700/80">
-                      Total adeudado por clientes en notas y compras a crÃ©dito activas ({kpis.clientesConDeudaCount || 0} clientes deudores).
+                      Total adeudado por clientes en notas y compras a crédito activas ({kpis.clientesConDeudaCount || 0} clientes deudores).
                     </p>
                   </div>
 
                   <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-1">
-                    <span className="text-[11px] font-bold text-emerald-600 uppercase">Efectividad de RecaudaciÃ³n en el Periodo:</span>
+                    <span className="text-[11px] font-bold text-emerald-600 uppercase">Efectividad de Recaudación en el Periodo:</span>
                     <div className="text-2xl font-black text-emerald-600">
                       ${kpis.totalRecaudadoCobros.toFixed(2)}
                     </div>
                     <p className="text-[10px] text-emerald-700/80">
-                      Monto lÃ­quido ingresado a caja por concepto de cobros y abonos en estas fechas.
+                      Monto líquido ingresado a caja por concepto de cobros y abonos en estas fechas.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Ventas y RecaudaciÃ³n por Canal de Venta & Contado vs CrÃ©dito */}
+              {/* Ventas y Recaudación por Canal de Venta & Contado vs Crédito */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Ventas por Canal de Entrada */}
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
                   <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
                     <span>Ventas por Canal de Entrada</span>
-                    <span className="text-[10px] text-[var(--muted-foreground)] font-normal">FacturaciÃ³n total</span>
+                    <span className="text-[10px] text-[var(--muted-foreground)] font-normal">Facturación total</span>
                   </h3>
                   <div className="space-y-2 text-xs">
                     {[
-                      { key: 'MANUAL', label: 'ðŸª POS Mostrador / Venta Directa', data: reporteData?.distribucionCanales?.MANUAL, color: 'bg-emerald-600' },
-                      { key: 'WHATSAPP', label: 'ðŸ’¬ Pedidos WhatsApp / Comercial', data: reporteData?.distribucionCanales?.WHATSAPP, color: 'bg-blue-600' },
-                      { key: 'CATALOGO', label: 'ðŸ“± CatÃ¡logo Digital Web', data: reporteData?.distribucionCanales?.CATALOGO, color: 'bg-purple-600' },
+                      { key: 'MANUAL', label: 'POS Mostrador / Venta Directa', data: reporteData?.distribucionCanales?.MANUAL, color: 'bg-emerald-600' },
+                      { key: 'WHATSAPP', label: 'Pedidos WhatsApp / Comercial', data: reporteData?.distribucionCanales?.WHATSAPP, color: 'bg-blue-600' },
+                      { key: 'CATALOGO', label: 'Catálogo Digital Web', data: reporteData?.distribucionCanales?.CATALOGO, color: 'bg-purple-600' },
                     ].map((c) => {
                       const monto = c.data?.monto || 0;
                       const pares = c.data?.pares || 0;
@@ -5631,16 +5633,16 @@ export default function ReportesComponent({
                   </div>
                 </div>
 
-                {/* Formas de Pago: Contado vs CrÃ©dito */}
+                {/* Formas de Pago: Contado vs Crédito */}
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
                   <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
-                    <span>DistribuciÃ³n Contado vs CrÃ©dito</span>
+                    <span>Distribución Contado vs Crédito</span>
                     <span className="text-[10px] text-[var(--muted-foreground)] font-normal">Forma comercial</span>
                   </h3>
                   <div className="space-y-2 text-xs">
                     {[
-                      { key: 'CONTADO', label: 'ðŸ’µ Ventas de Contado', data: reporteData?.distribucionFormasPago?.CONTADO, color: 'bg-emerald-600' },
-                      { key: 'CREDITO', label: 'ðŸ“‘ Ventas a CrÃ©dito', data: reporteData?.distribucionFormasPago?.CREDITO, color: 'bg-blue-600' },
+                      { key: 'CONTADO', label: 'Ventas de Contado', data: reporteData?.distribucionFormasPago?.CONTADO, color: 'bg-emerald-600' },
+                      { key: 'CREDITO', label: 'Ventas a Crédito', data: reporteData?.distribucionFormasPago?.CREDITO, color: 'bg-blue-600' },
                     ].map((f) => {
                       const monto = f.data?.monto || 0;
                       const pct = kpis.totalIngresos > 0 ? (monto / kpis.totalIngresos) * 100 : 0;
@@ -5663,11 +5665,11 @@ export default function ReportesComponent({
                 </div>
               </div>
 
-              {/* Cobros y RecaudaciÃ³n por Trabajador / Vendedor */}
+              {/* Cobros y Recaudación por Trabajador / Vendedor */}
               {reporteData?.recaudacionPorVendedor && reporteData.recaudacionPorVendedor.length > 0 && (
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
                   <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
-                    <span>Cobros y RecaudaciÃ³n por Trabajador</span>
+                    <span>Cobros y Recaudación por Trabajador</span>
                     <span className="text-[10px] text-[var(--muted-foreground)] font-normal">Abonos recaudados</span>
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -5711,7 +5713,7 @@ export default function ReportesComponent({
                         Historial de Transacciones de Cobro y Abonos
                       </h3>
                       <p className="text-xs text-[var(--muted-foreground)]">
-                        Ãšltimos movimientos financieros registrados en el periodo segÃºn los filtros activos
+                        Últimos movimientos financieros registrados en el periodo según los filtros activos
                       </p>
                     </div>
 
@@ -5735,7 +5737,7 @@ export default function ReportesComponent({
                           <th className="py-2.5 px-3.5">Cliente</th>
                           <th className="py-2.5 px-3.5">Recaudador / Vendedor</th>
                           <th className="py-2.5 px-3.5">Canal</th>
-                          <th className="py-2.5 px-3.5">MÃ©todo</th>
+                          <th className="py-2.5 px-3.5">Método</th>
                           <th className="py-2.5 px-3.5 text-right">Monto</th>
                         </tr>
                       </thead>
@@ -5765,7 +5767,7 @@ export default function ReportesComponent({
                                 )}
                               </td>
                               <td className="py-2.5 px-3.5 text-[var(--foreground)]">
-                                ðŸ‘¤ {ab.usuarioNombre}
+                                {ab.usuarioNombre}
                               </td>
                               <td className="py-2.5 px-3.5">
                                 <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
@@ -5773,7 +5775,7 @@ export default function ReportesComponent({
                                   ab.canal === 'WHATSAPP' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' :
                                   'bg-purple-500/10 text-purple-700 dark:text-purple-300'
                                 }`}>
-                                  {ab.canal === 'MANUAL' ? 'ðŸª POS' : ab.canal === 'WHATSAPP' ? 'ðŸ’¬ WhatsApp' : 'ðŸ“± CatÃ¡logo'}
+                                  {ab.canal === 'MANUAL' ? 'POS Mostrador' : ab.canal === 'WHATSAPP' ? 'WhatsApp' : 'Catálogo Web'}
                                 </span>
                               </td>
                               <td className="py-2.5 px-3.5">
@@ -5799,9 +5801,9 @@ export default function ReportesComponent({
             </div>
           )}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-          {/* TAB 5: PROYECCIÃ“N IA / MACHINE LEARNING                        */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 5: PROYECCIÓN IA / MACHINE LEARNING                        */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'proyeccion_ml' && (
             <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-5 shadow-xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
@@ -5814,7 +5816,7 @@ export default function ReportesComponent({
                       Motor Predictivo de Demanda de Calzado (Nexora ML)
                     </h3>
                     <p className="text-xs text-[var(--muted-foreground)]">
-                      ProyecciÃ³n estadÃ­stica e inferencia basada en patrones de consumo del cantÃ³n Cevallos
+                      Proyección estadística e inferencia basada en patrones de consumo del cantón Cevallos
                     </p>
                   </div>
                 </div>
@@ -5827,7 +5829,7 @@ export default function ReportesComponent({
                     className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
                   >
                     <Sparkles size={14} className={loadingMl ? 'animate-spin text-blue-600' : 'text-blue-600'} />
-                    <span>{loadingMl ? 'Calculando...' : 'Recalcular ProyecciÃ³n'}</span>
+                    <span>{loadingMl ? 'Calculando...' : 'Recalcular Proyección'}</span>
                   </button>
 
                   <button
@@ -5862,7 +5864,7 @@ export default function ReportesComponent({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl">
                       <span className="text-[10px] font-bold uppercase text-purple-700 dark:text-purple-300 block mb-1">
-                        Pares Proyectados (PrÃ³x. 30 DÃ­as):
+                        Pares Proyectados (Próx. 30 Días):
                       </span>
                       <span className="text-2xl font-black text-purple-900 dark:text-purple-200">
                         {proyeccionMl.totalParesProyectados || 0} pares
@@ -5880,7 +5882,7 @@ export default function ReportesComponent({
 
                     <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
                       <span className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300 block mb-1">
-                        RecomendaciÃ³n Operativa:
+                        Recomendación Operativa:
                       </span>
                       <span className="text-xs font-extrabold text-emerald-900 dark:text-emerald-200 block">
                         Abastecer series juveniles y adulto para pico de fin de semana
@@ -5888,15 +5890,15 @@ export default function ReportesComponent({
                     </div>
                   </div>
 
-                  {/* GrÃ¡fico de Curva Predictiva */}
+                  {/* Gráfico de Curva Predictiva */}
                   {Array.isArray(proyeccionMl.proyecciones) && proyeccionMl.proyecciones.length > 1 && (
                     <GraficoCurvaTendencia
                       puntos={proyeccionMl.proyecciones.map((p: any) => ({
                         label: p.diaLabel || p.fecha?.slice(5) || '',
                         valor: Number(p.demandaEsperadaPares) || 0,
                       }))}
-                      titulo="Curva de Demanda Proyectada (PrÃ³x. 30 DÃ­as)"
-                      subtitulo="Pares de calzado estimados por dÃ­a segÃºn el modelo predictivo"
+                      titulo="Curva de Demanda Proyectada (Próx. 30 Días)"
+                      subtitulo="Pares de calzado estimados por día según el modelo predictivo"
                       primaryColor="#9333EA"
                       secondaryColor="#7C3AED"
                       serie1Nombre="Pares proyectados"
@@ -5904,10 +5906,10 @@ export default function ReportesComponent({
                     />
                   )}
 
-                  {/* Tabla de proyecciÃ³n diaria */}
+                  {/* Tabla de proyección diaria */}
                   <div className="border border-[var(--border)] rounded-2xl overflow-hidden">
                     <div className="p-3 bg-[var(--muted)]/40 text-xs font-extrabold text-[var(--foreground)] border-b border-[var(--border)]">
-                      Demanda Proyectada DÃ­a por DÃ­a
+                      Demanda Proyectada Día por Día
                     </div>
                     <div className="max-h-60 overflow-y-auto divide-y divide-[var(--border)] text-xs">
                       {proyeccionMl.proyecciones?.map((p: any, i: number) => (
@@ -5928,26 +5930,26 @@ export default function ReportesComponent({
                 </div>
               ) : (
                 <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
-                  Presiona Â«Recalcular ProyecciÃ³n IAÂ» para consultar la predicciÃ³n de ventas.
+                  Presiona «Recalcular Proyección IA» para consultar la predicción de ventas.
                 </div>
               )}
             </div>
           )}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ════════════════════════════════════════════════════════════════ */}
           {/* TAB 10: ABASTECIMIENTO DE PROVEEDORES                           */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ════════════════════════════════════════════════════════════════ */}
           {tabActiva === 'proveedores' && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Cabecera del MÃ³dulo */}
+              {/* Cabecera del Módulo */}
               <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
-                      CICLO COMPLETO DE COMERCIALIZACIÃ“N
+                      CICLO COMPLETO DE COMERCIALIZACIÓN
                     </span>
                     <span className="text-xs text-[var(--muted-foreground)] font-mono">
-                      Proveedores â†’ Stock â†’ Ventas â†’ Cobranzas
+                      Proveedores → Stock → Ventas → Cobranzas
                     </span>
                   </div>
                   <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
@@ -6029,18 +6031,18 @@ export default function ReportesComponent({
 
                     <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
                       <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
-                        Devoluciones / GarantÃ­as
+                        Devoluciones / Garantías
                       </span>
                       <div className="text-2xl font-black font-mono text-red-500">
                         ${Number(proveedoresData.kpis?.montoDevoluciones || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
                       </div>
                       <span className="text-[10px] text-[var(--muted-foreground)] block">
-                        {proveedoresData.kpis?.totalDevoluciones || 0} pares con observaciÃ³n de proveedor
+                        {proveedoresData.kpis?.totalDevoluciones || 0} pares con observación de proveedor
                       </span>
                     </div>
                   </div>
 
-                  {/* GrÃ¡ficos EstadÃ­sticos de Abastecimiento */}
+                  {/* Gráficos Estadísticos de Abastecimiento */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Barras: Compras por Proveedor */}
                     {Array.isArray(proveedoresData.porProveedor) && proveedoresData.porProveedor.length > 0 && (
@@ -6053,7 +6055,7 @@ export default function ReportesComponent({
                             valor: Number(p.totalComprado) || 0,
                           }))}
                         titulo="Volumen de Compras por Proveedor"
-                        subtitulo="Monto total comprado a cada proveedor en el perÃ­odo"
+                        subtitulo="Monto total comprado a cada proveedor en el período"
                         primaryColor={negocioInfo?.primaryColor || '#0EA5E9'}
                         orientacion="horizontal"
                         unidad="$"
@@ -6080,7 +6082,7 @@ export default function ReportesComponent({
                         },
                       ].filter(d => d.valor > 0)}
                       titulo="Estado de Cuentas a Proveedores"
-                      subtitulo="DistribuciÃ³n del capital pagado, deuda y anticipos"
+                      subtitulo="Distribución del capital pagado, deuda y anticipos"
                     />
                   </div>
 
@@ -6089,7 +6091,7 @@ export default function ReportesComponent({
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
                       <div>
                         <h4 className="text-sm font-bold text-[var(--foreground)]">
-                          RelaciÃ³n de Proveedores & Estado de Cuenta
+                          Relación de Proveedores & Estado de Cuenta
                         </h4>
                         <p className="text-[11px] text-[var(--muted-foreground)]">
                           {(proveedoresData.porProveedor || []).length} proveedores registrados del local
@@ -6116,7 +6118,7 @@ export default function ReportesComponent({
                           className="text-xs px-2.5 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl font-bold cursor-pointer focus:outline-none"
                         >
                           <option value="TODOS">Todos los Estados</option>
-                          <option value="AL_DIA">Al DÃ­a</option>
+                          <option value="AL_DIA">Al Día</option>
                           <option value="CON_ANTICIPO">Con Saldo a Favor</option>
                           <option value="CON_DEUDA">Con Deuda Pendiente</option>
                         </select>
@@ -6128,8 +6130,8 @@ export default function ReportesComponent({
                         <thead>
                           <tr className="border-b border-[var(--border)] text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
                             <th className="py-2.5 px-3">Proveedor</th>
-                            <th className="py-2.5 px-3">RUC / CÃ©dula</th>
-                            <th className="py-2.5 px-3">UbicaciÃ³n</th>
+                            <th className="py-2.5 px-3">RUC / Cédula</th>
+                            <th className="py-2.5 px-3">Ubicación</th>
                             <th className="py-2.5 px-3 text-center">Lotes Recibidos</th>
                             <th className="py-2.5 px-3 text-right">Total Comprado</th>
                             <th className="py-2.5 px-3 text-right">Saldo a Favor</th>
@@ -6169,7 +6171,7 @@ export default function ReportesComponent({
                                   ${Number(p.totalComprado || 0).toFixed(2)}
                                 </td>
                                 <td className="py-3 px-3 text-right font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                                  {Number(p.saldoAFavor || 0) > 0 ? `+$${Number(p.saldoAFavor).toFixed(2)}` : 'â€”'}
+                                  {Number(p.saldoAFavor || 0) > 0 ? `+$${Number(p.saldoAFavor).toFixed(2)}` : '—'}
                                 </td>
                                 <td className="py-3 px-3 text-right font-mono font-bold text-orange-500">
                                   {Number(p.saldoPendiente || 0) > 0 ? `$${Number(p.saldoPendiente).toFixed(2)}` : '$0.00'}
@@ -6181,7 +6183,7 @@ export default function ReportesComponent({
                                     </span>
                                   ) : p.estadoSolvencia === 'AL_DIA' ? (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                                      Al DÃ­a
+                                      Al Día
                                     </span>
                                   ) : (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/10 text-orange-600 border border-orange-500/20">
@@ -6207,10 +6209,10 @@ export default function ReportesComponent({
                           <div key={lote.id} className="p-3 flex items-center justify-between text-xs bg-[var(--card)]">
                             <div>
                               <div className="font-bold text-[var(--foreground)]">
-                                Comprobante #{lote.numeroFactura || 'S/N'} â€” {lote.proveedorNombre}
+                                Comprobante #{lote.numeroFactura || 'S/N'} — {lote.proveedorNombre}
                               </div>
                               <div className="text-[10px] text-[var(--muted-foreground)]">
-                                Fecha: {new Date(lote.fechaCompra).toLocaleDateString('es-EC')} Â· {lote.itemsCount || 0} modelos/curvas
+                                Fecha: {new Date(lote.fechaCompra).toLocaleDateString('es-EC')} · {lote.itemsCount || 0} modelos/curvas
                               </div>
                             </div>
                             <div className="text-right">
@@ -6229,34 +6231,34 @@ export default function ReportesComponent({
                 </>
               ) : (
                 <div className="p-8 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl">
-                  Selecciona la pestaÃ±a para consultar el abastecimiento de proveedores.
+                  Selecciona la pestaña para consultar el abastecimiento de proveedores.
                 </div>
               )}
             </div>
           )}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-          {/* TAB 11: REPORTE DE INVENTARIO CON VALORACIÃ“N FIFO            */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 11: REPORTE DE INVENTARIO CON VALORACIÓN FIFO            */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'inventario_fifo' && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Cabecera del MÃ³dulo */}
+              {/* Cabecera del Módulo */}
               <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
-                      MÃ‰TODO DE COSTEO FIFO (FIRST-IN, FIRST-OUT)
+                      MÉTODO DE COSTEO FIFO (FIRST-IN, FIRST-OUT)
                     </span>
                     <span className="text-xs text-[var(--muted-foreground)] font-mono">
-                      Lotes de Compra â†’ PVP â†’ Margen Real
+                      Lotes de Compra → PVP → Margen Real
                     </span>
                   </div>
                   <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
                     <Boxes size={18} className="text-emerald-600" />
-                    <span>Reporte de Inventario con ValoraciÃ³n FIFO</span>
+                    <span>Reporte de Inventario con Valoración FIFO</span>
                   </h3>
                   <p className="text-xs text-[var(--muted-foreground)]">
-                    Control fÃ­sico de existencias valoradas segÃºn el costo de cada lote de compra, cÃ¡lculo de ganancia estimada y alertas de reposiciÃ³n.
+                    Control físico de existencias valoradas según el costo de cada lote de compra, cálculo de ganancia estimada y alertas de reposición.
                   </p>
                 </div>
 
@@ -6285,7 +6287,7 @@ export default function ReportesComponent({
               {loadingInventarioFifo ? (
                 <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
                   <Loader2 size={32} className="animate-spin text-emerald-600" />
-                  <span className="text-xs font-bold">Calculando valoraciÃ³n FIFO de inventario...</span>
+                  <span className="text-xs font-bold">Calculando valoración FIFO de inventario...</span>
                 </div>
               ) : inventarioFifoData ? (
                 <>
@@ -6308,7 +6310,7 @@ export default function ReportesComponent({
                     {/* KPI 2: Valor Total FIFO */}
                     <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
                       <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
-                        <span>InversiÃ³n FIFO</span>
+                        <span>Inversión FIFO</span>
                         <DollarSign size={14} className="text-emerald-500" />
                       </div>
                       <div className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
@@ -6357,23 +6359,23 @@ export default function ReportesComponent({
                         <span className="text-sm font-black text-red-600">
                           {inventarioFifoData.kpis.modelosAgotadosCount} agotados
                         </span>
-                        <span className="text-xs text-[var(--muted-foreground)]">Â·</span>
+                        <span className="text-xs text-[var(--muted-foreground)]">·</span>
                         <span className="text-sm font-black text-amber-600">
-                          {inventarioFifoData.kpis.modelosStockBajoCount} en mÃ­nimo
+                          {inventarioFifoData.kpis.modelosStockBajoCount} en mínimo
                         </span>
                       </div>
                       <p className="text-[10px] text-[var(--muted-foreground)]">
-                        Pares crÃ­ticos (&le; 2 pares)
+                        Pares críticos (&le; 2 pares)
                       </p>
                     </div>
                   </div>
 
-                  {/* GrÃ¡ficos EstadÃ­sticos */}
+                  {/* Gráficos Estadísticos */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* GrÃ¡fico 1: Top 5 InversiÃ³n FIFO vs PVP */}
+                    {/* Gráfico 1: Top 5 Inversión FIFO vs PVP */}
                     <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-3 flex items-center justify-between">
-                        <span>Top 5 InversiÃ³n en Bodega</span>
+                        <span>Top 5 Inversión en Bodega</span>
                         <BarChart3 size={13} className="text-emerald-500" />
                       </h4>
                       <div className="space-y-2.5">
@@ -6399,10 +6401,10 @@ export default function ReportesComponent({
                       </div>
                     </div>
 
-                    {/* GrÃ¡fico 2: DistribuciÃ³n por Serie */}
+                    {/* Gráfico 2: Distribución por Serie */}
                     <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-3 flex items-center justify-between">
-                        <span>DistribuciÃ³n de Pares por Serie</span>
+                        <span>Distribución de Pares por Serie</span>
                         <PieChart size={13} className="text-sky-500" />
                       </h4>
                       <div className="space-y-2.5">
@@ -6424,7 +6426,7 @@ export default function ReportesComponent({
                       </div>
                     </div>
 
-                    {/* GrÃ¡fico 3: SemÃ¡foro del Estado del Inventario */}
+                    {/* Gráfico 3: Semáforo del Estado del Inventario */}
                     <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs flex flex-col justify-between">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-3 flex items-center justify-between">
                         <span>Estado de Existencias</span>
@@ -6432,22 +6434,22 @@ export default function ReportesComponent({
                       </h4>
 
                       <div className="space-y-3 my-auto">
-                        {/* Ã“ptimo */}
+                        {/* Óptimo */}
                         <div className="flex items-center justify-between p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
                           <div className="flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Stock Ã“ptimo (&gt; 2 pares)</span>
+                            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Stock Óptimo (&gt; 2 pares)</span>
                           </div>
                           <span className="text-xs font-black font-mono text-emerald-700 dark:text-emerald-400">
                             {inventarioFifoData.graficos?.estadoInventario?.optimoCount || 0} mod ({inventarioFifoData.graficos?.estadoInventario?.optimoPct || 0}%)
                           </span>
                         </div>
 
-                        {/* MÃ­nimo */}
+                        {/* Mínimo */}
                         <div className="flex items-center justify-between p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl">
                           <div className="flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                            <span className="text-xs font-bold text-amber-700 dark:text-amber-400">Stock MÃ­nimo (1-2 pares)</span>
+                            <span className="text-xs font-bold text-amber-700 dark:text-amber-400">Stock Mínimo (1-2 pares)</span>
                           </div>
                           <span className="text-xs font-black font-mono text-amber-700 dark:text-amber-400">
                             {inventarioFifoData.graficos?.estadoInventario?.minimoCount || 0} mod ({inventarioFifoData.graficos?.estadoInventario?.minimoPct || 0}%)
@@ -6484,7 +6486,7 @@ export default function ReportesComponent({
                           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
                           <input
                             type="text"
-                            placeholder="Modelo, color, cÃ³digo o taller..."
+                            placeholder="Modelo, color, código o taller..."
                             value={filtroFifoBusqueda}
                             onChange={(e) => setFiltroFifoBusqueda(e.target.value)}
                             className="w-full pl-8 pr-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
@@ -6501,10 +6503,10 @@ export default function ReportesComponent({
                         </div>
                       </div>
 
-                      {/* Filtro por RotaciÃ³n */}
+                      {/* Filtro por Rotación */}
                       <div>
                         <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
-                          Por RotaciÃ³n
+                          Por Rotación
                         </label>
                         <select
                           value={filtroFifoRotacion}
@@ -6512,10 +6514,10 @@ export default function ReportesComponent({
                           className="w-full px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none"
                         >
                           <option value="TODOS">Todos los estados</option>
-                          <option value="MAS_VENDIDOS">ðŸ”¥ MÃ¡s vendidos (&gt; 5 pares)</option>
-                          <option value="MENOS_VENDIDOS">â„ï¸ Menos vendidos (&le; 5 pares)</option>
-                          <option value="STOCK_BAJO">âš ï¸ Stock mÃ­nimo (&le; 2 pares)</option>
-                          <option value="SIN_STOCK">âŒ Agotados (0 pares)</option>
+                          <option value="MAS_VENDIDOS">Más vendidos (&gt; 5 pares)</option>
+                          <option value="MENOS_VENDIDOS">Menos vendidos (&le; 5 pares)</option>
+                          <option value="STOCK_BAJO"> Stock mínimo (&le; 2 pares)</option>
+                          <option value="SIN_STOCK">Agotados (0 pares)</option>
                         </select>
                       </div>
 
@@ -6529,9 +6531,9 @@ export default function ReportesComponent({
                           onChange={(e: any) => setFiltroFifoOrden(e.target.value)}
                           className="w-full px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none"
                         >
-                          <option value="NOMBRE_ASC">Nombre (A â†’ Z)</option>
-                          <option value="NOMBRE_DESC">Nombre (Z â†’ A)</option>
-                          <option value="INVERSION_DESC">Mayor InversiÃ³n FIFO</option>
+                          <option value="NOMBRE_ASC">Nombre (A → Z)</option>
+                          <option value="NOMBRE_DESC">Nombre (Z → A)</option>
+                          <option value="INVERSION_DESC">Mayor Inversión FIFO</option>
                           <option value="PARES_DESC">Mayor Cantidad de Pares</option>
                         </select>
                       </div>
@@ -6632,7 +6634,7 @@ export default function ReportesComponent({
                                         <div>
                                           <div className="font-bold text-[var(--foreground)]">{m.nombre}</div>
                                           <div className="text-[10px] text-[var(--muted-foreground)] font-mono">
-                                            {m.color} Â· CÃ³d: {m.baseCode}
+                                            {m.color} · Cód: {m.baseCode}
                                           </div>
                                         </div>
                                       </div>
@@ -6709,16 +6711,16 @@ export default function ReportesComponent({
                                         </span>
                                       ) : m.estadoStock === 'MINIMO' ? (
                                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                                          MÃ­nimo
+                                          Mínimo
                                         </span>
                                       ) : (
                                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                                          Ã“ptimo
+                                          Óptimo
                                         </span>
                                       )}
                                     </td>
 
-                                    {/* BotÃ³n Lotes */}
+                                    {/* Botón Lotes */}
                                     <td className="py-3 px-3 text-center">
                                       <button
                                         type="button"
@@ -6746,7 +6748,7 @@ export default function ReportesComponent({
                                               Trazabilidad FIFO de Lotes: {m.nombre} ({m.color})
                                             </span>
                                             <span className="text-[10px] text-[var(--muted-foreground)]">
-                                              El sistema consume primero los lotes con fecha mÃ¡s antigua
+                                              El sistema consume primero los lotes con fecha más antigua
                                             </span>
                                           </div>
 
@@ -6811,7 +6813,7 @@ export default function ReportesComponent({
                                             </div>
                                           ) : (
                                             <div className="py-4 text-center text-xs text-[var(--muted-foreground)]">
-                                              No hay lotes FIFO especÃ­ficos registrados; este modelo utiliza el costo base del producto.
+                                              No hay lotes FIFO específicos registrados; este modelo utiliza el costo base del producto.
                                             </div>
                                           )}
                                         </div>
@@ -6829,18 +6831,18 @@ export default function ReportesComponent({
                 </>
               ) : (
                 <div className="p-8 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl">
-                  Selecciona la pestaÃ±a para consultar el inventario FIFO.
+                  Selecciona la pestaña para consultar el inventario FIFO.
                 </div>
               )}
             </div>
           )}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {/* TAB 12: REPORTE DE ENTREGAS Y PEDIDOS PENDIENTES             */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'entregas_pedidos' && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Cabecera del MÃ³dulo */}
+              {/* Cabecera del Módulo */}
               <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
@@ -6848,7 +6850,7 @@ export default function ReportesComponent({
                       CONTROL OPERATIVO DE PEDIDOS Y ENTREGAS
                     </span>
                     <span className="text-xs text-[var(--muted-foreground)] font-mono">
-                      Cliente â†’ Tallas Faltantes â†’ LiquidaciÃ³n
+                      Cliente → Tallas Faltantes → Liquidación
                     </span>
                   </div>
                   <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
@@ -6856,7 +6858,7 @@ export default function ReportesComponent({
                     <span>Reporte de Entregas y Pedidos Pendientes</span>
                   </h3>
                   <p className="text-xs text-[var(--muted-foreground)]">
-                    Identifica de inmediato a quÃ© clientes se les adeuda calzado, quÃ© curvas o nÃºmeros especÃ­ficos faltan entregar y saldos por cobrar.
+                    Identifica de inmediato a qué clientes se les adeuda calzado, qué curvas o números específicos faltan entregar y saldos por cobrar.
                   </p>
                 </div>
 
@@ -6874,15 +6876,16 @@ export default function ReportesComponent({
                     type="button"
                     onClick={() => handleReporteEntregasPdf('download')}
                     disabled={generandoEntregasPdf || loadingEntregas || !entregasData}
-                    className="px-3.5 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                    className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                    title="Exportar y descargar el reporte de todos los pedidos y pares pendientes de entrega"
                   >
                     {generandoEntregasPdf ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-                    <span>Descargar PDF</span>
+                    <span>Exportar Pendientes de Entrega</span>
                   </button>
                 </div>
               </div>
 
-              {/* SubpestaÃ±as Simples de Trabajo */}
+              {/* Subpestañas Simples de Trabajo */}
               <div className="flex items-center gap-2 p-1.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl w-fit shadow-2xs">
                 <button
                   type="button"
@@ -6893,7 +6896,7 @@ export default function ReportesComponent({
                       : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
                   }`}
                 >
-                  <span>ðŸ”´ Pendientes de Entrega</span>
+                  <span>Pendientes de Entrega</span>
                   {entregasData?.kpis?.totalPedidosPendientes !== undefined && (
                     <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-slate-900/20 text-slate-950 font-black">
                       {entregasData.kpis.totalPedidosPendientes}
@@ -6910,7 +6913,7 @@ export default function ReportesComponent({
                       : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
                   }`}
                 >
-                  <span>ðŸŸ¢ Pedidos Entregados</span>
+                  <span>Pedidos Entregados</span>
                   {entregasData?.kpis?.totalPedidosEntregados !== undefined && (
                     <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white/20 text-white font-black">
                       {entregasData.kpis.totalPedidosEntregados}
@@ -6927,7 +6930,7 @@ export default function ReportesComponent({
                       : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
                   }`}
                 >
-                  <span>ðŸ“‹ Todos los Pedidos</span>
+                  <span>Todos los Pedidos</span>
                 </button>
               </div>
 
@@ -6947,7 +6950,7 @@ export default function ReportesComponent({
                         <Clock size={14} className="text-amber-500" />
                       </div>
                       <div className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">
-                        {entregasData.kpis.totalPedidosPendientes} <span className="text-xs font-normal text-[var(--muted-foreground)]">Ã³rdenes</span>
+                        {entregasData.kpis.totalPedidosPendientes} <span className="text-xs font-normal text-[var(--muted-foreground)]">órdenes</span>
                       </div>
                       <p className="text-[10px] text-[var(--muted-foreground)]">
                         Con pares pendientes de retiro
@@ -6975,7 +6978,7 @@ export default function ReportesComponent({
                         <CheckCircle2 size={14} className="text-emerald-500" />
                       </div>
                       <div className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-                        {entregasData.kpis.totalPedidosEntregados} <span className="text-xs font-normal text-[var(--muted-foreground)]">Ã³rdenes</span>
+                        {entregasData.kpis.totalPedidosEntregados} <span className="text-xs font-normal text-[var(--muted-foreground)]">órdenes</span>
                       </div>
                       <p className="text-[10px] text-[var(--muted-foreground)]">
                         {entregasData.kpis.totalParesEntregados} pares despachados
@@ -6997,13 +7000,13 @@ export default function ReportesComponent({
                     </div>
                   </div>
 
-                  {/* Buscador RÃ¡pido de Entregas */}
+                  {/* Buscador Rápido de Entregas */}
                   <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs flex items-center justify-between gap-3">
                     <div className="relative flex-1 max-w-md">
                       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
                       <input
                         type="text"
-                        placeholder="Buscar por cliente, telÃ©fono, nÃºmero de nota o calzado..."
+                        placeholder="Buscar por cliente, teléfono, número de nota o calzado..."
                         value={filtroEntregasBusqueda}
                         onChange={(e) => setFiltroEntregasBusqueda(e.target.value)}
                         className="w-full pl-9 pr-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
@@ -7030,13 +7033,13 @@ export default function ReportesComponent({
                       <table className="w-full text-left text-xs">
                         <thead className="bg-[var(--muted)]/50 text-[10px] uppercase tracking-wider text-[var(--muted-foreground)] border-b border-[var(--border)]">
                           <tr>
-                            <th className="py-3 px-3">NÂ° Pedido / Fecha</th>
+                            <th className="py-3 px-3">N° Pedido / Fecha</th>
                             <th className="py-3 px-3">Cliente & Contacto</th>
                             <th className="py-3 px-3">Calzado Solicitado</th>
                             <th className="py-3 px-3">Pares que Faltan Entregar</th>
                             <th className="py-3 px-3">Progreso de Entrega</th>
                             <th className="py-3 px-3 text-right">Saldo de Dinero</th>
-                            <th className="py-3 px-3 text-center">AcciÃ³n RÃ¡pida</th>
+                            <th className="py-3 px-3 text-center">Acción Rápida</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
@@ -7045,7 +7048,7 @@ export default function ReportesComponent({
                               <td colSpan={7} className="py-12 text-center text-[var(--muted-foreground)]">
                                 <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-500 opacity-80" />
                                 <div className="font-bold text-sm text-[var(--foreground)]">No hay pedidos pendientes en esta vista</div>
-                                <div className="text-xs">Â¡Todas las entregas de calzado estÃ¡n al dÃ­a!</div>
+                                <div className="text-xs">¡Todas las entregas de calzado están al día!</div>
                               </td>
                             </tr>
                           ) : (
@@ -7053,7 +7056,7 @@ export default function ReportesComponent({
                               const estaLiquidando = liquidandoPedidoId === p.id;
                               return (
                                 <tr key={p.id} className="hover:bg-[var(--muted)]/30 transition-colors">
-                                  {/* NÂ° Pedido & Fecha */}
+                                  {/* N° Pedido & Fecha */}
                                   <td className="py-3.5 px-3">
                                     <div className="font-mono font-black text-xs text-[var(--foreground)]">{p.numeroPedido}</div>
                                     <div className="text-[10px] text-[var(--muted-foreground)]">
@@ -7080,7 +7083,7 @@ export default function ReportesComponent({
                                           {p.cliente.telefono}
                                         </a>
                                       ) : (
-                                        <span>Sin telÃ©fono</span>
+                                        <span>Sin teléfono</span>
                                       )}
                                       <span className="px-1 py-0.2 rounded text-[9px] font-extrabold bg-blue-500/10 text-blue-600">
                                         Score {p.cliente?.scoring || 'B'}
@@ -7150,7 +7153,7 @@ export default function ReportesComponent({
                                     </div>
                                   </td>
 
-                                  {/* AcciÃ³n RÃ¡pida */}
+                                  {/* Acción Rápida */}
                                   <td className="py-3.5 px-3 text-center">
                                     {p.paresPendientes > 0 ? (
                                       <button
@@ -7180,7 +7183,7 @@ export default function ReportesComponent({
                 </>
               ) : (
                 <div className="p-8 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl">
-                  Selecciona la pestaÃ±a para consultar las entregas pendientes.
+                  Selecciona la pestaña para consultar las entregas pendientes.
                 </div>
               )}
             </div>
@@ -7188,7 +7191,7 @@ export default function ReportesComponent({
         </>
       )}
 
-      {/* Modal de Detalle de Venta POS / Ticket TÃ©rmico */}
+      {/* Modal de Detalle de Venta POS / Ticket Térmico */}
       {ventaPosDetalle && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -7231,7 +7234,7 @@ export default function ReportesComponent({
                   <span className="font-bold">{ventaPosDetalle.vendedor?.nombre}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[var(--muted-foreground)]">MÃ©todo de Pago:</span>
+                  <span className="text-[var(--muted-foreground)]">Método de Pago:</span>
                   <span className="font-bold text-emerald-600">{ventaPosDetalle.metodoPago}</span>
                 </div>
                 {ventaPosDetalle.detallePago && (
@@ -7244,7 +7247,7 @@ export default function ReportesComponent({
 
               <div className="space-y-2">
                 <span className="font-extrabold uppercase text-[10px] tracking-wider text-[var(--muted-foreground)]">
-                  LÃ­neas de Calzado Vendidas
+                  Líneas de Calzado Vendidas
                 </span>
                 <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-2xl overflow-hidden">
                   {ventaPosDetalle.lineas?.map((l: any, i: number) => (
@@ -7252,7 +7255,7 @@ export default function ReportesComponent({
                       <div>
                         <div className="font-bold">{l.modelName || l.nombre}</div>
                         <div className="text-[10px] text-[var(--muted-foreground)]">
-                          Talla: {l.talla} Â· {l.color} {l.serie ? `Â· Serie ${formatearNombreSerie(l.serie)}` : ''}
+                          Talla: {l.talla} · {l.color} {l.serie ? `· Serie ${formatearNombreSerie(l.serie)}` : ''}
                         </div>
                       </div>
                       <div className="text-right">
@@ -7283,7 +7286,7 @@ export default function ReportesComponent({
         </div>
       )}
 
-      {/* Modal Universal de PrevisualizaciÃ³n de PDF */}
+      {/* Modal Universal de Previsualización de PDF */}
       <PdfPreviewModal
         isOpen={previewModalOpen}
         onClose={() => setPreviewModalOpen(false)}

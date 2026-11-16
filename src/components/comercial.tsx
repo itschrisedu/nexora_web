@@ -343,53 +343,6 @@ export default function ComercialComponent({
   const [showDropdownCliente, setShowDropdownCliente] = useState(false);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<any | null>(null);
   const [showNuevoClienteModal, setShowNuevoClienteModal] = useState(false);
-  const [exportandoPendientesPdf, setExportandoPendientesPdf] = useState(false);
-
-  const handleExportarPendientesEntregaPdf = async () => {
-    setExportandoPendientesPdf(true);
-    try {
-      const sucParam = selectedSucursalPedidoId && selectedSucursalPedidoId !== 'TODAS'
-        ? `&sucursalId=${selectedSucursalPedidoId}`
-        : '';
-      const data = await ApiService.get(`/reportes/entregas-pedidos?estadoVista=PENDIENTES${sucParam}`);
-      if (!data || !data.pedidos || data.pedidos.length === 0) {
-        showToast('No existen pedidos con entregas pendientes por despachar.', 'info');
-        return;
-      }
-      const rawNegocio = await ApiService.get('/configuracion/negocio').catch(() => null);
-      const payload: ReporteEntregasPendientesPdfData = {
-        negocio: {
-          nombre: rawNegocio?.nombre || 'CALZADO COMERCIAL',
-          ruc: rawNegocio?.ruc || '1800000000001',
-          direccion: rawNegocio?.direccion || 'Cevallos, Ecuador',
-          telefono: rawNegocio?.telefono || '',
-          primaryColor: rawNegocio?.primaryColor || '#0EA5E9',
-        },
-        fechaGeneracion: new Date().toLocaleDateString('es-EC'),
-        kpis: data.kpis,
-        pedidos: data.pedidos.map((p: any) => ({
-          numeroPedido: p.numeroPedido,
-          createdAt: p.createdAt,
-          clienteNombre: p.cliente?.nombre || 'Cliente',
-          clienteTelefono: p.cliente?.telefono || '',
-          calzadoResumen: p.calzadoResumen,
-          resumenPendientesTexto: p.resumenPendientesTexto,
-          totalPares: p.totalPares,
-          paresEntregados: p.paresEntregados,
-          paresPendientes: p.paresPendientes,
-          saldoPendiente: p.saldoPendiente,
-          estadoEntrega: p.estadoEntrega,
-        })),
-      };
-      const doc = generarReporteEntregasPendientesPdf(payload);
-      doc.save(`pendientes-entrega-${new Date().toISOString().split('T')[0]}.pdf`);
-      showToast('Reporte de pendientes de entrega exportado exitosamente.', 'success');
-    } catch (err: any) {
-      showToast('Error al exportar pendientes de entrega: ' + err?.message, 'error');
-    } finally {
-      setExportandoPendientesPdf(false);
-    }
-  };
 
   // Alerta de pedido duplicado por cliente (Fase 2B)
   const [alertaPedidoDuplicado, setAlertaPedidoDuplicado] = useState<{
@@ -3158,18 +3111,7 @@ export default function ComercialComponent({
         </div>
 
         <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
-          {/* Botón de Exportación de Pendientes de Entrega */}
           <button
-            type="button"
-            onClick={handleExportarPendientesEntregaPdf}
-            disabled={exportandoPendientesPdf}
-            title="Descargar de inmediato el PDF de los pares que faltan entregar hoy"
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-50"
-          >
-            {exportandoPendientesPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-            <span>Exportar Pendientes de Entrega</span></button>
-
-        <button
           onClick={() => {
             setEditingOrderId(null);
             setEditingOrderNumero('');
