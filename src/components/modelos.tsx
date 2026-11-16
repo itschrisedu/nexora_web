@@ -1002,7 +1002,7 @@ export default function ModelosComponent({
           salePrice: ms.salePrice > 0 ? String(ms.salePrice) : "",
         };
         if (sObj.tallas) {
-          const curva = getCurvaDocena(sObj.nombre, "DOCENA");
+          const curva = getDocenaBaseParaSerie(sObj);
           if (Object.keys(curva).length > 0) {
             initialCustomTallas[sObj.id] = buildTallaIdsFromCurva(sObj, curva);
           } else {
@@ -2087,7 +2087,7 @@ export default function ModelosComponent({
       }
 
       if (s.tallas) {
-        const curva = getCurvaDocena(s.nombre, 'DOCENA');
+        const curva = getDocenaBaseParaSerie(s);
         if (Object.keys(curva).length > 0) {
           initialTallas[s.id] = buildTallaIdsFromCurva(s, curva);
         } else {
@@ -5115,6 +5115,13 @@ export default function ModelosComponent({
             </div>
             <form onSubmit={handleUpdateSeries} className="flex flex-col flex-1 min-h-0 overflow-hidden">
               <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2">
+                  <span className="text-base shrink-0">⚠️</span>
+                  <div>
+                    <strong className="block font-bold">Plantilla Maestra Global:</strong>
+                    <span>Modificar el rango de tallas de esta serie afectará a todos los modelos que utilicen esta misma serie. Si solo deseas una curva de tallas distinta para un calzado en particular, ajusta las cantidades directamente en el modelo con los botones (+) y (−) sin modificar la serie global, o crea una nueva serie independiente (ej: Adulto 38-42).</span>
+                  </div>
+                </div>
                 <div>
                   <Lbl t="Nombre de la Serie" req />
                   <input type="text" value={editSerieNombre} onChange={e => setEditSerieNombre(e.target.value)}
