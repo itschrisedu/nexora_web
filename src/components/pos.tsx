@@ -114,6 +114,7 @@ interface EstrategiaComercialVigente {
     habilitarPromocionesBaja: boolean;
   };
   politicaDescuentoVenta?: "LIBRE" | "SOLO_CAMPANAS";
+  recargoParPos?: number;
 }
 
 interface GrupoModeloPos {
