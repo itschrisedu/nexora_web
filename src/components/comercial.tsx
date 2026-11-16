@@ -1877,18 +1877,39 @@ export default function ComercialComponent({
         const modelosData = Array.isArray(res) ? res : (res?.modelos || []);
         const flat: any[] = [];
         modelosData.forEach((modelo: any) => {
+          // Regla: si una serie de un color tiene foto, las demás series del mismo color Y MISMO PROVEEDOR la heredan por defecto
+          const fotoPorColorYProveedor = new Map<string, string>();
+          const fotoPorColorFallback = new Map<string, string>();
           (modelo.variantes || []).forEach((v: any) => {
+            const colClean = (v.color || '').trim().toUpperCase();
+            const supClean = v.supplierId || modelo.supplierId || 'DEFAULT';
+            const key = `${colClean}__${supClean}`;
+            if (v.imageUrl) {
+              if (!fotoPorColorYProveedor.has(key)) {
+                fotoPorColorYProveedor.set(key, v.imageUrl);
+              }
+              if (!fotoPorColorFallback.has(colClean)) {
+                fotoPorColorFallback.set(colClean, v.imageUrl);
+              }
+            }
+          });
+
+          (modelo.variantes || []).forEach((v: any) => {
+            const colClean = (v.color || '').trim().toUpperCase();
+            const supClean = v.supplierId || modelo.supplierId || 'DEFAULT';
+            const inheritedImageUrl = v.imageUrl || fotoPorColorYProveedor.get(`${colClean}__${supClean}`) || fotoPorColorFallback.get(colClean) || '';
             flat.push({
               id: v.id,
               code: v.code,
               color: v.color,
-              imageUrl: v.imageUrl,
+              imageUrl: inheritedImageUrl,
               costPrice: Number(v.ultimoCostoLote || v.costPrice || 0),
               ultimoCostoLote: Number(v.ultimoCostoLote || v.costPrice || 0),
               salePrice: Number(v.salePrice || 0),
               modelId: modelo.id,
               modelName: modelo.name,
               baseCode: modelo.baseCode,
+              supplierId: v.supplierId || modelo.supplierId || null,
               serieId: v.serieId || v.serie?.id || '',
               serieNombre: v.serieNombre,
               tallas: (v.tallas || []).slice().sort((a: any, b: any) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0)),
@@ -4865,11 +4886,24 @@ export default function ComercialComponent({
                               className="relative group cursor-zoom-in shrink-0"
                               title="Tocar para ampliar foto"
                             >
-                              <img src={productoSeleccionadoObj.imageUrl} alt="" className="w-12 h-12 object-cover rounded-lg border border-[var(--border)] group-hover:scale-105 transition-transform" />
-                              <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[10px] transition-opacity">📦</span></button>
-                          ) : (
-                            <div className="w-12 h-12 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0">👟</div>
-                          )}
+                              <img
+                                src={productoSeleccionadoObj.imageUrl}
+                                alt=""
+                                className="w-12 h-12 object-cover rounded-lg border border-[var(--border)] group-hover:scale-105 transition-transform"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const parent = e.currentTarget.parentElement;
+                                  if (parent) {
+                                    parent.style.display = 'none';
+                                    const fallback = parent.nextElementSibling as HTMLElement;
+                                    if (fallback) fallback.classList.remove('hidden');
+                                  }
+                                }}
+                              />
+                              <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[10px] transition-opacity">📦</span>
+                            </button>
+                          ) : null}
+                          <div className={`w-12 h-12 rounded-lg bg-[var(--muted)]/50 items-center justify-center text-lg shrink-0 ${productoSeleccionadoObj.imageUrl ? 'hidden' : 'flex'}`}>👟</div>
                           <div>
                             <div className="font-extrabold text-sm text-[var(--foreground)]">
                               {productoSeleccionadoObj.modelName} → {productoSeleccionadoObj.color}
@@ -5004,15 +5038,24 @@ export default function ComercialComponent({
                                             src={p.imageUrl}
                                             alt=""
                                             className="w-10 h-10 object-cover rounded-xl border border-[var(--border)] group-hover/zoom:scale-105 transition-transform"
+                                            onError={(e) => {
+                                              e.currentTarget.style.display = 'none';
+                                              const parent = e.currentTarget.parentElement;
+                                              if (parent) {
+                                                parent.style.display = 'none';
+                                                const fallback = parent.nextElementSibling as HTMLElement;
+                                                if (fallback) fallback.classList.remove('hidden');
+                                              }
+                                            }}
                                           />
                                           <span className="absolute inset-0 bg-black/30 opacity-0 group-hover/zoom:opacity-100 rounded-xl flex items-center justify-center text-white text-[9px] transition-opacity">
                                             📦
-                                          </span></button>
-                                      ) : (
-                                        <div className="w-10 h-10 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">
-                                          👟
-                                        </div>
-                                      )}
+                                          </span>
+                                        </button>
+                                      ) : null}
+                                      <div className={`w-10 h-10 rounded-xl bg-[var(--muted)]/50 items-center justify-center text-sm shrink-0 ${p.imageUrl ? 'hidden' : 'flex'}`}>
+                                        👟
+                                      </div>
 
                                       <div className="min-w-0">
                                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -8615,12 +8658,16 @@ export default function ComercialComponent({
                                 src={first.imageUrl}
                                 alt={first.modelName}
                                 className="w-12 h-12 rounded-xl object-cover border border-[var(--border)] shrink-0"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (fallback) fallback.classList.remove('hidden');
+                                }}
                               />
-                            ) : (
-                              <div className="w-12 h-12 rounded-xl bg-[var(--muted)] border border-[var(--border)] flex items-center justify-center shrink-0">
-                                <Package size={20} className="text-[var(--muted-foreground)]" />
-                              </div>
-                            )}
+                            ) : null}
+                            <div className={`w-12 h-12 rounded-xl bg-[var(--muted)] border border-[var(--border)] items-center justify-center shrink-0 ${first.imageUrl ? 'hidden' : 'flex'}`}>
+                              <Package size={20} className="text-[var(--muted-foreground)]" />
+                            </div>
                             <div>
                               <h4 className="font-black uppercase text-xs sm:text-sm text-[var(--foreground)] tracking-tight">
                                 {first.modelName || 'Calzado'}
@@ -9044,10 +9091,20 @@ export default function ComercialComponent({
                                 title={m.imageUrl ? 'Ver foto ampliada' : ''}
                               >
                                 {m.imageUrl ? (
-                                  <img src={m.imageUrl} alt={m.modelName} className="w-full h-full object-cover" />
-                                ) : (
+                                  <img
+                                    src={m.imageUrl}
+                                    alt={m.modelName}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (fallback) fallback.classList.remove('hidden');
+                                    }}
+                                  />
+                                ) : null}
+                                <div className={`w-full h-full items-center justify-center ${m.imageUrl ? 'hidden' : 'flex'}`}>
                                   <ShoppingBag size={24} className="text-[var(--muted-foreground)]/60" />
-                                )}
+                                </div>
                               </div>
                               <div className="min-w-0 flex-1">
                                 <h4 className="font-extrabold text-xs sm:text-sm text-[var(--foreground)] uppercase truncate">
