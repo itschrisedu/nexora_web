@@ -322,6 +322,95 @@ export interface ReporteRendimientoSucursalesPdfData {
   }[];
 }
 
+export interface VentaItemDetalle {
+  lineId: string;
+  productId: string;
+  modelName: string;
+  color: string;
+  serieNombre: string;
+  imageUrl?: string | null;
+  totalPares: number;
+  docenasLabel: string;
+  curvaTallas: string;
+  precioUnitario: number;
+  subtotal: number;
+  tallasDetalle?: Array<{ talla: number; cantidad: number }>;
+}
+
+export interface VentaTransaccionCliente {
+  orderId: string;
+  orderNumber: string;
+  comprobanteNumero: string;
+  fecha: string;
+  fechaFormateada: string;
+  canal: string;
+  canalLabel: string;
+  tipoPago: string;
+  montoTotal: number;
+  totalPares: number;
+  docenasLabel: string;
+  estado: string;
+  vendedorNombre?: string;
+  items: VentaItemDetalle[];
+}
+
+export interface VentaAgrupadaCliente {
+  clienteId: string;
+  nombre: string;
+  identificacion: string;
+  telefono: string;
+  email: string;
+  direccion?: string;
+  totalTransacciones: number;
+  totalPares: number;
+  totalDocenasLabel: string;
+  totalMonto: number;
+  transacciones: VentaTransaccionCliente[];
+}
+
+export interface ModeloVendidoConsolidado {
+  productId: string;
+  modelName: string;
+  color: string;
+  serieNombre: string;
+  imageUrl?: string | null;
+  loadedImageBase64?: string | null;
+  totalPares: number;
+  docenasLabel: string;
+  totalMonto: number;
+  precioPromedioPar: number;
+  curvaTallas: string;
+  tallasDesglose?: Array<{ talla: number; cantidad: number }>;
+  clientesCount?: number;
+  transaccionesCount?: number;
+}
+
+export interface ReporteVentasDetalladasData {
+  negocio: NegocioInfo;
+  filtros: {
+    fechaDesde: string | null;
+    fechaHasta: string | null;
+    canal: string;
+    diasPeriodo?: number;
+  };
+  resumenKpis: {
+    totalTransacciones: number;
+    totalPares: number;
+    totalDocenasEquivalentes: string;
+    totalMontoVendido: number;
+    totalClientesUnicos: number;
+    totalModelosDistintos: number;
+    ticketPromedio: number;
+    paresPromedioPorTransaccion?: number;
+    canalesDistribucion?: Array<{ canal: string; transacciones: number; pares: number; monto: number }>;
+  };
+  ventasPorCliente: VentaAgrupadaCliente[];
+  modelosConsolidados: ModeloVendidoConsolidado[];
+}
+
+export type ReporteVentasPorClientePdfData = ReporteVentasDetalladasData;
+export type ReporteConsolidadoModelosPdfData = ReporteVentasDetalladasData;
+
 // ── Helper Encabezado Institucional ──
 function dibujarEncabezado(
   doc: jsPDF,
@@ -4732,3 +4821,661 @@ export function generarReporteEntregasPendientesPdf(data: ReporteEntregasPendien
   dibujarPie(doc, 'Reporte de Entregas y Pedidos Pendientes — Sistema Comercial');
   return doc;
 }
+
+// ══════════════════════════════════════════════════════════════
+// REPORTE DE VENTAS DETALLADAS POR CLIENTE Y CONSOLIDADO DE MODELOS CON FOTO
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * Carga una imagen remota y la convierte en data URL Base64 para incrustarla en el PDF
+ */
+export async function cargarImagenComoBase64(url: string, timeoutMs = 2500): Promise<string | null> {
+  if (!url || typeof window === 'undefined') return null;
+  if (url.startsWith('data:image/')) return url;
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const timer = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        resolve(null);
+      }
+    }, timeoutMs);
+
+    try {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.onload = () => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timer);
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width || 120;
+          canvas.height = img.naturalHeight || img.height || 120;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            resolve(dataUrl);
+            return;
+          }
+        } catch {
+          // Bloqueo CORS en canvas fallback
+        }
+        resolve(null);
+      };
+      img.onerror = () => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timer);
+          resolve(null);
+        }
+      };
+      img.src = url;
+    } catch {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timer);
+        resolve(null);
+      }
+    }
+  });
+}
+
+/**
+ * Dibuja un placeholder visual elegante cuando no hay imagen disponible del calzado
+ */
+export function dibujarPlaceholderCalzado(doc: jsPDF, x: number, y: number, size: number, nombre: string) {
+  doc.setFillColor(241, 245, 249); // Slate 100
+  doc.setDrawColor(203, 213, 225); // Slate 300
+  doc.roundedRect(x, y, size, size, 1.2, 1.2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(148, 163, 184); // Slate 400
+  const initials = nombre ? nombre.substring(0, 3).toUpperCase() : 'CAL';
+  doc.text(initials, x + size / 2, y + size / 2 + 1, { align: 'center' });
+}
+
+/**
+ * Pre-carga imágenes de modelos en paralelo antes de renderizar el PDF consolidado
+ */
+export async function preCargarImagenesModelos(
+  modelos: ModeloVendidoConsolidado[]
+): Promise<ModeloVendidoConsolidado[]> {
+  if (!modelos || modelos.length === 0) return [];
+  return Promise.all(
+    modelos.map(async (m) => {
+      if (m.loadedImageBase64) return m;
+      let b64: string | null = null;
+      if (m.imageUrl) {
+        b64 = await cargarImagenComoBase64(m.imageUrl);
+      }
+      return {
+        ...m,
+        loadedImageBase64: b64,
+      };
+    })
+  );
+}
+
+/**
+ * Genera el documento PDF de Ventas Detalladas Agrupadas por Cliente y Transacción
+ */
+export async function generarReporteVentasPorClientePdf(
+  data: ReporteVentasPorClientePdfData
+): Promise<jsPDF> {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const marginLeft = 14;
+  const marginRight = 14;
+  const contentWidth = pageWidth - marginLeft - marginRight;
+
+  // Periodo formateado
+  let periodoStr = 'Histórico total acumulado';
+  if (data.filtros?.fechaDesde && data.filtros?.fechaHasta) {
+    periodoStr = `Del ${data.filtros.fechaDesde} al ${data.filtros.fechaHasta}`;
+  } else if (data.filtros?.fechaDesde) {
+    periodoStr = `Desde ${data.filtros.fechaDesde}`;
+  } else if (data.filtros?.fechaHasta) {
+    periodoStr = `Hasta ${data.filtros.fechaHasta}`;
+  }
+  const canalStr = data.filtros?.canal === 'POS' ? ' | Canal: Solo POS Mostrador' : data.filtros?.canal === 'PEDIDOS' ? ' | Canal: Solo Pedidos / Mayoristas' : ' | Canal: Todos los canales';
+  periodoStr += canalStr;
+
+  const fechaGeneracion = new Date().toLocaleDateString('es-EC', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+  // 1. Encabezado principal
+  let y = dibujarEncabezado(
+    doc,
+    data.negocio,
+    'VENTAS POR CLIENTE Y TRANSACCIÓN',
+    periodoStr,
+    fechaGeneracion
+  );
+
+  // 2. Tarjetas de KPI
+  const kpis = [
+    {
+      label: 'Clientes con Compras',
+      val: `${data.resumenKpis.totalClientesUnicos} clientes`,
+      sub: 'En el periodo consultado',
+    },
+    {
+      label: 'Ventas / Entregas',
+      val: `${data.resumenKpis.totalTransacciones} ops`,
+      sub: 'Transacciones comerciales',
+    },
+    {
+      label: 'Total Pares Vendidos',
+      val: `${data.resumenKpis.totalPares} pares`,
+      sub: data.resumenKpis.totalDocenasEquivalentes || `${(data.resumenKpis.totalPares / 12).toFixed(1)} docenas`,
+    },
+    {
+      label: 'Monto Total Facturado',
+      val: `$${data.resumenKpis.totalMontoVendido.toFixed(2)}`,
+      sub: `Ticket prom: $${(data.resumenKpis.ticketPromedio || 0).toFixed(2)}`,
+    },
+  ];
+  y = dibujarTarjetasKpi(doc, kpis, y);
+
+  // 3. Título de sección
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text('DETALLE INDIVIDUAL DE VENTAS AGRUPADAS POR CLIENTE', marginLeft, y);
+  y += 4;
+
+  const clientes = data.ventasPorCliente || [];
+  if (clientes.length === 0) {
+    doc.setFillColor(248, 250, 252);
+    doc.rect(marginLeft, y, contentWidth, 12, 'F');
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text('No se encontraron registros de ventas ni entregas para el periodo y filtros seleccionados.', marginLeft + 4, y + 7);
+    y += 15;
+  } else {
+    clientes.forEach((cli, cliIdx) => {
+      // Verificar salto de página para tarjeta de cliente
+      if (y > pageHeight - 35) {
+        doc.addPage();
+        y = 16;
+      }
+
+      // Tarjeta de cabecera del cliente (Dark Slate banner)
+      doc.setFillColor(15, 23, 42); // Slate 900
+      doc.roundedRect(marginLeft, y, contentWidth, 8, 1.5, 1.5, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      const nombreCli = capitalizarNombreCompleto(cli.nombre) || 'CLIENTE GENERAL';
+      const rucCli = cli.identificacion ? `C.I./RUC: ${cli.identificacion}` : 'Sin C.I.';
+      const telCli = cli.telefono ? `Tel: ${cli.telefono}` : '';
+      doc.text(`${cliIdx + 1}. ${nombreCli.toUpperCase()}  |  ${rucCli}${telCli ? `  |  ${telCli}` : ''}`, marginLeft + 3, y + 5.2);
+
+      // Resumen del cliente a la derecha
+      doc.setTextColor(52, 211, 153); // Emerald 400
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      const resumenCliTxt = `${cli.totalPares} pares (${cli.totalDocenasLabel})  •  $${cli.totalMonto.toFixed(2)}`;
+      doc.text(resumenCliTxt, pageWidth - marginRight - 3, y + 5.2, { align: 'right' });
+      y += 10;
+
+      // Iterar cada transacción del cliente
+      const transacciones = cli.transacciones || [];
+      transacciones.forEach((tx) => {
+        // Verificar salto de página para la transacción
+        if (y > pageHeight - 28) {
+          doc.addPage();
+          y = 16;
+        }
+
+        // Barra de cabecera de la transacción (Slate 100)
+        doc.setFillColor(241, 245, 249);
+        doc.roundedRect(marginLeft, y, contentWidth, 5.5, 1, 1, 'F');
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(marginLeft, y, contentWidth, 5.5, 1, 1, 'S');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(30, 41, 59);
+        const compTxt = `Comprobante / Pedido: ${tx.comprobanteNumero}`;
+        doc.text(compTxt, marginLeft + 3, y + 3.8);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+        doc.setTextColor(100, 116, 139);
+        const fechaTxt = `Fecha: ${tx.fechaFormateada}  |  Canal: ${tx.canalLabel}  |  Pago: ${tx.tipoPago}${tx.vendedorNombre ? `  |  Vend: ${tx.vendedorNombre}` : ''}`;
+        doc.text(fechaTxt, marginLeft + 55, y + 3.8);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(5, 150, 105);
+        const subtotalTxTxt = `${tx.totalPares} pares (${tx.docenasLabel})  •  $${tx.montoTotal.toFixed(2)}`;
+        doc.text(subtotalTxTxt, pageWidth - marginRight - 3, y + 3.8, { align: 'right' });
+        y += 6.5;
+
+        // Cabecera de items
+        const colW = [48, 24, 60, 22, 14, 14];
+        const itemHeaders = ['MODELO & COLOR', 'SERIE', 'CURVA DE TALLAS VENDIDAS', 'CANTIDAD', 'P. UNIT', 'SUBTOTAL'];
+
+        doc.setFillColor(226, 232, 240);
+        doc.rect(marginLeft, y, contentWidth, 4.5, 'F');
+        doc.setTextColor(51, 65, 85);
+        doc.setFontSize(5.5);
+        doc.setFont('helvetica', 'bold');
+
+        let xh = marginLeft + 2;
+        itemHeaders.forEach((h, i) => {
+          if (i === 4 || i === 5) {
+            doc.text(h, xh + colW[i] - 2, y + 3.2, { align: 'right' });
+          } else {
+            doc.text(h, xh, y + 3.2);
+          }
+          xh += colW[i];
+        });
+        y += 4.5;
+
+        // Filas de items
+        const items = tx.items || [];
+        items.forEach((it, itIdx) => {
+          if (y > pageHeight - 16) {
+            doc.addPage();
+            y = 16;
+            // Reimprimir cabecera de items
+            doc.setFillColor(226, 232, 240);
+            doc.rect(marginLeft, y, contentWidth, 4.5, 'F');
+            doc.setTextColor(51, 65, 85);
+            doc.setFontSize(5.5);
+            doc.setFont('helvetica', 'bold');
+            let xh2 = marginLeft + 2;
+            itemHeaders.forEach((h, i) => {
+              if (i === 4 || i === 5) {
+                doc.text(h, xh2 + colW[i] - 2, y + 3.2, { align: 'right' });
+              } else {
+                doc.text(h, xh2, y + 3.2);
+              }
+              xh2 += colW[i];
+            });
+            y += 4.5;
+          }
+
+          const bg = itIdx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+          doc.setFillColor(bg[0], bg[1], bg[2]);
+          doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+
+          let xi = marginLeft + 2;
+          // Modelo & Color
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6);
+          doc.setTextColor(15, 23, 42);
+          const modeloStr = `${it.modelName.toUpperCase()}${it.color ? ` - ${it.color}` : ''}`;
+          doc.text(modeloStr.substring(0, 36), xi, y + 3.6);
+          xi += colW[0];
+
+          // Serie
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(5.5);
+          doc.setTextColor(71, 85, 105);
+          doc.text(formatearNombreSerie(it.serieNombre).substring(0, 18), xi, y + 3.6);
+          xi += colW[1];
+
+          // Curva de tallas
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(5.5);
+          doc.setTextColor(15, 23, 42);
+          doc.text((it.curvaTallas || '-').substring(0, 48), xi, y + 3.6);
+          xi += colW[2];
+
+          // Cantidad y docenas
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(5.5);
+          doc.setTextColor(51, 65, 85);
+          doc.text(`${it.totalPares} p (${it.docenasLabel})`, xi, y + 3.6);
+          xi += colW[3];
+
+          // Precio unitario
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6);
+          doc.setTextColor(71, 85, 105);
+          doc.text(`$${it.precioUnitario.toFixed(2)}`, xi + colW[4] - 2, y + 3.6, { align: 'right' });
+          xi += colW[4];
+
+          // Subtotal
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6);
+          doc.setTextColor(5, 150, 105);
+          doc.text(`$${it.subtotal.toFixed(2)}`, xi + colW[5] - 2, y + 3.6, { align: 'right' });
+
+          y += 5.5;
+        });
+
+        y += 2.5; // Espacio entre transacciones
+      });
+
+      y += 3.5; // Espacio entre clientes
+    });
+  }
+
+  // Numeración dinámica de páginas en pie
+  const totalPaginas = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPaginas; i++) {
+    doc.setPage(i);
+    const yPie = pageHeight - 10;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(marginLeft, yPie, pageWidth - marginRight, yPie);
+
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Sistema Web de Gestión Comercial — Documento institucional de ventas.', marginLeft, yPie + 4.5);
+    doc.text(`Página ${i} de ${totalPaginas}`, pageWidth / 2, yPie + 4.5, { align: 'center' });
+    doc.text(data.negocio.nombre || 'Comercial Calzado', pageWidth - marginRight, yPie + 4.5, { align: 'right' });
+  }
+
+  return doc;
+}
+
+/**
+ * Descarga directamente el PDF de Ventas Detalladas por Cliente
+ */
+export async function descargarReporteVentasPorClientePdf(
+  data: ReporteVentasPorClientePdfData,
+  nombreArchivo?: string
+): Promise<void> {
+  const doc = await generarReporteVentasPorClientePdf(data);
+  const cleanNombre = (data.negocio.nombre || 'Ventas_Clientes').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const fDesde = data.filtros?.fechaDesde || 'inicio';
+  const fHasta = data.filtros?.fechaHasta || 'fin';
+  doc.save(nombreArchivo || `Reporte_Ventas_Clientes_${cleanNombre}_${fDesde}_${fHasta}.pdf`);
+}
+
+/**
+ * Genera el documento PDF de Consolidado de Calzado Vendido con Fotografía y Curvas de Tallas
+ */
+export async function generarReporteConsolidadoModelosPdf(
+  data: ReporteConsolidadoModelosPdfData
+): Promise<jsPDF> {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const marginLeft = 14;
+  const marginRight = 14;
+  const contentWidth = pageWidth - marginLeft - marginRight;
+
+  // Periodo formateado
+  let periodoStr = 'Histórico total acumulado';
+  if (data.filtros?.fechaDesde && data.filtros?.fechaHasta) {
+    periodoStr = `Del ${data.filtros.fechaDesde} al ${data.filtros.fechaHasta}`;
+  } else if (data.filtros?.fechaDesde) {
+    periodoStr = `Desde ${data.filtros.fechaDesde}`;
+  } else if (data.filtros?.fechaHasta) {
+    periodoStr = `Hasta ${data.filtros.fechaHasta}`;
+  }
+  const canalStr = data.filtros?.canal === 'POS' ? ' | Canal: Solo POS Mostrador' : data.filtros?.canal === 'PEDIDOS' ? ' | Canal: Solo Pedidos / Mayoristas' : ' | Canal: Todos los canales';
+  periodoStr += canalStr;
+
+  const fechaGeneracion = new Date().toLocaleDateString('es-EC', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+  // 1. Encabezado principal
+  let y = dibujarEncabezado(
+    doc,
+    data.negocio,
+    'CONSOLIDADO DE CALZADO VENDIDO',
+    periodoStr,
+    fechaGeneracion
+  );
+
+  // 2. Tarjetas de KPI
+  const kpis = [
+    {
+      label: 'Modelos Vendidos',
+      val: `${data.resumenKpis.totalModelosDistintos} modelos`,
+      sub: 'En catálogo comercial',
+    },
+    {
+      label: 'Total Pares Vendidos',
+      val: `${data.resumenKpis.totalPares} pares`,
+      sub: data.resumenKpis.totalDocenasEquivalentes || `${(data.resumenKpis.totalPares / 12).toFixed(1)} docenas`,
+    },
+    {
+      label: 'Clientes Compradores',
+      val: `${data.resumenKpis.totalClientesUnicos} clientes`,
+      sub: 'Demanda consolidada',
+    },
+    {
+      label: 'Recaudación Total',
+      val: `$${data.resumenKpis.totalMontoVendido.toFixed(2)}`,
+      sub: `${data.resumenKpis.totalTransacciones} transacciones`,
+    },
+  ];
+  y = dibujarTarjetasKpi(doc, kpis, y);
+
+  // Pre-cargar imágenes si no están cargadas
+  const modelosConImagenes = await preCargarImagenesModelos(data.modelosConsolidados || []);
+
+  // 3. Título de la tabla
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text('TOTALIZACIÓN POR MODELO CON FOTOGRAFÍA Y CURVAS DE TALLAS', marginLeft, y);
+  y += 4;
+
+  // Cabecera de la tabla
+  // Anchos: Foto 15, Modelo 40, Serie 22, Curva Tallas 52, Volumen 23, P. Prom 14, Total 16 = 182 mm
+  const colW = [15, 40, 22, 52, 23, 14, 16];
+  const headers = ['FOTO', 'MODELO & COLOR', 'SERIE', 'CURVA DE TALLAS VENDIDAS', 'VOLUMEN TOTAL', 'P. PROM', 'TOTAL ($)'];
+
+  const dibujarCabeceraTabla = (yPos: number) => {
+    doc.setFillColor(15, 23, 42); // Slate 900
+    doc.rect(marginLeft, yPos, contentWidth, 5.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'bold');
+    let x = marginLeft + 2;
+    headers.forEach((h, i) => {
+      if (i === 5 || i === 6) {
+        doc.text(h, x + colW[i] - 2, yPos + 3.8, { align: 'right' });
+      } else if (i === 0) {
+        doc.text(h, x + colW[i] / 2 - 1, yPos + 3.8, { align: 'center' });
+      } else {
+        doc.text(h, x, yPos + 3.8);
+      }
+      x += colW[i];
+    });
+    return yPos + 5.5;
+  };
+
+  y = dibujarCabeceraTabla(y);
+
+  if (modelosConImagenes.length === 0) {
+    doc.setFillColor(255, 255, 255);
+    doc.rect(marginLeft, y, contentWidth, 10, 'F');
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text('No hay registros de modelos vendidos en el periodo seleccionado.', marginLeft + 4, y + 6.5);
+    y += 12;
+  } else {
+    const rowHeight = 15; // Altura estándar para acomodar miniatura de 12x12
+    modelosConImagenes.forEach((mod, idx) => {
+      // Verificar salto de página
+      if (y + rowHeight > pageHeight - 20) {
+        doc.addPage();
+        y = 16;
+        y = dibujarCabeceraTabla(y);
+      }
+
+      const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+      doc.setFillColor(bg[0], bg[1], bg[2]);
+      doc.rect(marginLeft, y, contentWidth, rowHeight, 'F');
+
+      // Línea divisoria inferior
+      doc.setDrawColor(241, 245, 249);
+      doc.line(marginLeft, y + rowHeight, marginLeft + contentWidth, y + rowHeight);
+
+      let x = marginLeft + 2;
+
+      // 1. Columna Foto (15mm)
+      const imgSize = 12;
+      const imgX = x + (colW[0] - imgSize) / 2 - 1;
+      const imgY = y + (rowHeight - imgSize) / 2;
+
+      if (mod.loadedImageBase64) {
+        try {
+          doc.setFillColor(255, 255, 255);
+          doc.setDrawColor(203, 213, 225);
+          doc.roundedRect(imgX, imgY, imgSize, imgSize, 1.2, 1.2, 'FD');
+          doc.addImage(mod.loadedImageBase64, 'JPEG', imgX + 0.5, imgY + 0.5, imgSize - 1, imgSize - 1);
+        } catch {
+          dibujarPlaceholderCalzado(doc, imgX, imgY, imgSize, mod.modelName);
+        }
+      } else {
+        dibujarPlaceholderCalzado(doc, imgX, imgY, imgSize, mod.modelName);
+      }
+      x += colW[0];
+
+      // 2. Columna Modelo & Color (40mm)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(15, 23, 42);
+      const nombreMod = (mod.modelName || 'CALZADO').toUpperCase();
+      doc.text(nombreMod.substring(0, 26), x, y + 4.5);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(100, 116, 139);
+      const colorTxt = mod.color ? `Color: ${mod.color}` : 'Color general';
+      doc.text(colorTxt.substring(0, 26), x, y + 8);
+
+      doc.setFontSize(5);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`${mod.clientesCount || 1} cliente(s) • ${mod.transaccionesCount || 1} op(s)`, x, y + 11.5);
+      x += colW[1];
+
+      // 3. Columna Serie (22mm)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6);
+      doc.setTextColor(5, 150, 105); // Verde esmeralda para la serie
+      doc.text(formatearNombreSerie(mod.serieNombre).substring(0, 18), x, y + 8);
+      x += colW[2];
+
+      // 4. Columna Curva de Tallas (52mm)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6);
+      doc.setTextColor(30, 41, 59);
+      const curvaTxt = mod.curvaTallas || '-';
+      const curvaLineas = doc.splitTextToSize(curvaTxt, colW[3] - 2);
+      if (curvaLineas.length === 1) {
+        doc.text(curvaLineas[0], x, y + 8);
+      } else {
+        doc.text(curvaLineas[0], x, y + 6);
+        doc.text(curvaLineas[1], x, y + 10);
+      }
+      x += colW[3];
+
+      // 5. Columna Volumen Total (23mm)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`${mod.totalPares} pares`, x, y + 6);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5.5);
+      doc.setTextColor(5, 150, 105);
+      doc.text(mod.docenasLabel || `${(mod.totalPares / 12).toFixed(1)} doc`, x, y + 10);
+      x += colW[4];
+
+      // 6. Columna Precio Promedio (14mm)
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`$${mod.precioPromedioPar.toFixed(2)}`, x + colW[5] - 2, y + 8, { align: 'right' });
+      x += colW[5];
+
+      // 7. Columna Total Recaudado (16mm)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(5, 150, 105);
+      doc.text(`$${mod.totalMonto.toFixed(2)}`, x + colW[6] - 2, y + 8, { align: 'right' });
+
+      y += rowHeight;
+    });
+
+    // Fila de Total Consolidado
+    if (y + 9 > pageHeight - 20) {
+      doc.addPage();
+      y = 16;
+    }
+
+    doc.setFillColor(15, 23, 42); // Slate 900
+    doc.rect(marginLeft, y, contentWidth, 7, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.text(`TOTAL CONSOLIDADO (${modelosConImagenes.length} MODELOS):`, marginLeft + 4, y + 4.5);
+
+    doc.text(`${data.resumenKpis.totalPares} pares (${data.resumenKpis.totalDocenasEquivalentes})`, marginLeft + colW[0] + colW[1] + colW[2] + colW[3], y + 4.5);
+
+    doc.setTextColor(52, 211, 153); // Emerald 400
+    doc.setFontSize(7.5);
+    doc.text(`$${data.resumenKpis.totalMontoVendido.toFixed(2)}`, pageWidth - marginRight - 4, y + 4.5, { align: 'right' });
+    y += 10;
+  }
+
+  // Numeración dinámica de páginas en pie
+  const totalPaginas = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPaginas; i++) {
+    doc.setPage(i);
+    const yPie = pageHeight - 10;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(marginLeft, yPie, pageWidth - marginRight, yPie);
+
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Sistema Web de Gestión Comercial — Consolidado de calzado vendido con fotografía.', marginLeft, yPie + 4.5);
+    doc.text(`Página ${i} de ${totalPaginas}`, pageWidth / 2, yPie + 4.5, { align: 'center' });
+    doc.text(data.negocio.nombre || 'Comercial Calzado', pageWidth - marginRight, yPie + 4.5, { align: 'right' });
+  }
+
+  return doc;
+}
+
+/**
+ * Descarga directamente el PDF Consolidado de Calzado Vendido con Fotos
+ */
+export async function descargarReporteConsolidadoModelosPdf(
+  data: ReporteConsolidadoModelosPdfData,
+  nombreArchivo?: string
+): Promise<void> {
+  const doc = await generarReporteConsolidadoModelosPdf(data);
+  const cleanNombre = (data.negocio.nombre || 'Consolidado_Modelos').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const fDesde = data.filtros?.fechaDesde || 'inicio';
+  const fHasta = data.filtros?.fechaHasta || 'fin';
+  doc.save(nombreArchivo || `Reporte_Consolidado_Modelos_${cleanNombre}_${fDesde}_${fHasta}.pdf`);
+}
+
