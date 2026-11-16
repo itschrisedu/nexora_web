@@ -5271,7 +5271,20 @@ export default function ComercialComponent({
                                   className="relative group cursor-zoom-in shrink-0"
                                   title="Tocar para ampliar foto en alta resolución"
                                 >
-                                  <img src={prodObj.imageUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] group-hover:scale-105 transition-transform" />
+                                  <img
+                                    src={prodObj.imageUrl}
+                                    alt=""
+                                    className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] group-hover:scale-105 transition-transform"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      const parent = e.currentTarget.parentElement;
+                                      if (parent) {
+                                        parent.style.display = 'none';
+                                        const fallback = parent.nextElementSibling as HTMLElement;
+                                        if (fallback) fallback.classList.remove('hidden');
+                                      }
+                                    }}
+                                  />
                                   <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center text-white text-xs transition-opacity">📦</span></button>
                               ) : (
                                 <div className="w-12 h-12 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0 border border-[var(--border)]">
@@ -5817,7 +5830,20 @@ export default function ComercialComponent({
                                   className="relative group cursor-zoom-in shrink-0"
                                   title="Tocar para ampliar foto"
                                 >
-                                  <img src={primerItem.imageUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] group-hover:scale-105 transition-transform" />
+                                  <img
+                                    src={primerItem.imageUrl}
+                                    alt=""
+                                    className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] group-hover:scale-105 transition-transform"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      const parent = e.currentTarget.parentElement;
+                                      if (parent) {
+                                        parent.style.display = 'none';
+                                        const fallback = parent.nextElementSibling as HTMLElement;
+                                        if (fallback) fallback.classList.remove('hidden');
+                                      }
+                                    }}
+                                  />
                                   <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center text-white text-xs transition-opacity">📦</span></button>
                               ) : (
                                 <div className="w-12 h-12 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0">👟</div>
