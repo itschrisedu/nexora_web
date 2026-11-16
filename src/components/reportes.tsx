@@ -1,7299 +1,7307 @@
-"use client";
-
-import React, { useState, useEffect } from 'react';
-import {
-  BarChart3,
-  TrendingUp,
-  Calendar,
-  Users,
-  Package,
-  DollarSign,
-  Printer,
-  Download,
-  Filter,
-  RefreshCw,
-  ShoppingBag,
-  CreditCard,
-  Building2,
-  BrainCircuit,
-  ArrowUpRight,
-  ArrowDownRight,
-  Sparkles,
-  Award,
-  AlertTriangle,
-  Receipt,
-  Store,
-  ChevronDown,
-  Loader2,
-  CheckCircle2,
-  Eye,
-  Search,
-  Megaphone,
-  Percent,
-  Tag,
-  AlertCircle,
-  FileSpreadsheet,
-  FileText,
-  ShieldAlert,
-  ChevronRight,
-  UserCheck,
-  X,
-  RotateCcw,
-  Layers,
-  Grid,
-  List,
-  Flame,
-  TrendingDown,
-  Boxes,
-  Truck,
-  Phone,
-  PieChart,
-  Activity,
-  Clock,
-} from 'lucide-react';
-import { ApiService } from '@/services/api.service';
-import { useToast } from '@/components/ui/toast';
-import PdfPreviewModal from '@/components/ui/pdf-preview-modal';
-import { normalizarParaBusqueda } from '@/utils/text-formatters';
-import {
-  generarReporteCobranzasPdf,
-  generarReporteCampanasPdf,
-  generarReporteResumenEjecutivoPdf,
-  generarReporteModelosRotacionPdf,
-  generarReporteProductividadVendedoresPdf,
-  generarReporteFinanzasMetodosPdf,
-  generarReporteProyeccionMlPdf,
-  generarReporteGeneralIntegralPdf,
-  generarReportePosPdf,
-  generarReporteRendimientoSucursalesPdf,
-  generarReporteAbastecimientoPdf,
-  generarReporteInventarioFifoPdf,
-  generarReporteEntregasPendientesPdf,
-  generarReporteVentasPorClientePdf,
-  generarReporteConsolidadoModelosPdf,
-  descargarReporteVentasPorClientePdf,
-  descargarReporteConsolidadoModelosPdf,
-  ReporteInventarioFifoPdfData,
-  ReporteEntregasPendientesPdfData,
-  ReporteVentasPorClientePdfData,
-  ReporteConsolidadoModelosPdfData,
-  ClienteDeudor,
-  CampanaReporte,
-  ModeloReporte,
-  VendedorReporte,
-  ProveedorAbastecimientoReporte,
-  ModeloVendidoConsolidado,
-  VentaAgrupadaCliente,
-} from '@/services/pdf-reportes.service';
-import { formatearNombreSerie, capitalizarNombreCompleto } from '@/utils/text-formatters';
-import {
-  GraficoBarrasModerno,
-  GraficoCurvaTendencia,
-  GraficoDonutCircular,
-} from './ui/reporte-charts';
-import { jsPDF } from 'jspdf';
-
-type PeriodoTipo = 'HOY' | 'SEMANAL' | 'MENSUAL' | 'TRIMESTRAL' | 'ANUAL' | 'PERSONALIZADO';
-type TabReporte =
-  | 'resumen'
-  | 'pos'
-  | 'sucursales'
-  | 'modelos'
-  | 'vendedores'
-  | 'finanzas'
-  | 'cobranzas'
-  | 'campanas'
-  | 'proyeccion_ml'
-  | 'proveedores'
-  | 'inventario_fifo'
-  | 'entregas_pedidos'
-  | 'ventas_cliente'
-  | 'ventas_modelos_foto';
-
-interface Vendedor {
-  id: string;
-  nombre: string;
-  email: string;
-  rol: string;
-  activo: boolean;
-}
-
-interface ReportesComponentProps {
-  user?: any;
-  activeSucursalId?: string;
-  sucursales?: any[];
-}
-
-export default function ReportesComponent({
-  user: propUser,
-  activeSucursalId: propActiveSucursalId,
-  sucursales: propSucursales,
-}: ReportesComponentProps = {}) {
-  const { showToast } = useToast();
-
-  // Usuario y Rol del usuario autenticado
-  const [currentUser, setCurrentUser] = useState<any>(propUser || null);
-
-  // Estados de Filtros Globales
-  const [periodo, setPeriodo] = useState<PeriodoTipo>('MENSUAL');
-  const [fechaDesde, setFechaDesde] = useState('');
-  const [fechaHasta, setFechaHasta] = useState('');
-  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('TODAS');
-  const [vendedorSeleccionado, setVendedorSeleccionado] = useState<string>('TODOS');
-  const [canalSeleccionado, setCanalSeleccionado] = useState<string>('TODOS');
-
-  // Estados de Datos Generales
-  const [loading, setLoading] = useState(true);
-  const [reporteData, setReporteData] = useState<any>(null);
-  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
-  const [sucursales, setSucursales] = useState<any[]>(propSucursales || []);
-  const [tabActiva, setTabActiva] = useState<TabReporte>('resumen');
-  const [negocioInfo, setNegocioInfo] = useState<any>(null);
-
-  // Estados específicos para Reporte Punto de Venta (POS)
-  const [loadingPos, setLoadingPos] = useState(false);
-  const [posData, setPosData] = useState<any>(null);
-  const [filtroPosMetodo, setFiltroPosMetodo] = useState('TODOS');
-  const [filtroPosBusqueda, setFiltroPosBusqueda] = useState('');
-  const [filtroPosModelo, setFiltroPosModelo] = useState('TODOS');
-  const [generandoPosPdf, setGenerandoPosPdf] = useState(false);
-  const [ventaPosDetalle, setVentaPosDetalle] = useState<any | null>(null);
-
-  // Estados específicos para Reporte Rendimiento de Sucursales
-  const [loadingSucursales, setLoadingSucursales] = useState(false);
-  const [sucursalesReporteData, setSucursalesReporteData] = useState<any>(null);
-  const [filtroSucursalModeloTexto, setFiltroSucursalModeloTexto] = useState('');
-  const [filtroSucursalOrden, setFiltroSucursalOrden] = useState<'VENTAS_DESC' | 'PARES_DESC' | 'PRECIO_DESC'>('VENTAS_DESC');
-  const [generandoSucursalPdf, setGenerandoSucursalPdf] = useState(false);
-
-  // Filtros específicos para Productividad por Trabajador
-  const [filtroTrabajadorTexto, setFiltroTrabajadorTexto] = useState('');
-  const [filtroTrabajadorRol, setFiltroTrabajadorRol] = useState('TODOS');
-  const [filtroTrabajadorOrden, setFiltroTrabajadorOrden] = useState<'VENTAS_DESC' | 'PARES_DESC' | 'PEDIDOS_DESC' | 'VENTAS_ASC'>('VENTAS_DESC');
-  const [filtroAbonosFinanzasTexto, setFiltroAbonosFinanzasTexto] = useState('');
-
-  // Filtros específicos para Rotación de Calzado & Modelos (Catálogo Completo)
-  const [filtroRotacionTexto, setFiltroRotacionTexto] = useState('');
-  const [filtroRotacionSerie, setFiltroRotacionSerie] = useState('TODAS');
-  const [filtroRotacionEstado, setFiltroRotacionEstado] = useState<'TODOS' | 'ALTA' | 'MEDIA' | 'BAJA' | 'SIN_MOVIMIENTO' | 'CON_STOCK' | 'SIN_STOCK'>('TODOS');
-  const [filtroRotacionOrden, setFiltroRotacionOrden] = useState<'VENTAS_DESC' | 'VENTAS_ASC' | 'STOCK_DESC' | 'STOCK_ASC' | 'INGRESOS_DESC' | 'MARGEN_DESC'>('VENTAS_DESC');
-  const [filtroRotacionVista, setFiltroRotacionVista] = useState<'tabla' | 'tarjetas'>('tabla');
-  const [productoExpandidoId, setProductoExpandidoId] = useState<string | null>(null);
-
-  // FASE 8: Estados para Reporte de Ventas por Modelo y Margen FIFO Real
-  const [loadingModelosMargen, setLoadingModelosMargen] = useState(false);
-  const [modelosMargenData, setModelosMargenData] = useState<any>(null);
-  const [filtroCategoriaModelo, setFiltroCategoriaModelo] = useState('TODAS');
-
-  // Estado de Reporte de Cobranzas (Clientes Deudores)
-  const [loadingCobranzas, setLoadingCobranzas] = useState(false);
-  const [cobranzasData, setCobranzasData] = useState<any>(null);
-  const [filtroDeudor, setFiltroDeudor] = useState('');
-  const [filtroScoreDeudor, setFiltroScoreDeudor] = useState('TODOS');
-  const [clienteExpandidoId, setClienteExpandidoId] = useState<string | null>(null);
-
-  // Estado de Reporte de Campañas
-  const [loadingCampanas, setLoadingCampanas] = useState(false);
-  const [campanasData, setCampanasData] = useState<any>(null);
-  const [filtroCampanaEstado, setFiltroCampanaEstado] = useState('TODAS');
-  const [busquedaCampana, setBusquedaCampana] = useState('');
-
-  // Estado de Proyección ML
-  const [loadingMl, setLoadingMl] = useState(false);
-  const [proyeccionMl, setProyeccionMl] = useState<any>(null);
-
-  // Estado de Reporte de Abastecimiento de Proveedores / Fabricantes
-  const [loadingProveedores, setLoadingProveedores] = useState(false);
-  const [proveedoresData, setProveedoresData] = useState<any>(null);
-  const [filtroProveedorBusqueda, setFiltroProveedorBusqueda] = useState('');
-  const [filtroProveedorSolvencia, setFiltroProveedorSolvencia] = useState('TODOS');
-  const [generandoProveedoresPdf, setGenerandoProveedoresPdf] = useState(false);
-
-  // Estado de Reporte de Inventario con Valoración FIFO
-  const [loadingInventarioFifo, setLoadingInventarioFifo] = useState(false);
-  const [inventarioFifoData, setInventarioFifoData] = useState<any>(null);
-  const [filtroFifoSerie, setFiltroFifoSerie] = useState('TODAS');
-  const [filtroFifoProveedor, setFiltroFifoProveedor] = useState('TODOS');
-  const [filtroFifoRotacion, setFiltroFifoRotacion] = useState('TODOS');
-  const [filtroFifoOrden, setFiltroFifoOrden] = useState<'NOMBRE_ASC' | 'NOMBRE_DESC' | 'INVERSION_DESC' | 'PARES_DESC'>('NOMBRE_ASC');
-  const [filtroFifoBusqueda, setFiltroFifoBusqueda] = useState('');
-  const [modeloFifoExpandidoId, setModeloFifoExpandidoId] = useState<string | null>(null);
-  const [generandoFifoPdf, setGenerandoFifoPdf] = useState(false);
-
-  // Estado de Reporte de Entregas y Pedidos Pendientes
-  const [loadingEntregas, setLoadingEntregas] = useState(false);
-  const [entregasData, setEntregasData] = useState<any>(null);
-  const [subTabEntregas, setSubTabEntregas] = useState<'PENDIENTES' | 'ENTREGADOS' | 'TODOS'>('PENDIENTES');
-  const [filtroEntregasBusqueda, setFiltroEntregasBusqueda] = useState('');
-  const [generandoEntregasPdf, setGenerandoEntregasPdf] = useState(false);
-  const [liquidandoPedidoId, setLiquidandoPedidoId] = useState<string | null>(null);
-
-  // Estado del Modal de Previsualización de PDF Universal
-  const [previewModalOpen, setPreviewModalOpen] = useState(false);
-  const [pdfDocPreview, setPdfDocPreview] = useState<jsPDF | null>(null);
-  const [previewTitulo, setPreviewTitulo] = useState('Previsualización de Documento');
-  const [previewNombreArchivo, setPreviewNombreArchivo] = useState('reporte-nexora.pdf');
-  const [generandoGeneralPdf, setGenerandoGeneralPdf] = useState(false);
-
-  // Estados específicos para Reportes de Ventas Detalladas y Consolidadas
-  const [categoriaActiva, setCategoriaActiva] = useState<'comercial' | 'inventario' | 'clientes' | 'estrategia'>('comercial');
-  const [loadingVentasDetalladas, setLoadingVentasDetalladas] = useState(false);
-  const [ventasDetalladasData, setVentasDetalladasData] = useState<any>(null);
-  const [generandoVentasClientePdf, setGenerandoVentasClientePdf] = useState(false);
-  const [generandoConsolidadoModelosPdf, setGenerandoConsolidadoModelosPdf] = useState(false);
-  const [filtroVentasClienteBusqueda, setFiltroVentasClienteBusqueda] = useState('');
-  const [filtroVentasModeloBusqueda, setFiltroVentasModeloBusqueda] = useState('');
-  const [clienteDetalleExpandidoId, setClienteDetalleExpandidoId] = useState<string | null>(null);
-  const [vistaModelosConsolidados, setVistaModelosConsolidados] = useState<'tabla' | 'tarjetas'>('tabla');
-
-  // Inicialización de usuario y permisos por rol
-  useEffect(() => {
-    let activeUser = propUser;
-    if (!activeUser && typeof window !== 'undefined') {
-      const rawUser = localStorage.getItem('user');
-      if (rawUser) {
-        try {
-          activeUser = JSON.parse(rawUser);
-        } catch {}
-      }
-    }
-    if (activeUser) {
-      setCurrentUser(activeUser);
-      const isGlobal = activeUser.rol === 'ROL_SUPER_ADMIN' || (activeUser.rol === 'ROL_ADMIN' && activeUser.esAdminGeneral === true);
-      if (!isGlobal) {
-        const localSucursal = (propActiveSucursalId && propActiveSucursalId !== 'TODAS')
-          ? propActiveSucursalId
-          : (activeUser.tenantId || activeUser.sucursalId || '');
-        if (localSucursal) {
-          setSucursalSeleccionada(localSucursal);
-        }
-      }
-      if (activeUser.rol === 'ROL_VENDEDOR') {
-        setVendedorSeleccionado(activeUser.id || activeUser.sub || '');
-      }
-    }
-  }, [propUser, propActiveSucursalId]);
-
-  const isSuperAdmin = currentUser?.rol === 'ROL_SUPER_ADMIN';
-  const isGlobalAdmin = isSuperAdmin || (currentUser?.rol === 'ROL_ADMIN' && currentUser?.esAdminGeneral === true);
-  const isVendedor = currentUser?.rol === 'ROL_VENDEDOR';
-
-  useEffect(() => {
-    cargarSucursales();
-    cargarVendedores();
-    cargarNegocioInfo();
-  }, []);
-
-  useEffect(() => {
-    cargarReporte();
-    if (tabActiva === 'pos') {
-      cargarReportePos();
-    } else if (tabActiva === 'sucursales') {
-      cargarReporteSucursales();
-    } else if (tabActiva === 'modelos') {
-      cargarReporteModelosMargen();
-    } else if (tabActiva === 'cobranzas') {
-      cargarCobranzas();
-    } else if (tabActiva === 'campanas') {
-      cargarCampanas();
-    } else if (tabActiva === 'proveedores') {
-      cargarReporteProveedores();
-    } else if (tabActiva === 'inventario_fifo') {
-      cargarReporteInventarioFifo();
-    } else if (tabActiva === 'entregas_pedidos') {
-      cargarReporteEntregas();
-    } else if (tabActiva === 'ventas_cliente' || tabActiva === 'ventas_modelos_foto') {
-      cargarReporteVentasDetalladas();
-    }
-  }, [
-    periodo,
-    fechaDesde,
-    fechaHasta,
-    sucursalSeleccionada,
-    vendedorSeleccionado,
-    canalSeleccionado,
-    filtroCategoriaModelo,
-    filtroFifoSerie,
-    filtroFifoProveedor,
-    filtroFifoRotacion,
-    filtroFifoOrden,
-    filtroFifoBusqueda,
-    subTabEntregas,
-    filtroEntregasBusqueda,
-  ]);
-
-  useEffect(() => {
-    if (tabActiva === 'pos') {
-      if (!posData) cargarReportePos();
-    } else if (tabActiva === 'sucursales') {
-      if (!sucursalesReporteData) cargarReporteSucursales();
-    } else if (tabActiva === 'modelos') {
-      if (!modelosMargenData) cargarReporteModelosMargen();
-    } else if (tabActiva === 'cobranzas') {
-      if (!cobranzasData) cargarCobranzas();
-    } else if (tabActiva === 'campanas') {
-      if (!campanasData) cargarCampanas();
-    } else if (tabActiva === 'proveedores') {
-      if (!proveedoresData) cargarReporteProveedores();
-    } else if (tabActiva === 'proyeccion_ml') {
-      if (!proyeccionMl) cargarProyeccionMl();
-    } else if (tabActiva === 'inventario_fifo') {
-      if (!inventarioFifoData) cargarReporteInventarioFifo();
-    } else if (tabActiva === 'entregas_pedidos') {
-      if (!entregasData) cargarReporteEntregas();
-    } else if (tabActiva === 'ventas_cliente' || tabActiva === 'ventas_modelos_foto') {
-      if (!ventasDetalladasData) cargarReporteVentasDetalladas();
-    }
-  }, [tabActiva]);
-
-  // Sincronizar automáticamente la categoría superior al cambiar tabActiva
-  useEffect(() => {
-    if (['ventas_cliente', 'ventas_modelos_foto', 'pos', 'entregas_pedidos'].includes(tabActiva)) {
-      setCategoriaActiva('comercial');
-    } else if (['modelos', 'inventario_fifo', 'proveedores'].includes(tabActiva)) {
-      setCategoriaActiva('inventario');
-    } else if (['cobranzas', 'campanas', 'vendedores'].includes(tabActiva)) {
-      setCategoriaActiva('clientes');
-    } else if (['resumen', 'finanzas', 'sucursales', 'proyeccion_ml'].includes(tabActiva)) {
-      setCategoriaActiva('estrategia');
-    }
-  }, [tabActiva]);
-
-  const cargarSucursales = async () => {
-    try {
-      const data = await ApiService.get('/configuracion/sucursales');
-      if (Array.isArray(data)) {
-        setSucursales(data);
-      }
-    } catch (err: any) {
-      console.warn('No se pudo cargar sucursales:', err?.message);
-    }
-  };
-
-  const cargarNegocioInfo = async () => {
-    try {
-      const data = await ApiService.get('/configuracion/negocio');
-      if (data) {
-        setNegocioInfo(data);
-      }
-    } catch (err: any) {
-      console.warn('No se pudo cargar config negocio:', err?.message);
-    }
-  };
-
-  const cargarVendedores = async () => {
-    try {
-      const data = await ApiService.get('/reportes/vendedores');
-      if (Array.isArray(data)) {
-        setVendedores(data);
-      }
-    } catch (err: any) {
-      console.error('Error al cargar lista de vendedores:', err);
-    }
-  };
-
-  const cargarReporte = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.append('periodo', periodo);
-      if (periodo === 'PERSONALIZADO') {
-        if (fechaDesde) params.append('fechaDesde', fechaDesde);
-        if (fechaHasta) params.append('fechaHasta', fechaHasta);
-      }
-      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
-        params.append('sucursalId', sucursalSeleccionada);
-      }
-      if (vendedorSeleccionado && vendedorSeleccionado !== 'TODOS') {
-        params.append('vendedorId', vendedorSeleccionado);
-      }
-      if (canalSeleccionado && canalSeleccionado !== 'TODOS') {
-        params.append('canal', canalSeleccionado);
-      }
-
-      const data = await ApiService.get(`/reportes/resumen-ejecutivo?${params.toString()}`);
-      if (data) {
-        setReporteData(data);
-      }
-    } catch (err: any) {
-      console.warn('Reportes: esperando backend o error de red:', err?.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const cargarReportePos = async () => {
-    setLoadingPos(true);
-    try {
-      const params = new URLSearchParams();
-      params.append('periodo', periodo);
-      if (periodo === 'PERSONALIZADO') {
-        if (fechaDesde) params.append('fechaDesde', fechaDesde);
-        if (fechaHasta) params.append('fechaHasta', fechaHasta);
-      }
-      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
-        params.append('sucursalId', sucursalSeleccionada);
-      }
-      if (vendedorSeleccionado && vendedorSeleccionado !== 'TODOS') {
-        params.append('vendedorId', vendedorSeleccionado);
-      }
-      if (canalSeleccionado && canalSeleccionado !== 'TODOS') {
-        params.append('canal', canalSeleccionado);
-      }
-      if (filtroPosMetodo && filtroPosMetodo !== 'TODOS') {
-        params.append('metodoPago', filtroPosMetodo);
-      }
-      if (filtroPosModelo && filtroPosModelo !== 'TODOS') {
-        params.append('modelo', filtroPosModelo);
-      }
-      if (filtroPosBusqueda && filtroPosBusqueda.trim()) {
-        params.append('busqueda', filtroPosBusqueda.trim());
-      }
-
-      const data = await ApiService.get(`/reportes/pos?${params.toString()}`);
-      setPosData(data);
-    } catch (err: any) {
-      console.error('Error al cargar reporte POS:', err);
-      showToast('Error al cargar reporte del Punto de Venta.', 'warning');
-    } finally {
-      setLoadingPos(false);
-    }
-  };
-
-  const cargarReporteSucursales = async () => {
-    setLoadingSucursales(true);
-    try {
-      const params = new URLSearchParams();
-      params.append('periodo', periodo);
-      if (periodo === 'PERSONALIZADO') {
-        if (fechaDesde) params.append('fechaDesde', fechaDesde);
-        if (fechaHasta) params.append('fechaHasta', fechaHasta);
-      }
-      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
-        params.append('sucursalId', sucursalSeleccionada);
-      }
-      if (vendedorSeleccionado && vendedorSeleccionado !== 'TODOS') {
-        params.append('vendedorId', vendedorSeleccionado);
-      }
-      if (canalSeleccionado && canalSeleccionado !== 'TODOS') {
-        params.append('canal', canalSeleccionado);
-      }
-
-      const data = await ApiService.get(`/reportes/rendimiento-sucursales?${params.toString()}`);
-      setSucursalesReporteData(data);
-    } catch (err: any) {
-      console.error('Error al cargar reporte de sucursales:', err);
-      showToast('Error al cargar reporte de rendimiento por sucursal.', 'warning');
-    } finally {
-      setLoadingSucursales(false);
-    }
-  };
-
-  const cargarCobranzas = async () => {
-    setLoadingCobranzas(true);
-    try {
-      const params = new URLSearchParams();
-      params.append('periodo', periodo);
-      if (periodo === 'PERSONALIZADO') {
-        if (fechaDesde) params.append('fechaDesde', fechaDesde);
-        if (fechaHasta) params.append('fechaHasta', fechaHasta);
-      }
-      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
-        params.append('sucursalId', sucursalSeleccionada);
-      }
-      if (vendedorSeleccionado && vendedorSeleccionado !== 'TODOS') {
-        params.append('vendedorId', vendedorSeleccionado);
-      }
-      if (canalSeleccionado && canalSeleccionado !== 'TODOS') {
-        params.append('canal', canalSeleccionado);
-      }
-      const data = await ApiService.get(`/reportes/cobranzas?${params.toString()}`);
-      setCobranzasData(data);
-    } catch (err: any) {
-      console.error('Error al cargar reporte de cobranzas:', err);
-      showToast('Error al obtener reporte de clientes deudores.', 'warning');
-    } finally {
-      setLoadingCobranzas(false);
-    }
-  };
-
-  const cargarCampanas = async () => {
-    setLoadingCampanas(true);
-    try {
-      const params = new URLSearchParams();
-      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
-        params.append('sucursalId', sucursalSeleccionada);
-      }
-      const data = await ApiService.get(`/reportes/campanas?${params.toString()}`);
-      setCampanasData(data);
-    } catch (err: any) {
-      console.error('Error al cargar reporte de campañas:', err);
-      showToast('Error al obtener reporte de campañas promocionales.', 'warning');
-    } finally {
-      setLoadingCampanas(false);
-    }
-  };
-
-  const cargarProyeccionMl = async () => {
-    setLoadingMl(true);
-    try {
-      const data = await ApiService.get('/reportes/proyeccion-ml?horizonteDias=30');
-      setProyeccionMl(data);
-      showToast('Proyección de demanda generada exitosamente con Inteligencia Artificial.', 'success');
-    } catch (err: any) {
-      showToast('Error al conectar con el motor de predicción ML.', 'warning');
-    } finally {
-      setLoadingMl(false);
-    }
-  };
-
-  const cargarReporteProveedores = async () => {
-    setLoadingProveedores(true);
-    try {
-      const params = new URLSearchParams();
-      params.append('periodo', periodo);
-      if (periodo === 'PERSONALIZADO') {
-        if (fechaDesde) params.append('fechaDesde', fechaDesde);
-        if (fechaHasta) params.append('fechaHasta', fechaHasta);
-      }
-      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
-        params.append('sucursalId', sucursalSeleccionada);
-      }
-      const data = await ApiService.get(`/reportes/abastecimiento-proveedores?${params.toString()}`);
-      if (data) {
-        setProveedoresData(data);
-      }
-    } catch (err: any) {
-      console.warn('Error al cargar reporte de abastecimiento:', err);
-      showToast('Error al obtener reporte de abastecimiento de proveedores.', 'warning');
-    } finally {
-      setLoadingProveedores(false);
-    }
-  };
-
-  const cargarReporteModelosMargen = async () => {
-    setLoadingModelosMargen(true);
-    try {
-      const params = new URLSearchParams();
-      if (periodo) params.append('periodo', periodo);
-      if (periodo === 'PERSONALIZADO') {
-        if (fechaDesde) params.append('fechaDesde', fechaDesde);
-        if (fechaHasta) params.append('fechaHasta', fechaHasta);
-      }
-      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
-        params.append('sucursalId', sucursalSeleccionada);
-      }
-      if (filtroCategoriaModelo && filtroCategoriaModelo !== 'TODAS') {
-        params.append('categoria', filtroCategoriaModelo);
-      }
-      const data = await ApiService.get(`/reportes/ventas-modelos-margen?${params.toString()}`);
-      if (data) {
-        setModelosMargenData(data);
-      }
-    } catch (err: any) {
-      console.warn('Error al cargar ventas por modelo y margen:', err);
-    } finally {
-      setLoadingModelosMargen(false);
-    }
-  };
-
-  const cargarReporteInventarioFifo = async () => {
-    setLoadingInventarioFifo(true);
-    try {
-      const params = new URLSearchParams();
-      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
-        params.append('sucursalId', sucursalSeleccionada);
-      }
-      if (filtroFifoSerie && filtroFifoSerie !== 'TODAS') {
-        params.append('serie', filtroFifoSerie);
-      }
-      if (filtroFifoProveedor && filtroFifoProveedor !== 'TODOS') {
-        params.append('proveedorId', filtroFifoProveedor);
-      }
-      if (filtroFifoRotacion && filtroFifoRotacion !== 'TODOS') {
-        params.append('rotacion', filtroFifoRotacion);
-      }
-      if (filtroFifoOrden) {
-        params.append('orden', filtroFifoOrden);
-      }
-      if (filtroFifoBusqueda) {
-        params.append('busqueda', filtroFifoBusqueda);
-      }
-      const data = await ApiService.get(`/reportes/inventario-fifo?${params.toString()}`);
-      if (data) {
-        setInventarioFifoData(data);
-      }
-    } catch (err: any) {
-      console.warn('Error al cargar reporte de inventario FIFO:', err);
-    } finally {
-      setLoadingInventarioFifo(false);
-    }
-  };
-
-  const cargarReporteEntregas = async () => {
-    setLoadingEntregas(true);
-    try {
-      const params = new URLSearchParams();
-      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
-        params.append('sucursalId', sucursalSeleccionada);
-      }
-      params.append('estadoVista', subTabEntregas);
-      if (filtroEntregasBusqueda) {
-        params.append('clienteBusqueda', filtroEntregasBusqueda);
-      }
-      const data = await ApiService.get(`/reportes/entregas-pedidos?${params.toString()}`);
-      if (data) {
-        setEntregasData(data);
-      }
-    } catch (err: any) {
-      console.warn('Error al cargar reporte de entregas:', err);
-    } finally {
-      setLoadingEntregas(false);
-    }
-  };
-
-  const handleLiquidarEntrega = async (pedidoId: string) => {
-    if (!confirm('¿Confirma registrar la entrega completa de los pares restantes de este pedido?')) return;
-    setLiquidandoPedidoId(pedidoId);
-    try {
-      await ApiService.post(`/pedidos/${pedidoId}/confirmar-entrega`, {});
-      showToast('Entrega completada y registrada exitosamente.', 'success');
-      cargarReporteEntregas();
-    } catch (err: any) {
-      showToast(err?.message || 'Error al confirmar la entrega del pedido.', 'error');
-    } finally {
-      setLiquidandoPedidoId(null);
-    }
-  };
-
-  const handleReporteInventarioFifoPdf = async (modo: 'preview' | 'download') => {
-    if (!inventarioFifoData) return;
-    setGenerandoFifoPdf(true);
-    try {
-      const payload: ReporteInventarioFifoPdfData = {
-        negocio: obtenerNegocioPayload(),
-        periodo: periodo,
-        fechaGeneracion: new Date().toLocaleDateString('es-EC'),
-        kpis: inventarioFifoData.kpis,
-        modelos: (inventarioFifoData.modelos || []).map((m: any) => ({
-          nombre: m.nombre,
-          color: m.color,
-          serieNombre: m.serieNombre,
-          stockTotal: m.stockTotal,
-          pvp: m.pvp,
-          costoFifoActivo: m.costoFifoActivo,
-          valorTotalFifo: m.valorTotalFifo,
-          valorTotalPvp: m.valorTotalPvp,
-          gananciaTotal: m.gananciaTotal,
-          margenPct: m.margenPct,
-          estadoStock: m.estadoStock,
-          proveedorNombre: m.proveedorNombre,
-          lotes: m.lotes,
-        })),
-      };
-
-      const doc = generarReporteInventarioFifoPdf(payload);
-      if (modo === 'download') {
-        doc.save(`reporte-inventario-fifo-${new Date().toISOString().split('T')[0]}.pdf`);
-        showToast('Reporte de inventario FIFO descargado correctamente.', 'success');
-      } else {
-        setPdfDocPreview(doc);
-        setPreviewTitulo('Reporte de Inventario con Valoración FIFO');
-        setPreviewNombreArchivo(`reporte-inventario-fifo-${new Date().toISOString().split('T')[0]}.pdf`);
-        setPreviewModalOpen(true);
-      }
-    } catch (err: any) {
-      showToast('Error al generar PDF de inventario FIFO: ' + err?.message, 'error');
-    } finally {
-      setGenerandoFifoPdf(false);
-    }
-  };
-
-  const handleReporteEntregasPdf = async (modo: 'preview' | 'download') => {
-    if (!entregasData) return;
-    setGenerandoEntregasPdf(true);
-    try {
-      const payload: ReporteEntregasPendientesPdfData = {
-        negocio: obtenerNegocioPayload(),
-        fechaGeneracion: new Date().toLocaleDateString('es-EC'),
-        kpis: entregasData.kpis,
-        pedidos: (entregasData.pedidos || []).map((p: any) => ({
-          numeroPedido: p.numeroPedido,
-          createdAt: p.createdAt,
-          clienteNombre: p.cliente?.nombre || 'Cliente Mostrador',
-          clienteTelefono: p.cliente?.telefono || '',
-          calzadoResumen: p.calzadoResumen,
-          resumenPendientesTexto: p.resumenPendientesTexto,
-          totalPares: p.totalPares,
-          paresEntregados: p.paresEntregados,
-          paresPendientes: p.paresPendientes,
-          saldoPendiente: p.saldoPendiente,
-          estadoEntrega: p.estadoEntrega,
-        })),
-      };
-
-      const doc = generarReporteEntregasPendientesPdf(payload);
-      if (modo === 'download') {
-        doc.save(`reporte-entregas-pendientes-${new Date().toISOString().split('T')[0]}.pdf`);
-        showToast('Reporte de entregas pendientes descargado correctamente.', 'success');
-      } else {
-        setPdfDocPreview(doc);
-        setPreviewTitulo('Reporte de Entregas y Pedidos Pendientes');
-        setPreviewNombreArchivo(`reporte-entregas-pendientes-${new Date().toISOString().split('T')[0]}.pdf`);
-        setPreviewModalOpen(true);
-      }
-    } catch (err: any) {
-      showToast('Error al generar PDF de entregas pendientes: ' + err?.message, 'error');
-    } finally {
-      setGenerandoEntregasPdf(false);
-    }
-  };
-
-  // ── Cargador de Ventas Detalladas y Consolidadas ──
-  const cargarReporteVentasDetalladas = async () => {
-    setLoadingVentasDetalladas(true);
-    try {
-      const params = new URLSearchParams();
-      if (periodo === 'PERSONALIZADO') {
-        if (fechaDesde) params.append('fechaDesde', fechaDesde);
-        if (fechaHasta) params.append('fechaHasta', fechaHasta);
-      } else {
-        const hoy = new Date();
-        let fInicio = new Date();
-        if (periodo === 'HOY') {
-          fInicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-        } else if (periodo === 'SEMANAL') {
-          fInicio.setDate(hoy.getDate() - 7);
-        } else if (periodo === 'MENSUAL') {
-          fInicio.setDate(hoy.getDate() - 30);
-        } else if (periodo === 'TRIMESTRAL') {
-          fInicio.setDate(hoy.getDate() - 90);
-        } else if (periodo === 'ANUAL') {
-          fInicio.setDate(hoy.getDate() - 365);
-        }
-        params.append('fechaDesde', fInicio.toISOString().split('T')[0]);
-        params.append('fechaHasta', hoy.toISOString().split('T')[0]);
-      }
-
-      if (canalSeleccionado && canalSeleccionado !== 'TODOS') {
-        params.append('canal', canalSeleccionado);
-      }
-      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
-        params.append('sucursalId', sucursalSeleccionada);
-      }
-
-      const data = await ApiService.get(`/reportes/ventas-detalladas?${params.toString()}`);
-      setVentasDetalladasData(data);
-    } catch (err: any) {
-      console.error('Error cargando ventas detalladas:', err);
-      showToast('Error al cargar ventas detalladas: ' + (err?.message || 'Error del servidor'), 'error');
-    } finally {
-      setLoadingVentasDetalladas(false);
-    }
-  };
-
-  // ── Generador PDF: Ventas Detalladas por Cliente ──
-  const handleReporteVentasPorClientePdf = async (modo: 'preview' | 'download') => {
-    if (!ventasDetalladasData) {
-      showToast('No hay datos disponibles para generar el PDF.', 'warning');
-      return;
-    }
-    setGenerandoVentasClientePdf(true);
-    try {
-      const payload: ReporteVentasPorClientePdfData = {
-        negocio: obtenerNegocioPayload(),
-        filtros: {
-          fechaDesde: ventasDetalladasData.filtros?.fechaDesde || fechaDesde || null,
-          fechaHasta: ventasDetalladasData.filtros?.fechaHasta || fechaHasta || null,
-          canal: canalSeleccionado,
-          diasPeriodo: ventasDetalladasData.filtros?.diasPeriodo,
-        },
-        resumenKpis: ventasDetalladasData.resumenKpis,
-        ventasPorCliente: ventasDetalladasData.ventasPorCliente || [],
-        modelosConsolidados: ventasDetalladasData.modelosConsolidados || [],
-      };
-
-      const doc = await generarReporteVentasPorClientePdf(payload);
-      const nombreArchivo = `reporte_ventas_clientes_${new Date().toISOString().split('T')[0]}.pdf`;
-
-      if (modo === 'preview') {
-        setPdfDocPreview(doc);
-        setPreviewTitulo('Reporte de Ventas por Cliente & Transacción');
-        setPreviewNombreArchivo(nombreArchivo);
-        setPreviewModalOpen(true);
-      } else {
-        doc.save(nombreArchivo);
-        showToast('Reporte de ventas por cliente descargado exitosamente.', 'success');
-      }
-    } catch (err: any) {
-      console.error('Error generando PDF de ventas por cliente:', err);
-      showToast('Error al generar PDF: ' + (err?.message || 'Error desconocido'), 'error');
-    } finally {
-      setGenerandoVentasClientePdf(false);
-    }
-  };
-
-  // ── Generador PDF: Consolidado de Modelos con Fotos ──
-  const handleReporteConsolidadoModelosPdf = async (modo: 'preview' | 'download') => {
-    if (!ventasDetalladasData) {
-      showToast('No hay datos disponibles para generar el PDF.', 'warning');
-      return;
-    }
-    setGenerandoConsolidadoModelosPdf(true);
-    try {
-      const payload: ReporteConsolidadoModelosPdfData = {
-        negocio: obtenerNegocioPayload(),
-        filtros: {
-          fechaDesde: ventasDetalladasData.filtros?.fechaDesde || fechaDesde || null,
-          fechaHasta: ventasDetalladasData.filtros?.fechaHasta || fechaHasta || null,
-          canal: canalSeleccionado,
-          diasPeriodo: ventasDetalladasData.filtros?.diasPeriodo,
-        },
-        resumenKpis: ventasDetalladasData.resumenKpis,
-        ventasPorCliente: ventasDetalladasData.ventasPorCliente || [],
-        modelosConsolidados: ventasDetalladasData.modelosConsolidados || [],
-      };
-
-      const doc = await generarReporteConsolidadoModelosPdf(payload);
-      const nombreArchivo = `reporte_consolidado_modelos_${new Date().toISOString().split('T')[0]}.pdf`;
-
-      if (modo === 'preview') {
-        setPdfDocPreview(doc);
-        setPreviewTitulo('Reporte Consolidado de Calzado Vendido (con Fotos)');
-        setPreviewNombreArchivo(nombreArchivo);
-        setPreviewModalOpen(true);
-      } else {
-        doc.save(nombreArchivo);
-        showToast('Reporte consolidado con fotografías descargado exitosamente.', 'success');
-      }
-    } catch (err: any) {
-      console.error('Error generando PDF consolidado de modelos:', err);
-      showToast('Error al generar PDF: ' + (err?.message || 'Error desconocido'), 'error');
-    } finally {
-      setGenerandoConsolidadoModelosPdf(false);
-    }
-  };
-
-  const obtenerNegocioPayload = () => ({
-    nombre: negocioInfo?.nombre || 'CALZADO COMERCIAL',
-    ruc: negocioInfo?.ruc || '1800000000001',
-    direccion: negocioInfo?.direccion || 'Cevallos, Tungurahua, Ecuador',
-    telefono: negocioInfo?.telefono || '',
-    primaryColor: negocioInfo?.primaryColor || '#0EA5E9',
-  });
-
-  // ══════════════════════════════════════════════════════════════
-  // GENERADORES DE PDF PARA TODAS LAS SECCIONES
-  // ══════════════════════════════════════════════════════════════
-
-  // 1. INFORME GENERAL CONSOLIDADO (UNIFICA TODO EL NEGOCIO)
-  const handleReporteGeneralIntegral = async (modo: 'preview' | 'download') => {
-    setGenerandoGeneralPdf(true);
-    try {
-      let cobData = cobranzasData;
-      let campData = campanasData;
-      let mlData = proyeccionMl;
-      let pos = posData;
-      let suc = sucursalesReporteData;
-      let prov = proveedoresData;
-      let modMargen = modelosMargenData;
-      let invFifo = inventarioFifoData;
-      let entData = entregasData;
-
-      const baseParams = new URLSearchParams();
-      baseParams.append('periodo', periodo);
-      if (periodo === 'PERSONALIZADO') {
-        if (fechaDesde) baseParams.append('fechaDesde', fechaDesde);
-        if (fechaHasta) baseParams.append('fechaHasta', fechaHasta);
-      }
-      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
-        baseParams.append('sucursalId', sucursalSeleccionada);
-      }
-      const qs = baseParams.toString();
-
-      const promises: Promise<any>[] = [];
-      if (!cobData) promises.push(ApiService.get(`/reportes/cobranzas?${qs}`).then(d => { cobData = d; setCobranzasData(d); }).catch(() => {}));
-      if (!campData) promises.push(ApiService.get(`/reportes/campanas?${qs}`).then(d => { campData = d; setCampanasData(d); }).catch(() => {}));
-      if (!mlData) promises.push(ApiService.get('/reportes/proyeccion-ml?horizonteDias=30').then(d => { mlData = d; setProyeccionMl(d); }).catch(() => {}));
-      if (!pos) promises.push(ApiService.get(`/reportes/pos?${qs}`).then(d => { pos = d; setPosData(d); }).catch(() => {}));
-      if (!suc) promises.push(ApiService.get(`/reportes/rendimiento-sucursales?${qs}`).then(d => { suc = d; setSucursalesReporteData(d); }).catch(() => {}));
-      if (!prov) promises.push(ApiService.get(`/reportes/abastecimiento-proveedores?${qs}`).then(d => { prov = d; setProveedoresData(d); }).catch(() => {}));
-      if (!modMargen) promises.push(ApiService.get(`/reportes/ventas-modelos-margen?${qs}`).then(d => { modMargen = d; setModelosMargenData(d); }).catch(() => {}));
-      if (!invFifo) promises.push(ApiService.get(`/reportes/inventario-fifo?${qs}`).then(d => { invFifo = d; setInventarioFifoData(d); }).catch(() => {}));
-      if (!entData) promises.push(ApiService.get(`/reportes/entregas-pedidos?${qs}`).then(d => { entData = d; setEntregasData(d); }).catch(() => {}));
-
-      if (promises.length > 0) {
-        await Promise.all(promises);
-      }
-
-      const payload = {
-        negocio: obtenerNegocioPayload(),
-        periodo,
-        fechaGeneracion: new Date().toLocaleString('es-EC'),
-        kpis,
-        serieTemporal: reporteData?.serieTemporal || [],
-        topModelos: reporteData?.topModelos || [],
-        bajaRotacion: reporteData?.bajaRotacion || [],
-        rankingVendedores: reporteData?.rankingVendedores || [],
-        modelosMargen: modMargen || undefined,
-        inventarioFifoData: invFifo || undefined,
-        entregasPedidosData: entData || undefined,
-        cobranzas: cobData ? {
-          totalCartera: cobData.totalCartera || 0,
-          totalClientes: cobData.totalClientes || 0,
-          clientes: cobData.clientes || [],
-        } : undefined,
-        campanas: campData?.campanas || [],
-        distribucionMetodos: reporteData?.distribucionMetodosAbono || {},
-        distribucionCanales: reporteData?.distribucionCanales,
-        distribucionFormasPago: reporteData?.distribucionFormasPago,
-        posData: pos || undefined,
-        sucursalesData: suc || undefined,
-        proveedoresData: prov || undefined,
-        proyeccionMl: mlData || undefined,
-      };
-
-      const doc = generarReporteGeneralIntegralPdf(payload);
-      const nombre = `informe_general_consolidado_${new Date().toISOString().split('T')[0]}.pdf`;
-
-      if (modo === 'preview') {
-        setPdfDocPreview(doc);
-        setPreviewTitulo('Informe General Consolidado — Business Intelligence');
-        setPreviewNombreArchivo(nombre);
-        setPreviewModalOpen(true);
-      } else {
-        doc.save(nombre);
-        showToast('Informe General Consolidado descargado exitosamente.', 'success');
-      }
-    } catch (err: any) {
-      console.error('Error generando informe general:', err);
-      showToast('Error al generar el informe general consolidado.', 'error');
-    } finally {
-      setGenerandoGeneralPdf(false);
-    }
-  };
-
-  // 2. RESUMEN EJECUTIVO
-  const handleReporteResumenPdf = (modo: 'preview' | 'download') => {
-    const payload = {
-      negocio: obtenerNegocioPayload(),
-      periodo,
-      fechaGeneracion: new Date().toLocaleString('es-EC'),
-      kpis,
-      serieTemporal: reporteData?.serieTemporal || [],
-      topModelos: reporteData?.topModelos || [],
-      rankingVendedores: reporteData?.rankingVendedores || [],
-      distribucionCanales: reporteData?.distribucionCanales,
-      distribucionFormasPago: reporteData?.distribucionFormasPago,
-    };
-
-    const doc = generarReporteResumenEjecutivoPdf(payload);
-    const nombre = `reporte_resumen_ejecutivo_${new Date().toISOString().split('T')[0]}.pdf`;
-
-    if (modo === 'preview') {
-      setPdfDocPreview(doc);
-      setPreviewTitulo('Reporte de Resumen Ejecutivo & KPIs');
-      setPreviewNombreArchivo(nombre);
-      setPreviewModalOpen(true);
-    } else {
-      doc.save(nombre);
-      showToast('Reporte de Resumen Ejecutivo descargado exitosamente.', 'success');
-    }
-  };
-
-  // 3. ROTACIÓN DE CALZADO & MODELOS
-  const handleReporteModelosPdf = (modo: 'preview' | 'download') => {
-    const modelosGrafica = (modelosMargenData?.topModelosGrafica && modelosMargenData.topModelosGrafica.length > 0)
-      ? modelosMargenData.topModelosGrafica
-      : (reporteData?.topModelos || []).map((m: any, idx: number) => ({
-          nombre: `${m.modelName || 'Calzado'} ${m.color ? `(${m.color})` : ''}`,
-          paresVendidos: m.pares || 0,
-          margenPorcentual: m.margen || 25,
-          gananciaNeta: Math.round((m.ingresos || 0) * 0.25),
-          porcentajeParticipacion: m.participacion || Math.max(3, 20 - idx * 3),
-        }));
-
-    const payload = {
-      negocio: obtenerNegocioPayload(),
-      periodo,
-      fechaGeneracion: new Date().toLocaleString('es-EC'),
-      topModelos: (reporteData?.topModelos as ModeloReporte[]) || [],
-      topModelosGrafica: modelosGrafica,
-      bajaRotacion: reporteData?.bajaRotacion || [],
-      catalogoCompleto: reporteData?.catalogoProductosCompleto || [],
-      rotacionResumen: reporteData?.rotacionResumen || {},
-      totalParesVendidos: modelosMargenData?.metricas?.totalPares || kpis.totalParesVendidos || 0,
-      totalIngresosModelos: modelosMargenData?.metricas?.totalIngresos || kpis.totalIngresos || 0,
-      filtroSerie: filtroRotacionSerie,
-      filtroEstado: filtroRotacionEstado,
-    };
-
-    const doc = generarReporteModelosRotacionPdf(payload);
-    const nombre = `reporte_rotacion_calzado_${new Date().toISOString().split('T')[0]}.pdf`;
-
-    if (modo === 'preview') {
-      setPdfDocPreview(doc);
-      setPreviewTitulo('Reporte de Rotación de Calzado & Modelos');
-      setPreviewNombreArchivo(nombre);
-      setPreviewModalOpen(true);
-    } else {
-      doc.save(nombre);
-      showToast('Reporte de Rotación de Calzado descargado exitosamente.', 'success');
-    }
-  };
-
-  // 4. PRODUCTIVIDAD POR TRABAJADOR
-  const handleReporteProductividadPdf = (modo: 'preview' | 'download') => {
-    const payload = {
-      negocio: obtenerNegocioPayload(),
-      periodo,
-      fechaGeneracion: new Date().toLocaleString('es-EC'),
-      totalIngresosSucursal: kpis.totalIngresos || 0,
-      totalParesSucursal: kpis.totalParesVendidos || 0,
-      vendedores: (reporteData?.rankingVendedores as VendedorReporte[]) || [],
-    };
-
-    const doc = generarReporteProductividadVendedoresPdf(payload);
-    const nombre = `reporte_productividad_personal_${new Date().toISOString().split('T')[0]}.pdf`;
-
-    if (modo === 'preview') {
-      setPdfDocPreview(doc);
-      setPreviewTitulo('Reporte de Productividad por Trabajador');
-      setPreviewNombreArchivo(nombre);
-      setPreviewModalOpen(true);
-    } else {
-      doc.save(nombre);
-      showToast('Reporte de Productividad descargado exitosamente.', 'success');
-    }
-  };
-
-  // 5. COBRANZAS & CLIENTES DEUDORES
-  const handleReporteCobranzasPdf = (modo: 'preview' | 'download') => {
-    if (!cobranzasData || !cobranzasData.clientes) {
-      showToast('No hay datos de cobranzas disponibles para generar el PDF.', 'warning');
-      return;
-    }
-
-    const payload = {
-      negocio: obtenerNegocioPayload(),
-      periodo,
-      fechaGeneracion: new Date().toLocaleString('es-EC'),
-      totalCartera: cobranzasData.totalCartera || 0,
-      totalClientes: cobranzasData.totalClientes || 0,
-      totalRecaudado: kpis.totalRecaudadoCobros || 0,
-      clientes: cobranzasData.clientes as ClienteDeudor[],
-    };
-
-    const doc = generarReporteCobranzasPdf(payload);
-    const nombre = `reporte_cobranzas_${new Date().toISOString().split('T')[0]}.pdf`;
-
-    if (modo === 'preview') {
-      setPdfDocPreview(doc);
-      setPreviewTitulo('Reporte de Cobranzas — Clientes Deudores');
-      setPreviewNombreArchivo(nombre);
-      setPreviewModalOpen(true);
-    } else {
-      doc.save(nombre);
-      showToast('Reporte de cobranzas descargado exitosamente.', 'success');
-    }
-  };
-
-  // 6. CAMPAÑAS Y PROMOCIONES
-  const handleReporteCampanasPdf = (modo: 'preview' | 'download') => {
-    if (!campanasData || !campanasData.campanas) {
-      showToast('No hay datos de campañas disponibles para generar el PDF.', 'warning');
-      return;
-    }
-
-    const payload = {
-      negocio: obtenerNegocioPayload(),
-      periodo,
-      fechaGeneracion: new Date().toLocaleString('es-EC'),
-      campanas: campanasData.campanas as CampanaReporte[],
-    };
-
-    const doc = generarReporteCampanasPdf(payload);
-    const nombre = `reporte_campanas_promociones_${new Date().toISOString().split('T')[0]}.pdf`;
-
-    if (modo === 'preview') {
-      setPdfDocPreview(doc);
-      setPreviewTitulo('Reporte de Rendimiento de Campañas y Promociones');
-      setPreviewNombreArchivo(nombre);
-      setPreviewModalOpen(true);
-    } else {
-      doc.save(nombre);
-      showToast('Reporte de campañas descargado exitosamente.', 'success');
-    }
-  };
-
-  // 7. FINANZAS & MÉTODOS DE PAGO
-  const handleReporteFinanzasPdf = (modo: 'preview' | 'download') => {
-    const vObj = vendedores.find((v) => v.id === vendedorSeleccionado);
-    const canalLabels: Record<string, string> = {
-      MANUAL: 'POS Mostrador / Venta Directa',
-      WHATSAPP: 'Pedidos WhatsApp / Comercial',
-      CATALOGO: 'Catálogo Digital Web',
-    };
-    const payload = {
-      negocio: obtenerNegocioPayload(),
-      periodo,
-      fechaGeneracion: new Date().toLocaleString('es-EC'),
-      totalRecaudadoCobros: kpis.totalRecaudadoCobros || 0,
-      saldoCarteraTotal: kpis.saldoCarteraTotal || 0,
-      totalIngresosVentas: kpis.totalIngresos || 0,
-      distribucionMetodosAbono: reporteData?.distribucionMetodosAbono || {},
-      vendedorNombre: vObj?.nombre || (vendedorSeleccionado !== 'TODOS' ? vendedorSeleccionado : undefined),
-      canalNombre: canalSeleccionado !== 'TODOS' ? (canalLabels[canalSeleccionado] || canalSeleccionado) : undefined,
-      distribucionCanales: reporteData?.distribucionCanales || undefined,
-      distribucionFormasPago: reporteData?.distribucionFormasPago || undefined,
-      recaudacionPorVendedor: reporteData?.recaudacionPorVendedor || undefined,
-    };
-
-    const doc = generarReporteFinanzasMetodosPdf(payload);
-    const nombre = `reporte_finanzas_metodos_pago_${new Date().toISOString().split('T')[0]}.pdf`;
-
-    if (modo === 'preview') {
-      setPdfDocPreview(doc);
-      setPreviewTitulo('Reporte de Finanzas & Métodos de Recaudación');
-      setPreviewNombreArchivo(nombre);
-      setPreviewModalOpen(true);
-    } else {
-      doc.save(nombre);
-      showToast('Reporte de Finanzas descargado exitosamente.', 'success');
-    }
-  };
-
-  // 8. PROYECCIÓN IA / MACHINE LEARNING
-  const handleReporteProyeccionMlPdf = (modo: 'preview' | 'download') => {
-    if (!proyeccionMl) {
-      showToast('Por favor calcula la inferencia IA antes de previsualizar el reporte.', 'warning');
-      return;
-    }
-
-    const payload = {
-      negocio: obtenerNegocioPayload(),
-      fechaGeneracion: new Date().toLocaleString('es-EC'),
-      ml: proyeccionMl,
-    };
-
-    const doc = generarReporteProyeccionMlPdf(payload);
-    const nombre = `reporte_proyeccion_ia_ml_${new Date().toISOString().split('T')[0]}.pdf`;
-
-    if (modo === 'preview') {
-      setPdfDocPreview(doc);
-      setPreviewTitulo('Reporte de Pronóstico de Demanda Inteligente (Nexora ML)');
-      setPreviewNombreArchivo(nombre);
-      setPreviewModalOpen(true);
-    } else {
-      doc.save(nombre);
-      showToast('Reporte de Proyección IA descargado exitosamente.', 'success');
-    }
-  };
-
-  // 9. REPORTE DEL PUNTO DE VENTA (POS)
-  const handleReportePosPdf = (modo: 'preview' | 'download') => {
-    if (!posData) {
-      showToast('No hay datos del Punto de Venta disponibles.', 'warning');
-      return;
-    }
-    setGenerandoPosPdf(true);
-    try {
-      const sucursalNombre = sucursalSeleccionada === 'TODAS'
-        ? 'Todas las Sucursales'
-        : sucursales.find((s) => s.id === sucursalSeleccionada)?.name || 'Sucursal';
-
-      const doc = generarReportePosPdf({
-        negocio: obtenerNegocioPayload(),
-        periodo: periodo === 'PERSONALIZADO' ? `${fechaDesde} al ${fechaHasta}` : periodo,
-        sucursalNombre,
-        fechaGeneracion: new Date().toLocaleString('es-EC'),
-        metricas: posData.metricas,
-        ventas: posData.ventas,
-      });
-
-      const nombre = `reporte_pos_${periodo.toLowerCase()}_${new Date().toISOString().split('T')[0]}.pdf`;
-
-      if (modo === 'preview') {
-        setPdfDocPreview(doc);
-        setPreviewTitulo(`Reporte Punto de Venta — ${sucursalNombre}`);
-        setPreviewNombreArchivo(nombre);
-        setPreviewModalOpen(true);
-      } else {
-        doc.save(nombre);
-        showToast('Reporte POS descargado exitosamente.', 'success');
-      }
-    } catch (err: any) {
-      console.error('Error generando PDF POS:', err);
-      showToast('Error al generar PDF del Punto de Venta.', 'error');
-    } finally {
-      setGenerandoPosPdf(false);
-    }
-  };
-
-  // 10. REPORTE DE RENDIMIENTO DE SUCURSALES
-  const handleReporteSucursalPdf = (modo: 'preview' | 'download') => {
-    if (!sucursalesReporteData) {
-      showToast('No hay datos de sucursales disponibles.', 'warning');
-      return;
-    }
-    setGenerandoSucursalPdf(true);
-    try {
-      const doc = generarReporteRendimientoSucursalesPdf({
-        negocio: obtenerNegocioPayload(),
-        periodo: periodo === 'PERSONALIZADO' ? `${fechaDesde} al ${fechaHasta}` : periodo,
-        sucursalSeleccionada: sucursalesReporteData.sucursalSeleccionada,
-        fechaGeneracion: new Date().toLocaleString('es-EC'),
-        totalesEmpresa: sucursalesReporteData.totalesEmpresa,
-        totalesSucursalSeleccionada: sucursalesReporteData.totalesSucursalSeleccionada,
-        sucursales: sucursalesReporteData.sucursales,
-        modelosVendidos: sucursalesReporteData.modelosVendidos,
-      });
-
-      const nombre = `reporte_rendimiento_sucursal_${new Date().toISOString().split('T')[0]}.pdf`;
-
-      if (modo === 'preview') {
-        setPdfDocPreview(doc);
-        setPreviewTitulo(`Rendimiento Comercial — ${sucursalesReporteData.sucursalSeleccionada?.nombre}`);
-        setPreviewNombreArchivo(nombre);
-        setPreviewModalOpen(true);
-      } else {
-        doc.save(nombre);
-        showToast('Reporte de Sucursales descargado exitosamente.', 'success');
-      }
-    } catch (err: any) {
-      console.error('Error generando PDF Sucursal:', err);
-      showToast('Error al generar PDF de Sucursal.', 'error');
-    } finally {
-      setGenerandoSucursalPdf(false);
-    }
-  };
-
-  // 11. REPORTE DE ABASTECIMIENTO DE PROVEEDORES
-  const handleReporteProveedoresPdf = (modo: 'preview' | 'download') => {
-    if (!proveedoresData) {
-      showToast('No hay datos de abastecimiento para generar el PDF.', 'warning');
-      return;
-    }
-    setGenerandoProveedoresPdf(true);
-    try {
-      const doc = generarReporteAbastecimientoPdf({
-        negocio: obtenerNegocioPayload(),
-        periodo: periodo === 'PERSONALIZADO' ? `${fechaDesde} al ${fechaHasta}` : periodo,
-        fechaGeneracion: new Date().toLocaleString('es-EC'),
-        kpis: proveedoresData.kpis || {
-          totalComprado: 0,
-          totalLotes: 0,
-          totalPares: 0,
-          deudaTotal: 0,
-          anticiposTotal: 0,
-          totalDevoluciones: 0,
-          montoDevoluciones: 0,
-        },
-        proveedores: (proveedoresData.porProveedor || []) as ProveedorAbastecimientoReporte[],
-      });
-
-      const nombre = `reporte_abastecimiento_proveedores_${new Date().toISOString().split('T')[0]}.pdf`;
-
-      if (modo === 'preview') {
-        setPdfDocPreview(doc);
-        setPreviewTitulo('Reporte de Abastecimiento & Proveedores');
-        setPreviewNombreArchivo(nombre);
-        setPreviewModalOpen(true);
-      } else {
-        doc.save(nombre);
-        showToast('Reporte de abastecimiento descargado exitosamente.', 'success');
-      }
-    } catch (err: any) {
-      console.error('Error generando PDF de Abastecimiento:', err);
-      showToast('Error al generar PDF de Abastecimiento.', 'error');
-    } finally {
-      setGenerandoProveedoresPdf(false);
-    }
-  };
-
-  const handleImprimirReporte = () => {
-    window.print();
-  };
-
-  const kpis = reporteData?.kpis || {
-    totalIngresos: 0,
-    totalParesVendidos: 0,
-    totalPedidos: 0,
-    ticketPromedio: 0,
-    costoEstimadoTotal: 0,
-    gananciaBruta: 0,
-    margenPorcentaje: 0,
-    totalRecaudadoCobros: 0,
-    saldoCarteraTotal: 0,
-  };
-
-  return (
-    <div className="space-y-6 animate-in fade-in duration-300 pb-16">
-      {/* ════════════════════════════════════════════════════════════════ */}
-      {/* CABECERA PRINCIPAL & ACCIONES                                    */}
-      {/* ════════════════════════════════════════════════════════════════ */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--card)] p-6 rounded-3xl border border-[var(--border)] shadow-xs">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-[#0F172A] text-white rounded-2xl shadow-sm">
-            <BarChart3 size={24} />
-          </div>
-          <div>
-            <h1 className="text-xl font-extrabold text-[var(--foreground)] tracking-tight">
-              Reportes & Business Intelligence
-            </h1>
-            <p className="text-xs text-[var(--muted-foreground)]">
-              Análisis multi-filtro de ventas, rendimiento por trabajador, rotación de calzado y cobranzas de la sucursal
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={cargarReporte}
-            disabled={loading}
-            className="px-3.5 py-2.5 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            <span>Actualizar</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleReporteGeneralIntegral('preview')}
-            disabled={generandoGeneralPdf || loading}
-            className="px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
-            title="Previsualizar el informe integral consolidado de toda la sucursal"
-          >
-            {generandoGeneralPdf ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
-            <span>Previsualizar PDF</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleReporteGeneralIntegral('download')}
-            disabled={generandoGeneralPdf || loading}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
-            title="Descargar PDF consolidado con todas las áreas del negocio"
-          >
-            <Download size={14} />
-            <span>Descargar PDF</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ════════════════════════════════════════════════════════════════ */}
-      {/* PANEL DE CONTROL: MULTI-FILTRO AVANZADO                          */}
-      {/* ════════════════════════════════════════════════════════════════ */}
-      <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
-        <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
-          <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
-            <Filter size={14} className="text-[#0F172A]" />
-            <span>Filtros de Análisis</span>
-          </span>
-          <span className="text-[11px] text-[var(--muted-foreground)] font-semibold">
-            {periodo === 'PERSONALIZADO' ? 'Rango personalizado' : `Vista: ${periodo}`}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* 1. Selector de Periodicidad */}
-          <div>
-            <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
-              1. Periodicidad / Fecha
-            </label>
-            <div className="flex flex-wrap gap-1">
-              {(['HOY', 'SEMANAL', 'MENSUAL', 'TRIMESTRAL', 'ANUAL', 'PERSONALIZADO'] as PeriodoTipo[]).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPeriodo(p)}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
-                    periodo === p
-                      ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-2xs'
-                      : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[#0F172A]'
-                  }`}
-                >
-                  {p === 'HOY' && 'Hoy'}
-                  {p === 'SEMANAL' && 'Sem.'}
-                  {p === 'MENSUAL' && 'Mes'}
-                  {p === 'TRIMESTRAL' && 'Trim.'}
-                  {p === 'ANUAL' && 'Año'}
-                  {p === 'PERSONALIZADO' && 'Personal.'}
-                </button>
-              ))}
-            </div>
-
-            {/* Fechas personalizadas */}
-            {periodo === 'PERSONALIZADO' && (
-              <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-[var(--border)]">
-                <div>
-                  <label className="text-[10px] font-bold text-[var(--muted-foreground)] block mb-1">Desde:</label>
-                  <input
-                    type="date"
-                    value={fechaDesde}
-                    onChange={(e) => setFechaDesde(e.target.value)}
-                    className="w-full px-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-[var(--muted-foreground)] block mb-1">Hasta:</label>
-                  <input
-                    type="date"
-                    value={fechaHasta}
-                    onChange={(e) => setFechaHasta(e.target.value)}
-                    className="w-full px-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 2. Selector de Sucursal / Sede */}
-          <div>
-            <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
-              2. Sucursal / Sede
-            </label>
-            <div className="relative">
-              {isGlobalAdmin ? (
-                <>
-                  <select
-                    value={sucursalSeleccionada}
-                    onChange={(e) => setSucursalSeleccionada(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
-                  >
-                    <option value="TODAS">Todas las Sucursales (Consolidado)</option>
-                    {sucursales.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name || s.nombre} {s.isMatriz ? '(Matriz)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-                </>
-              ) : (
-                <div className="w-full px-3.5 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] flex items-center justify-between">
-                  <span>{sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.name || sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.nombre || 'Sucursal Asignada'}</span>
-                  <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">Sede Local</span>
-                </div>
-              )}
-            </div>
-            <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-              {isGlobalAdmin
-                ? 'Filtra por sucursal específica o visualiza la red completa.'
-                : 'Reporte delimitado exclusivamente a tu local comercial asignado.'}
-            </p>
-          </div>
-
-          {/* 3. Selector de Vendedor / Trabajador */}
-          <div>
-            <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
-              3. Trabajador o Vendedor
-            </label>
-            <div className="relative">
-              {isVendedor ? (
-                <div className="w-full px-3.5 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] flex items-center justify-between">
-                  <span>{currentUser?.nombre ? capitalizarNombreCompleto(currentUser.nombre) : (currentUser?.email || 'Mis Ventas')}</span>
-                  <span className="text-[10px] font-semibold text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded-full">Vendedor</span>
-                </div>
-              ) : (
-                <>
-                  <select
-                    value={vendedorSeleccionado}
-                    onChange={(e) => setVendedorSeleccionado(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
-                  >
-                    <option value="TODOS">Todos los Trabajadores</option>
-                    {vendedores.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {capitalizarNombreCompleto(v.nombre)} ({v.rol.replace('ROL_', '')})
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-                </>
-              )}
-            </div>
-            <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-              {isVendedor ? 'Visualizando exclusivamente tus transacciones comerciales.' : 'Productividad individual o grupal del equipo.'}
-            </p>
-          </div>
-
-          {/* 4. Selector de Canal de Venta */}
-          <div>
-            <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
-              4. Canal de Venta
-            </label>
-            <div className="relative">
-              <select
-                value={canalSeleccionado}
-                onChange={(e) => setCanalSeleccionado(e.target.value)}
-                className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
-              >
-                <option value="TODOS">Todos los Canales (POS + Pedidos)</option>
-                <option value="POS">Solo Punto de Venta Mostrador (POS)</option>
-                <option value="PEDIDOS">Solo Pedidos por Encargo / Mayoristas</option>
-                <option value="WHATSAPP">Solo WhatsApp / Comercial</option>
-                <option value="CATALOGO">Solo Catálogo Digital Web</option>
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-            </div>
-            <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-              Filtra entre mostrador POS y pedidos entregados al por mayor.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ════════════════════════════════════════════════════════════════ */}
-      {/* NAVEGACIÓN ESTRUCTURADA POR CATEGORÍAS TEMÁTICAS                  */}
-      {/* ════════════════════════════════════════════════════════════════ */}
-      <div className="space-y-3">
-        {/* Nivel 1: Selector de Categoría Principal */}
-        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl">
-          {[
-            {
-              id: 'comercial' as const,
-              label: 'Comercial & Ventas',
-              badge: '4 reportes',
-              icon: <ShoppingBag size={15} />,
-              color: 'text-emerald-500',
-            },
-            {
-              id: 'inventario' as const,
-              label: 'Inventario & Almacén',
-              badge: '3 reportes',
-              icon: <Boxes size={15} />,
-              color: 'text-blue-500',
-            },
-            {
-              id: 'clientes' as const,
-              label: 'Clientes, Cartera & Equipo',
-              badge: '3 reportes',
-              icon: <Receipt size={15} />,
-              color: 'text-purple-500',
-            },
-            {
-              id: 'estrategia' as const,
-              label: 'Finanzas & Rendimiento',
-              badge: '4 reportes',
-              icon: <TrendingUp size={15} />,
-              color: 'text-amber-500',
-            },
-          ].map((cat) => {
-            const isCatActive = categoriaActiva === cat.id;
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => {
-                  setCategoriaActiva(cat.id);
-                  // Si la tab activa actual no pertenece a esta categoría, seleccionar la primera
-                  if (cat.id === 'comercial' && !['ventas_cliente', 'ventas_modelos_foto', 'pos', 'entregas_pedidos'].includes(tabActiva)) {
-                    setTabActiva('ventas_cliente');
-                    if (!ventasDetalladasData) cargarReporteVentasDetalladas();
-                  } else if (cat.id === 'inventario' && !['modelos', 'inventario_fifo', 'proveedores'].includes(tabActiva)) {
-                    setTabActiva('modelos');
-                    if (!modelosMargenData) cargarReporteModelosMargen();
-                  } else if (cat.id === 'clientes' && !['cobranzas', 'campanas', 'vendedores'].includes(tabActiva)) {
-                    setTabActiva('cobranzas');
-                    if (!cobranzasData) cargarCobranzas();
-                  } else if (cat.id === 'estrategia' && !['resumen', 'finanzas', 'sucursales', 'proyeccion_ml'].includes(tabActiva)) {
-                    setTabActiva('resumen');
-                  }
-                }}
-                className={`flex-1 min-w-[200px] px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-between gap-2 cursor-pointer ${
-                  isCatActive
-                    ? 'bg-[#0F172A] text-white shadow-sm'
-                    : 'bg-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={isCatActive ? 'text-white' : cat.color}>{cat.icon}</span>
-                  <span>{cat.label}</span>
-                </div>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                  isCatActive
-                    ? 'bg-white/20 text-white'
-                    : 'bg-[var(--card)] text-[var(--muted-foreground)] border border-[var(--border)]'
-                }`}>
-                  {cat.badge}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Nivel 2: Sub-reportes de la Categoría Seleccionada */}
-        <div className="flex flex-wrap gap-2 pt-1 pb-2 border-b border-[var(--border)]">
-          {(() => {
-            const reportesVisibles: Array<{
-              id: TabReporte;
-              label: string;
-              icon: React.ReactNode;
-              badge?: string;
-              badgeColor?: string;
-            }> = [];
-
-            if (categoriaActiva === 'comercial') {
-              reportesVisibles.push(
-                {
-                  id: 'ventas_cliente',
-                  label: 'Ventas por Cliente & Transacción',
-                  icon: <Users size={14} />,
-                  badge: 'Agrupado',
-                  badgeColor: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25',
-                },
-                {
-                  id: 'ventas_modelos_foto',
-                  label: 'Consolidado de Calzado (con Fotos)',
-                  icon: <Package size={14} />,
-                  badge: 'Con Fotos',
-                  badgeColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25',
-                },
-                {
-                  id: 'pos',
-                  label: 'Punto de Venta Mostrador (POS)',
-                  icon: <Store size={14} />,
-                },
-                {
-                  id: 'entregas_pedidos',
-                  label: 'Entregas & Pedidos Pendientes',
-                  icon: <Truck size={14} />,
-                  badge: 'Pendientes',
-                  badgeColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25',
-                }
-              );
-            } else if (categoriaActiva === 'inventario') {
-              reportesVisibles.push(
-                {
-                  id: 'modelos',
-                  label: 'Rotación de Calzado & Modelos',
-                  icon: <Flame size={14} />,
-                },
-                {
-                  id: 'inventario_fifo',
-                  label: 'Inventario & Valoración FIFO',
-                  icon: <Boxes size={14} />,
-                },
-                {
-                  id: 'proveedores',
-                  label: 'Abastecimiento & Proveedores',
-                  icon: <Building2 size={14} />,
-                }
-              );
-            } else if (categoriaActiva === 'clientes') {
-              reportesVisibles.push(
-                {
-                  id: 'cobranzas',
-                  label: 'Cobranzas & Clientes Deudores',
-                  icon: <Receipt size={14} />,
-                },
-                {
-                  id: 'campanas',
-                  label: 'Rendimiento de Campañas & Promos',
-                  icon: <Megaphone size={14} />,
-                },
-                {
-                  id: 'vendedores',
-                  label: 'Productividad por Trabajador',
-                  icon: <Users size={14} />,
-                }
-              );
-            } else if (categoriaActiva === 'estrategia') {
-              reportesVisibles.push(
-                {
-                  id: 'resumen',
-                  label: 'Resumen Ejecutivo & KPIs',
-                  icon: <BarChart3 size={14} />,
-                },
-                {
-                  id: 'finanzas',
-                  label: 'Finanzas & Métodos de Pago',
-                  icon: <DollarSign size={14} />,
-                },
-                {
-                  id: 'sucursales',
-                  label: 'Rendimiento de Sucursales',
-                  icon: <Building2 size={14} />,
-                },
-                {
-                  id: 'proyeccion_ml',
-                  label: 'Proyección IA / Machine Learning',
-                  icon: <BrainCircuit size={14} />,
-                }
-              );
-            }
-
-            return reportesVisibles.map((tab) => {
-              const isTabActive = tabActiva === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => {
-                    setTabActiva(tab.id);
-                    if (tab.id === 'ventas_cliente' || tab.id === 'ventas_modelos_foto') {
-                      if (!ventasDetalladasData) cargarReporteVentasDetalladas();
-                    } else if (tab.id === 'pos' && !posData) {
-                      cargarReportePos();
-                    } else if (tab.id === 'sucursales' && !sucursalesReporteData) {
-                      cargarReporteSucursales();
-                    } else if (tab.id === 'proveedores' && !proveedoresData) {
-                      cargarReporteProveedores();
-                    } else if (tab.id === 'inventario_fifo' && !inventarioFifoData) {
-                      cargarReporteInventarioFifo();
-                    } else if (tab.id === 'entregas_pedidos' && !entregasData) {
-                      cargarReporteEntregas();
-                    } else if (tab.id === 'proyeccion_ml' && !proyeccionMl) {
-                      cargarProyeccionMl();
-                    } else if (tab.id === 'cobranzas' && !cobranzasData) {
-                      cargarCobranzas();
-                    } else if (tab.id === 'campanas' && !campanasData) {
-                      cargarCampanas();
-                    }
-                  }}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    isTabActive
-                      ? 'bg-[#0F172A] text-white shadow-xs'
-                      : 'bg-[var(--card)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] border border-[var(--border)]'
-                  }`}
-                >
-                  {tab.icon}
-                  <span>{tab.label}</span>
-                  {tab.badge && (
-                    <span className={`text-[9px] px-1.5 py-0.2 rounded-md font-extrabold ${tab.badgeColor || 'bg-blue-500/20 text-blue-400'}`}>
-                      {tab.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            });
-          })()}
-        </div>
-      </div>
-
-      {/* Loading state */}
-      {loading ? (
-        <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
-          <Loader2 size={36} className="animate-spin text-[#0F172A]" />
-          <span className="text-xs font-bold">Generando consolidado de inteligencia comercial...</span>
-        </div>
-      ) : (
-        <>
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB 1: RESUMEN EJECUTIVO & KPIs                                */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'resumen' && (
-            <div className="space-y-6">
-              {/* Encabezado y Acciones de PDF para Resumen */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
-                    <BarChart3 size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
-                      Resumen Ejecutivo & Indicadores Clave (KPIs)
-                    </h3>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      Facturación total, volumen de calzado, margen bruto y comportamiento de ventas
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => handleReporteResumenPdf('preview')}
-                    disabled={loading || !reporteData}
-                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Eye size={14} />
-                    <span>Previsualizar PDF</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteResumenPdf('download')}
-                    disabled={loading || !reporteData}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Download size={14} />
-                    <span>Descargar PDF</span>
-                  </button>
-                </div>
-              </div>
-              {/* Tarjetas KPIs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 1. Ventas Totales */}
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      {isVendedor
-                        ? 'Mis Ventas Totales'
-                        : isGlobalAdmin && sucursalSeleccionada === 'TODAS'
-                        ? 'Ventas Totales del Negocio'
-                        : 'Ventas de la Sucursal'}
-                    </span>
-                    <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
-                      <DollarSign size={18} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-black text-[var(--foreground)]">
-                      ${kpis.totalIngresos.toFixed(2)}
-                    </div>
-                    <div className="text-[11px] text-[var(--muted-foreground)] font-semibold mt-1">
-                      {isVendedor ? 'Mis transacciones registradas' : `${kpis.totalPedidos} pedidos registrados`}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Pares Vendidos */}
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      {isVendedor ? 'Mis Pares Vendidos' : 'Calzado Vendido'}
-                    </span>
-                    <div className="p-2 bg-indigo-500/10 text-indigo-600 rounded-xl">
-                      <ShoppingBag size={18} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-black text-[var(--foreground)]">
-                      {kpis.totalParesVendidos} <span className="text-sm font-bold text-[var(--muted-foreground)]">pares</span>
-                    </div>
-                    <div className="text-[11px] text-[var(--muted-foreground)] font-semibold mt-1">
-                      Ticket Promedio: ${kpis.ticketPromedio.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Margen Bruto Estimado */}
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      Ganancia Bruta Est.
-                    </span>
-                    <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
-                      <TrendingUp size={18} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-black text-emerald-600">
-                      ${kpis.gananciaBruta.toFixed(2)}
-                    </div>
-                    <div className="text-[11px] text-amber-700 dark:text-amber-400 font-bold mt-1">
-                      Margen: {kpis.margenPorcentaje.toFixed(1)}% sobre costo
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. Recaudación de Cobros */}
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      Recaudación Cobros
-                    </span>
-                    <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
-                      <Receipt size={18} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-black text-[var(--foreground)]">
-                      ${kpis.totalRecaudadoCobros.toFixed(2)}
-                    </div>
-                    <div className="text-[11px] text-red-500 font-bold mt-1">
-                      Saldo Cartera Activa: ${kpis.saldoCarteraTotal.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Gráfico de Evolución Temporal Profesional */}
-              <GraficoCurvaTendencia
-                puntos={
-                  reporteData?.serieTemporal?.map((t: any) => ({
-                    label: t.label,
-                    valor: t.ingresos || 0,
-                    valor2: t.pares || 0,
-                    valorFormateado: `$${(t.ingresos || 0).toFixed(2)}`,
-                    valor2Formateado: `${t.pares || 0} pares`,
-                  })) || []
-                }
-                titulo="Curva de Evolución Temporal de Ingresos & Volumen de Pares"
-                subtitulo="Comportamiento dinámico de la facturación y despacho físico en el periodo seleccionado"
-                primaryColor={negocioInfo?.primaryColor || '#0EA5E9'}
-                secondaryColor="#10B981"
-                serie1Nombre="Facturación ($)"
-                serie2Nombre="Pares Vendidos"
-                emptyMessage="No hay movimientos registrados para el filtro de fechas seleccionado."
-              />
-
-              {/* Distribución por Canales y Formas de Pago */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Canales de Venta */}
-                <GraficoDonutCircular
-                  items={[
-                    {
-                      label: 'POS Mostrador / Directo',
-                      valor: reporteData?.distribucionCanales?.MANUAL?.monto || 0,
-                      color: '#0EA5E9',
-                      subtexto: `${reporteData?.distribucionCanales?.MANUAL?.pares || 0} pares (${reporteData?.distribucionCanales?.MANUAL?.count || 0} pedidos)`,
-                    },
-                    {
-                      label: 'Pedidos WhatsApp / Asesor',
-                      valor: reporteData?.distribucionCanales?.WHATSAPP?.monto || 0,
-                      color: '#10B981',
-                      subtexto: `${reporteData?.distribucionCanales?.WHATSAPP?.pares || 0} pares (${reporteData?.distribucionCanales?.WHATSAPP?.count || 0} pedidos)`,
-                    },
-                    {
-                      label: 'Catálogo Digital Web',
-                      valor: reporteData?.distribucionCanales?.CATALOGO?.monto || 0,
-                      color: '#6366F1',
-                      subtexto: `${reporteData?.distribucionCanales?.CATALOGO?.pares || 0} pares (${reporteData?.distribucionCanales?.CATALOGO?.count || 0} pedidos)`,
-                    },
-                  ]}
-                  titulo="Ventas por Canal de Entrada"
-                  subtitulo="Desglose de ingresos según el origen del pedido"
-                  valorCentro={kpis.totalIngresos > 0 ? `$${kpis.totalIngresos.toFixed(0)}` : '$0'}
-                  etiquetaCentro="Total Facturado"
-                />
-
-                {/* Formas de Pago */}
-                <GraficoDonutCircular
-                  items={[
-                    {
-                      label: 'Ventas de Contado',
-                      valor: reporteData?.distribucionFormasPago?.CONTADO?.monto || 0,
-                      color: '#10B981',
-                      subtexto: `${reporteData?.distribucionFormasPago?.CONTADO?.count || 0} transacciones cobradas`,
-                    },
-                    {
-                      label: 'Ventas a Crédito',
-                      valor: reporteData?.distribucionFormasPago?.CREDITO?.monto || 0,
-                      color: '#3B82F6',
-                      subtexto: `${reporteData?.distribucionFormasPago?.CREDITO?.count || 0} notas con saldo diferido`,
-                    },
-                  ]}
-                  titulo="Distribución Contado vs Crédito"
-                  subtitulo="Estructura de cobro de las transacciones comerciales"
-                  valorCentro={
-                    kpis.totalIngresos > 0 && reporteData?.distribucionFormasPago?.CONTADO?.monto
-                      ? `${((reporteData.distribucionFormasPago.CONTADO.monto / kpis.totalIngresos) * 100).toFixed(0)}%`
-                      : '100%'
-                  }
-                  etiquetaCentro="Al Contado"
-                />
-              </div>
-
-              {/* Métricas de Eficiencia Comercial */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-                  <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
-                    Ticket Promedio por Pedido
-                  </span>
-                  <div className="text-xl font-black text-[var(--foreground)]">
-                    ${kpis.totalPedidos > 0 ? (kpis.totalIngresos / kpis.totalPedidos).toFixed(2) : '0.00'}
-                  </div>
-                  <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5 block">
-                    Facturación media por cada transacción
-                  </span>
-                </div>
-
-                <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-                  <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
-                    Volumen Promedio por Venta
-                  </span>
-                  <div className="text-xl font-black text-blue-600">
-                    {kpis.totalPedidos > 0 && (kpis.totalParesVendidos || 0) > 0
-                      ? ((kpis.totalParesVendidos || 0) / kpis.totalPedidos).toFixed(1)
-                      : '0.0'} pares
-                  </div>
-                  <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5 block">
-                    Pares promedio comercializados por pedido
-                  </span>
-                </div>
-
-                <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-                  <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
-                    Tasa de Cobro Inmediato
-                  </span>
-                  <div className="text-xl font-black text-emerald-600">
-                    {kpis.totalIngresos > 0 && reporteData?.distribucionFormasPago?.CONTADO?.monto
-                      ? `${((reporteData.distribucionFormasPago.CONTADO.monto / kpis.totalIngresos) * 100).toFixed(0)}%`
-                      : '100%'}
-                  </div>
-                  <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5 block">
-                    Ventas liquidadas al contado sin diferir
-                  </span>
-                </div>
-              </div>
-
-              {/* Tablas Ejecutivas: Top Modelos y Rendimiento de Vendedores */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Top 5 Modelos */}
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3.5 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
-                    <div>
-                      <h4 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
-                        <ShoppingBag size={16} className="text-blue-500" />
-                        Top Modelos Más Vendidos
-                      </h4>
-                      <p className="text-[11px] text-[var(--muted-foreground)]">
-                        Calzado con mayor rotación en el periodo
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600">
-                      Catálogo
-                    </span>
-                  </div>
-
-                  {Array.isArray(reporteData?.topModelos) && reporteData.topModelos.length > 0 ? (
-                    <div className="space-y-2.5">
-                      {reporteData.topModelos.slice(0, 5).map((m: any, idx: number) => {
-                        const maxP = Math.max(...reporteData.topModelos.map((x: any) => x.pares || 0), 1);
-                        const pct = Math.min(100, Math.max(8, ((m.pares || 0) / maxP) * 100));
-                        const colors = ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'];
-                        const col = colors[idx % colors.length];
-
-                        return (
-                          <div key={idx} className="p-2.5 bg-[var(--muted)]/20 border border-[var(--border)]/60 rounded-xl space-y-1.5">
-                            <div className="flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span
-                                  className="w-5 h-5 rounded-lg flex items-center justify-center font-black text-[10px] text-white shrink-0"
-                                  style={{ backgroundColor: col }}
-                                >
-                                  {idx + 1}
-                                </span>
-                                <span className="font-bold text-[var(--foreground)] truncate max-w-[180px]">
-                                  {m.modelName} {m.color ? `(${m.color})` : ''}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span className="font-mono font-bold text-xs text-[var(--foreground)]">
-                                  {m.pares} pares
-                                </span>
-                                <span className="font-mono font-black text-xs text-emerald-600">
-                                  ${Number(m.ingresos || 0).toFixed(0)}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="w-full bg-[var(--muted)]/40 h-1.5 rounded-full overflow-hidden">
-                              <div
-                                style={{ width: `${pct}%`, backgroundColor: col }}
-                                className="h-full rounded-full transition-all duration-500"
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="p-6 text-center text-xs text-[var(--muted-foreground)] italic">
-                      No hay datos de modelos para este periodo.
-                    </div>
-                  )}
-                </div>
-
-                {/* Ranking de Vendedores */}
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3.5 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
-                    <div>
-                      <h4 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
-                        <Users size={16} className="text-emerald-500" />
-                        Productividad del Equipo de Ventas
-                      </h4>
-                      <p className="text-[11px] text-[var(--muted-foreground)]">
-                        Pares comercializados e ingresos por asesor
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600">
-                      Personal
-                    </span>
-                  </div>
-
-                  {Array.isArray(reporteData?.rankingVendedores) && reporteData.rankingVendedores.length > 0 ? (
-                    <div className="space-y-2.5">
-                      {reporteData.rankingVendedores.slice(0, 5).map((v: any, idx: number) => {
-                        const totalVtas = kpis.totalIngresos || 1;
-                        const pctV = Math.min(100, Math.max(0, ((v.totalIngresos || 0) / totalVtas) * 100));
-
-                        return (
-                          <div key={idx} className="p-2.5 bg-[var(--muted)]/20 border border-[var(--border)]/60 rounded-xl space-y-1.5">
-                            <div className="flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="w-5 h-5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-black text-[10px] shrink-0">
-                                  {idx + 1}
-                                </span>
-                                <span className="font-bold text-[var(--foreground)] truncate max-w-[180px]">
-                                  {capitalizarNombreCompleto(v.nombre || 'Vendedor')}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span className="font-mono text-xs text-[var(--muted-foreground)]">
-                                  {v.paresVendidos || 0} pares
-                                </span>
-                                <span className="font-mono font-black text-xs text-[var(--foreground)]">
-                                  ${Number(v.totalIngresos || 0).toFixed(2)}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="w-full bg-[var(--muted)]/40 h-1.5 rounded-full overflow-hidden">
-                              <div
-                                style={{ width: `${pctV}%` }}
-                                className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="p-6 text-center text-xs text-[var(--muted-foreground)] italic">
-                      No hay registros de vendedores para este periodo.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB: VENTAS POR CLIENTE & TRANSACCIÓN                          */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'ventas_cliente' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Cabecera del Módulo */}
-              <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
-                      VENTAS AGRUPADAS POR COMPRADOR
-                    </span>
-                    <span className="text-xs text-[var(--muted-foreground)] font-mono">
-                      {canalSeleccionado === 'POS' ? 'Canal: Solo POS Mostrador' : canalSeleccionado === 'PEDIDOS' ? 'Canal: Solo Pedidos / Mayoristas' : 'Canal: Todos los Canales'}
-                    </span>
-                  </div>
-                  <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
-                    <Users size={18} className="text-emerald-600" />
-                    <span>Ventas Detalladas por Cliente & Transacción</span>
-                  </h3>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    Revisa exactamente qué compró cada cliente en el periodo: fecha, comprobante, modelos, serie y curvas de tallas físicas entregadas.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={cargarReporteVentasDetalladas}
-                    disabled={loadingVentasDetalladas}
-                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <RefreshCw size={13} className={loadingVentasDetalladas ? 'animate-spin' : ''} />
-                    <span>Actualizar</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteVentasPorClientePdf('preview')}
-                    disabled={loadingVentasDetalladas || !ventasDetalladasData}
-                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    {generandoVentasClientePdf ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
-                    <span>Previsualizar PDF</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteVentasPorClientePdf('download')}
-                    disabled={loadingVentasDetalladas || !ventasDetalladasData}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Download size={13} />
-                    <span>Descargar PDF</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Tarjetas KPI Superiores */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      Clientes con Compras
-                    </span>
-                    <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
-                      <Users size={16} />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-black text-[var(--foreground)] tracking-tight">
-                    {ventasDetalladasData?.resumenKpis?.totalClientesUnicos || 0}
-                  </div>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">
-                    Compradores registrados en el periodo
-                  </p>
-                </div>
-
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      Total Transacciones
-                    </span>
-                    <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
-                      <Receipt size={16} />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-black text-[var(--foreground)] tracking-tight">
-                    {ventasDetalladasData?.resumenKpis?.totalTransacciones || 0}
-                  </div>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">
-                    Ventas POS y entregas de pedidos
-                  </p>
-                </div>
-
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      Pares Vendidos
-                    </span>
-                    <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
-                      <Package size={16} />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-black text-[var(--foreground)] tracking-tight">
-                    {ventasDetalladasData?.resumenKpis?.totalPares || 0} <span className="text-sm font-normal text-[var(--muted-foreground)]">pares</span>
-                  </div>
-                  <p className="text-[11px] text-emerald-600 font-bold">
-                    {ventasDetalladasData?.resumenKpis?.totalDocenasEquivalentes || '0 docenas'}
-                  </p>
-                </div>
-
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      Total Facturado
-                    </span>
-                    <div className="p-2 bg-purple-500/10 text-purple-600 rounded-xl">
-                      <DollarSign size={16} />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-black text-emerald-600 tracking-tight">
-                    ${(ventasDetalladasData?.resumenKpis?.totalMontoVendido || 0).toFixed(2)}
-                  </div>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">
-                    Ticket promedio: ${(ventasDetalladasData?.resumenKpis?.ticketPromedio || 0).toFixed(2)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Barra de Búsqueda y Filtros de Cliente */}
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                <div className="relative flex-1">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
-                  <input
-                    type="text"
-                    placeholder="Buscar cliente por nombre, cédula o teléfono..."
-                    value={filtroVentasClienteBusqueda}
-                    onChange={(e) => setFiltroVentasClienteBusqueda(e.target.value)}
-                    className="w-full pl-9 pr-3.5 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                  />
-                  {filtroVentasClienteBusqueda && (
-                    <button
-                      type="button"
-                      onClick={() => setFiltroVentasClienteBusqueda('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                    >
-                      <X size={13} />
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 text-xs text-[var(--muted-foreground)] font-semibold">
-                  <span>Mostrando {
-                    (ventasDetalladasData?.ventasPorCliente || []).filter((c: any) => {
-                      if (!filtroVentasClienteBusqueda.trim()) return true;
-                      const term = normalizarParaBusqueda(filtroVentasClienteBusqueda);
-                      return normalizarParaBusqueda(c.nombre).includes(term) ||
-                             (c.identificacion && normalizarParaBusqueda(c.identificacion).includes(term)) ||
-                             (c.telefono && c.telefono.includes(filtroVentasClienteBusqueda));
-                    }).length
-                  } cliente(s)</span>
-                </div>
-              </div>
-
-              {/* Listado de Clientes con Transacciones y Curvas de Tallas */}
-              {loadingVentasDetalladas ? (
-                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
-                  <Loader2 size={32} className="animate-spin text-emerald-600" />
-                  <span className="text-xs font-bold">Cargando ventas y curvas de calzado por cliente...</span>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {(() => {
-                    const clientesFiltrados = (ventasDetalladasData?.ventasPorCliente || []).filter((c: any) => {
-                      if (!filtroVentasClienteBusqueda.trim()) return true;
-                      const term = normalizarParaBusqueda(filtroVentasClienteBusqueda);
-                      return normalizarParaBusqueda(c.nombre).includes(term) ||
-                             (c.identificacion && normalizarParaBusqueda(c.identificacion).includes(term)) ||
-                             (c.telefono && c.telefono.includes(filtroVentasClienteBusqueda));
-                    });
-
-                    if (clientesFiltrados.length === 0) {
-                      return (
-                        <div className="p-12 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2">
-                          <Users size={32} className="mx-auto text-[var(--muted-foreground)]/40" />
-                          <p className="font-bold text-sm text-[var(--foreground)]">No se encontraron clientes con ventas</p>
-                          <p>Verifica el rango de fechas seleccionado o los filtros de canal de venta.</p>
-                        </div>
-                      );
-                    }
-
-                    return clientesFiltrados.map((cli: any, idx: number) => {
-                      const expandido = clienteDetalleExpandidoId === cli.clienteId || clienteDetalleExpandidoId === 'TODOS';
-                      return (
-                        <div
-                          key={cli.clienteId || idx}
-                          className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs transition-all"
-                        >
-                          {/* Cabecera del Cliente */}
-                          <div
-                            onClick={() => setClienteDetalleExpandidoId(expandido ? null : cli.clienteId)}
-                            className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-[var(--muted)]/30 transition-colors"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold text-sm">
-                                {cli.nombre ? cli.nombre.substring(0, 2).toUpperCase() : 'CL'}
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-extrabold text-sm text-[var(--foreground)]">
-                                    {capitalizarNombreCompleto(cli.nombre) || 'CLIENTE GENERAL'}
-                                  </span>
-                                  {cli.identificacion && (
-                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[var(--muted)] text-[var(--muted-foreground)]">
-                                      {cli.identificacion}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-xs text-[var(--muted-foreground)] flex items-center gap-2 mt-0.5">
-                                  {cli.telefono && (
-                                    <span className="flex items-center gap-1">
-                                      <Phone size={11} /> {cli.telefono}
-                                    </span>
-                                  )}
-                                  <span>•</span>
-                                  <span>{cli.totalTransacciones} compra(s)</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Resumen numérico a la derecha */}
-                            <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                <div className="text-xs font-extrabold text-[var(--foreground)]">
-                                  {cli.totalPares} pares <span className="text-emerald-600 font-bold">({cli.totalDocenasLabel})</span>
-                                </div>
-                                <div className="text-sm font-black text-emerald-600">
-                                  ${cli.totalMonto.toFixed(2)}
-                                </div>
-                              </div>
-                              <ChevronDown
-                                size={18}
-                                className={`text-[var(--muted-foreground)] transition-transform duration-200 ${expandido ? 'rotate-180' : ''}`}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Detalle Desplegable de Transacciones */}
-                          {expandido && (
-                            <div className="border-t border-[var(--border)] p-5 bg-[var(--background)]/50 space-y-4">
-                              {(cli.transacciones || []).map((tx: any, tIdx: number) => (
-                                <div
-                                  key={tx.orderId || tIdx}
-                                  className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-3"
-                                >
-                                  {/* Cabecera de la Transacción */}
-                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)] pb-2.5 text-xs">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="font-bold text-[var(--foreground)]">
-                                        Comprobante: {tx.comprobanteNumero}
-                                      </span>
-                                      <span className="text-[var(--muted-foreground)]">•</span>
-                                      <span className="text-[var(--muted-foreground)]">{tx.fechaFormateada}</span>
-                                      <span className="text-[var(--muted-foreground)]">•</span>
-                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                        tx.canal === 'POS'
-                                          ? 'bg-blue-500/10 text-blue-600'
-                                          : 'bg-amber-500/10 text-amber-600'
-                                      }`}>
-                                        {tx.canalLabel}
-                                      </span>
-                                      <span className="px-2 py-0.5 rounded-md bg-[var(--muted)] text-[var(--muted-foreground)] text-[10px] font-semibold">
-                                        {tx.tipoPago}
-                                      </span>
-                                      {tx.vendedorNombre && (
-                                        <span className="text-[var(--muted-foreground)] text-[11px]">
-                                          Vend: {tx.vendedorNombre}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="text-right font-extrabold text-xs text-[var(--foreground)]">
-                                      Subtotal: <span className="text-emerald-600 font-bold">${tx.montoTotal.toFixed(2)}</span> ({tx.totalPares} p)
-                                    </div>
-                                  </div>
-
-                                  {/* Listado de Modelos con Curva de Tallas */}
-                                  <div className="space-y-2">
-                                    {(tx.items || []).map((it: any, iIdx: number) => (
-                                      <div
-                                        key={it.lineId || iIdx}
-                                        className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          {it.imageUrl ? (
-                                            <img
-                                              src={it.imageUrl}
-                                              alt={it.modelName}
-                                              className="w-11 h-11 rounded-lg object-cover border border-[var(--border)]"
-                                            />
-                                          ) : (
-                                            <div className="w-11 h-11 rounded-lg bg-[var(--muted)] flex items-center justify-center font-bold text-xs text-[var(--muted-foreground)]">
-                                              CAL
-                                            </div>
-                                          )}
-                                          <div>
-                                            <div className="font-extrabold uppercase text-[var(--foreground)]">
-                                              {it.modelName} {it.color ? `· ${it.color}` : ''}
-                                            </div>
-                                            <div className="text-[11px] font-bold text-emerald-600">
-                                              Serie: {formatearNombreSerie(it.serieNombre)}
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        {/* Curva de Tallas */}
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                          <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">Curva:</span>
-                                          <span className="px-2.5 py-1 rounded-lg bg-[var(--card)] border border-[var(--border)] font-mono font-bold text-[11px] text-[var(--foreground)]">
-                                            {it.curvaTallas || `${it.totalPares} pares`}
-                                          </span>
-                                        </div>
-
-                                        {/* Cantidad y Subtotal */}
-                                        <div className="text-right">
-                                          <div className="font-bold text-[var(--foreground)]">
-                                            {it.totalPares} pares <span className="text-emerald-600 font-bold">({it.docenasLabel})</span>
-                                          </div>
-                                          <div className="text-xs text-[var(--muted-foreground)]">
-                                            ${it.precioUnitario.toFixed(2)} / par • <span className="font-extrabold text-emerald-600">${it.subtotal.toFixed(2)}</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB: CONSOLIDADO DE CALZADO VENDIDO CON FOTOGRAFÍA             */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'ventas_modelos_foto' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Cabecera del Módulo */}
-              <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25">
-                      TOTALIZACIÓN GENERAL CON FOTOGRAFÍA
-                    </span>
-                    <span className="text-xs text-[var(--muted-foreground)] font-mono">
-                      {canalSeleccionado === 'POS' ? 'Canal: Solo POS Mostrador' : canalSeleccionado === 'PEDIDOS' ? 'Canal: Solo Pedidos / Mayoristas' : 'Canal: Todos los Canales'}
-                    </span>
-                  </div>
-                  <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
-                    <Package size={18} className="text-blue-600" />
-                    <span>Consolidado de Calzado Vendido con Fotografía</span>
-                  </h3>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    Todos los modelos vendidos agrupados en un solo consolidado con su fotografía real, serie, desglose exacto de tallas físicas y total de docenas.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={cargarReporteVentasDetalladas}
-                    disabled={loadingVentasDetalladas}
-                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <RefreshCw size={13} className={loadingVentasDetalladas ? 'animate-spin' : ''} />
-                    <span>Actualizar</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteConsolidadoModelosPdf('preview')}
-                    disabled={loadingVentasDetalladas || !ventasDetalladasData}
-                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    {generandoConsolidadoModelosPdf ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
-                    <span>Previsualizar PDF</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteConsolidadoModelosPdf('download')}
-                    disabled={loadingVentasDetalladas || !ventasDetalladasData}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Download size={13} />
-                    <span>Descargar PDF</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Tarjetas KPI Superiores */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      Modelos Vendidos
-                    </span>
-                    <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
-                      <Package size={16} />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-black text-[var(--foreground)] tracking-tight">
-                    {ventasDetalladasData?.resumenKpis?.totalModelosDistintos || 0}
-                  </div>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">
-                    Modelos con demanda activa
-                  </p>
-                </div>
-
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      Total Pares Vendidos
-                    </span>
-                    <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
-                      <Boxes size={16} />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-black text-[var(--foreground)] tracking-tight">
-                    {ventasDetalladasData?.resumenKpis?.totalPares || 0} <span className="text-sm font-normal text-[var(--muted-foreground)]">pares</span>
-                  </div>
-                  <p className="text-[11px] text-emerald-600 font-bold">
-                    {ventasDetalladasData?.resumenKpis?.totalDocenasEquivalentes || '0 docenas'}
-                  </p>
-                </div>
-
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      Clientes Compradores
-                    </span>
-                    <div className="p-2 bg-purple-500/10 text-purple-600 rounded-xl">
-                      <Users size={16} />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-black text-[var(--foreground)] tracking-tight">
-                    {ventasDetalladasData?.resumenKpis?.totalClientesUnicos || 0}
-                  </div>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">
-                    Total de clientes compradores
-                  </p>
-                </div>
-
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      Recaudación Total
-                    </span>
-                    <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
-                      <DollarSign size={16} />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-black text-emerald-600 tracking-tight">
-                    ${(ventasDetalladasData?.resumenKpis?.totalMontoVendido || 0).toFixed(2)}
-                  </div>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">
-                    {ventasDetalladasData?.resumenKpis?.totalTransacciones || 0} transacciones acumuladas
-                  </p>
-                </div>
-              </div>
-
-              {/* Barra de Filtros y Selector de Vista */}
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                <div className="relative flex-1">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
-                  <input
-                    type="text"
-                    placeholder="Buscar calzado por modelo, color o serie..."
-                    value={filtroVentasModeloBusqueda}
-                    onChange={(e) => setFiltroVentasModeloBusqueda(e.target.value)}
-                    className="w-full pl-9 pr-3.5 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                  />
-                  {filtroVentasModeloBusqueda && (
-                    <button
-                      type="button"
-                      onClick={() => setFiltroVentasModeloBusqueda('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                    >
-                      <X size={13} />
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex bg-[var(--background)] border border-[var(--border)] p-1 rounded-xl">
-                    <button
-                      type="button"
-                      onClick={() => setVistaModelosConsolidados('tabla')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                        vistaModelosConsolidados === 'tabla'
-                          ? 'bg-[#0F172A] text-white shadow-2xs'
-                          : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                      }`}
-                    >
-                      <List size={13} />
-                      <span>Tabla</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setVistaModelosConsolidados('tarjetas')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                        vistaModelosConsolidados === 'tarjetas'
-                          ? 'bg-[#0F172A] text-white shadow-2xs'
-                          : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                      }`}
-                    >
-                      <Grid size={13} />
-                      <span>Tarjetas con Curva</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contenido: Tabla o Tarjetas */}
-              {loadingVentasDetalladas ? (
-                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
-                  <Loader2 size={32} className="animate-spin text-blue-600" />
-                  <span className="text-xs font-bold">Cargando consolidado de calzado vendido con fotografía...</span>
-                </div>
-              ) : (
-                (() => {
-                  const modelosFiltrados = (ventasDetalladasData?.modelosConsolidados || []).filter((m: any) => {
-                    if (!filtroVentasModeloBusqueda.trim()) return true;
-                    const term = normalizarParaBusqueda(filtroVentasModeloBusqueda);
-                    return normalizarParaBusqueda(m.modelName).includes(term) ||
-                           (m.color && normalizarParaBusqueda(m.color).includes(term)) ||
-                           (m.serieNombre && normalizarParaBusqueda(m.serieNombre).includes(term));
-                  });
-
-                  if (modelosFiltrados.length === 0) {
-                    return (
-                      <div className="p-12 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2">
-                        <Package size={32} className="mx-auto text-[var(--muted-foreground)]/40" />
-                        <p className="font-bold text-sm text-[var(--foreground)]">No hay modelos de calzado vendidos</p>
-                        <p>No se registraron ventas para el periodo o filtros indicados.</p>
-                      </div>
-                    );
-                  }
-
-                  if (vistaModelosConsolidados === 'tarjetas') {
-                    return (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {modelosFiltrados.map((mod: any, mIdx: number) => (
-                          <div
-                            key={mod.productId || mIdx}
-                            className="bg-[var(--card)] border border-[var(--border)] rounded-3xl p-5 space-y-3.5 shadow-xs hover:border-[#0F172A] transition-all flex flex-col justify-between"
-                          >
-                            {/* Encabezado con Miniatura y Serie */}
-                            <div className="flex items-start gap-3">
-                              {mod.imageUrl ? (
-                                <img
-                                  src={mod.imageUrl}
-                                  alt={mod.modelName}
-                                  className="w-14 h-14 rounded-2xl object-cover border border-[var(--border)] shrink-0 shadow-2xs"
-                                />
-                              ) : (
-                                <div className="w-14 h-14 rounded-2xl bg-[var(--muted)] flex items-center justify-center font-bold text-xs text-[var(--muted-foreground)] shrink-0">
-                                  CAL
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <div className="font-black text-sm uppercase text-[var(--foreground)] truncate">
-                                  {mod.modelName}
-                                </div>
-                                <div className="text-xs text-[var(--muted-foreground)]">
-                                  {mod.color || 'Color estándar'}
-                                </div>
-                                <div className="text-[11px] font-bold text-emerald-600 mt-0.5">
-                                  Serie: {formatearNombreSerie(mod.serieNombre)}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Curva de Tallas Vendidas */}
-                            <div className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-2xl space-y-1.5">
-                              <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
-                                Curva de Tallas Entregadas:
-                              </span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {(mod.tallasDesglose || []).map((t: any, tIdx: number) => (
-                                  <span
-                                    key={tIdx}
-                                    className="px-2 py-0.5 rounded-lg bg-[var(--card)] border border-[var(--border)] text-[11px] font-mono font-bold text-[var(--foreground)]"
-                                  >
-                                    T{t.talla}: <span className="text-emerald-600">{t.cantidad}</span>
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Resumen Comercial Inferior */}
-                            <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between text-xs">
-                              <div>
-                                <div className="font-extrabold text-[var(--foreground)]">
-                                  {mod.totalPares} pares
-                                </div>
-                                <div className="text-[11px] text-emerald-600 font-bold">
-                                  {mod.docenasLabel}
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-[11px] text-[var(--muted-foreground)]">
-                                  ${mod.precioPromedioPar.toFixed(2)} / par
-                                </div>
-                                <div className="font-black text-sm text-emerald-600">
-                                  ${mod.totalMonto.toFixed(2)}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  }
-
-                  // Vista de Tabla Detallada
-                  return (
-                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-xs">
-                          <thead>
-                            <tr className="bg-[var(--muted)]/50 border-b border-[var(--border)] text-[var(--muted-foreground)] font-bold text-[11px] uppercase tracking-wider">
-                              <th className="py-3 px-3.5 text-center w-14">Foto</th>
-                              <th className="py-3 px-3.5">Modelo & Color</th>
-                              <th className="py-3 px-3.5">Serie Comercial</th>
-                              <th className="py-3 px-3.5">Curva de Tallas Vendidas</th>
-                              <th className="py-3 px-3.5 text-right">Volumen Total</th>
-                              <th className="py-3 px-3.5 text-right">P. Promedio</th>
-                              <th className="py-3 px-3.5 text-right">Recaudación</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-[var(--border)]">
-                            {modelosFiltrados.map((mod: any, mIdx: number) => (
-                              <tr key={mod.productId || mIdx} className="hover:bg-[var(--muted)]/20 transition-colors">
-                                <td className="py-2.5 px-3.5 text-center">
-                                  {mod.imageUrl ? (
-                                    <img
-                                      src={mod.imageUrl}
-                                      alt={mod.modelName}
-                                      className="w-11 h-11 rounded-xl object-cover border border-[var(--border)] mx-auto shadow-2xs"
-                                    />
-                                  ) : (
-                                    <div className="w-11 h-11 rounded-xl bg-[var(--muted)] flex items-center justify-center font-bold text-[10px] text-[var(--muted-foreground)] mx-auto">
-                                      CAL
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="py-2.5 px-3.5">
-                                  <div className="font-extrabold uppercase text-[var(--foreground)]">
-                                    {mod.modelName}
-                                  </div>
-                                  <div className="text-[11px] text-[var(--muted-foreground)]">
-                                    {mod.color || 'Color estándar'}
-                                  </div>
-                                  <div className="text-[10px] text-[var(--muted-foreground)]/70">
-                                    {mod.clientesCount || 1} cliente(s) • {mod.transaccionesCount || 1} pedido(s)
-                                  </div>
-                                </td>
-                                <td className="py-2.5 px-3.5">
-                                  <span className="font-bold text-emerald-600">
-                                    {formatearNombreSerie(mod.serieNombre)}
-                                  </span>
-                                </td>
-                                <td className="py-2.5 px-3.5">
-                                  <div className="font-mono text-[11px] font-bold text-[var(--foreground)] bg-[var(--background)] px-2.5 py-1 rounded-lg border border-[var(--border)] inline-block max-w-md">
-                                    {mod.curvaTallas || `${mod.totalPares} pares`}
-                                  </div>
-                                </td>
-                                <td className="py-2.5 px-3.5 text-right">
-                                  <div className="font-extrabold text-[var(--foreground)]">
-                                    {mod.totalPares} pares
-                                  </div>
-                                  <div className="text-[11px] text-emerald-600 font-bold">
-                                    {mod.docenasLabel}
-                                  </div>
-                                </td>
-                                <td className="py-2.5 px-3.5 text-right text-[var(--muted-foreground)] font-semibold">
-                                  ${mod.precioPromedioPar.toFixed(2)}
-                                </td>
-                                <td className="py-2.5 px-3.5 text-right font-black text-sm text-emerald-600">
-                                  ${mod.totalMonto.toFixed(2)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr className="bg-[var(--muted)]/60 font-bold border-t-2 border-[var(--border)] text-xs">
-                              <td colSpan={4} className="py-3 px-3.5 text-right font-black uppercase text-[var(--foreground)]">
-                                Total Consolidado ({modelosFiltrados.length} Modelos):
-                              </td>
-                              <td className="py-3 px-3.5 text-right font-black text-[var(--foreground)]">
-                                {ventasDetalladasData?.resumenKpis?.totalPares || 0} pares
-                                <div className="text-[10px] text-emerald-600 font-bold font-normal">
-                                  {ventasDetalladasData?.resumenKpis?.totalDocenasEquivalentes || ''}
-                                </div>
-                              </td>
-                              <td className="py-3 px-3.5 text-right text-[var(--muted-foreground)]">
-                                -
-                              </td>
-                              <td className="py-3 px-3.5 text-right font-black text-emerald-600 text-sm">
-                                ${(ventasDetalladasData?.resumenKpis?.totalMontoVendido || 0).toFixed(2)}
-                              </td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </div>
-                  );
-                })()
-              )}
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB POS: REPORTE DEL PUNTO DE VENTA (MOSTRADOR / CAJA)          */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'pos' && (
-            <div className="space-y-6">
-              {/* Encabezado y Acciones de PDF para POS */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl shadow-sm">
-                    <Store size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
-                      Reporte de Punto de Venta & Caja Mostrador
-                    </h3>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      Registro y control de ventas directas por par, recaudación en efectivo, tarjetas y transferencias por sucursal
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={cargarReportePos}
-                    disabled={loadingPos}
-                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <RefreshCw size={14} className={loadingPos ? 'animate-spin' : ''} />
-                    <span>Recargar</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReportePosPdf('preview')}
-                    disabled={loadingPos || !posData}
-                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Eye size={14} />
-                    <span>Previsualizar PDF</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReportePosPdf('download')}
-                    disabled={loadingPos || !posData}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Download size={14} />
-                    <span>Descargar PDF</span>
-                  </button>
-                </div>
-              </div>
-
-              {loadingPos ? (
-                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
-                  <Loader2 size={36} className="animate-spin text-blue-600" />
-                  <span className="text-xs font-bold">Consolidando transacciones del Punto de Venta...</span>
-                </div>
-              ) : posData ? (
-                <div className="space-y-6">
-                  {/* KPIs del Punto de Venta */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
-                        <span className="text-[11px] font-bold uppercase">Total Recaudado POS</span>
-                        <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
-                          <DollarSign size={16} />
-                        </div>
-                      </div>
-                      <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                        ${posData.metricas?.totalRecaudado?.toFixed(2) || '0.00'}
-                      </div>
-                      <div className="text-[11px] text-[var(--muted-foreground)]">
-                        Cobros en mostrador del período
-                      </div>
-                    </div>
-
-                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
-                        <span className="text-[11px] font-bold uppercase">Ventas Realizadas</span>
-                        <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
-                          <Receipt size={16} />
-                        </div>
-                      </div>
-                      <div className="text-2xl font-black text-[var(--foreground)]">
-                        {posData.metricas?.cantidadVentas || 0}
-                      </div>
-                      <div className="text-[11px] text-[var(--muted-foreground)]">
-                        Tickets emitidos en caja
-                      </div>
-                    </div>
-
-                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
-                        <span className="text-[11px] font-bold uppercase">Pares Despachados</span>
-                        <div className="p-2 bg-indigo-500/10 text-indigo-600 rounded-xl">
-                          <ShoppingBag size={16} />
-                        </div>
-                      </div>
-                      <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                        {posData.metricas?.cantidadPares || 0} pares
-                      </div>
-                      <div className="text-[11px] text-[var(--muted-foreground)]">
-                        Calzado entregado en tienda
-                      </div>
-                    </div>
-
-                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
-                        <span className="text-[11px] font-bold uppercase">Ticket Promedio POS</span>
-                        <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
-                          <Tag size={16} />
-                        </div>
-                      </div>
-                      <div className="text-2xl font-black text-[var(--foreground)] font-mono">
-                        ${posData.metricas?.ticketPromedio?.toFixed(2) || '0.00'}
-                      </div>
-                      <div className="text-[11px] text-[var(--muted-foreground)]">
-                        Gasto promedio por cliente
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Gráficas Estadísticas del Punto de Venta */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Donut de Métodos de Recaudación en Caja */}
-                    <GraficoDonutCircular
-                      items={[
-                        {
-                          label: 'Efectivo en Caja',
-                          valor: posData.metricas?.desgloseMetodosPago?.efectivo?.total || 0,
-                          color: '#10B981',
-                          subtexto: `${posData.metricas?.desgloseMetodosPago?.efectivo?.cantidad || 0} cobros realizados`,
-                        },
-                        {
-                          label: 'Tarjeta (Datafast / Voucher)',
-                          valor: posData.metricas?.desgloseMetodosPago?.tarjeta?.total || 0,
-                          color: '#0EA5E9',
-                          subtexto: `${posData.metricas?.desgloseMetodosPago?.tarjeta?.cantidad || 0} transacciones`,
-                        },
-                        {
-                          label: 'Transferencia Bancaria',
-                          valor: posData.metricas?.desgloseMetodosPago?.transferencia?.total || 0,
-                          color: '#8B5CF6',
-                          subtexto: `${posData.metricas?.desgloseMetodosPago?.transferencia?.cantidad || 0} comprobantes`,
-                        },
-                      ]}
-                      titulo="Distribución de Cobros en Caja"
-                      subtitulo="Participación de ingresos por método de recaudación directa"
-                      valorCentro={`$${(posData.metricas?.totalRecaudado || 0).toFixed(0)}`}
-                      etiquetaCentro="Total Caja"
-                    />
-
-                    {/* Barras de Modelos Más Vendidos en Mostrador */}
-                    <GraficoBarrasModerno
-                      items={
-                        (posData.metricas?.topModelos || []).slice(0, 5).map((m: any, idx: number) => ({
-                          label: `${m.nombre} ${m.color ? `(${m.color})` : ''}`,
-                          valor: m.pares,
-                          valorFormateado: `${m.pares} pares`,
-                          subtexto: `$${(m.total || 0).toFixed(2)} recaudados`,
-                          color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'][idx % 5],
-                        }))
-                      }
-                      titulo="Top Calzado Vendido en Mostrador"
-                      subtitulo="Variantes con mayor rotación directa en tienda"
-                      unidad="pares"
-                      emptyMessage="No se registran modelos vendidos en este rango de fechas."
-                    />
-                  </div>
-
-                  {/* Tabla y Buscador de Ventas Realizadas en POS */}
-                  <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
-                      <div>
-                        <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
-                          Historial de Ventas y Comprobantes POS
-                        </h4>
-                        <p className="text-[11px] text-[var(--muted-foreground)]">
-                          Registro detallado de transacciones, clientes, productos despachados y comprobantes
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {/* Buscador */}
-                        <div className="relative w-64">
-                          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
-                          <input
-                            type="text"
-                            placeholder="Buscar nota, cliente o modelo..."
-                            value={filtroPosBusqueda}
-                            onChange={(e) => setFiltroPosBusqueda(e.target.value)}
-                            className="w-full pl-8 pr-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
-                          />
-                        </div>
-
-                        {/* Filtro Método */}
-                        <select
-                          value={filtroPosMetodo}
-                          onChange={(e) => setFiltroPosMetodo(e.target.value)}
-                          className="px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                        >
-                          <option value="TODOS">Todos los Métodos</option>
-                          <option value="EFECTIVO">Efectivo</option>
-                          <option value="TARJETA">Tarjeta</option>
-                          <option value="TRANSFERENCIA">Transferencia</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Tabla de ventas POS */}
-                    {posData.ventas?.length === 0 ? (
-                      <div className="p-12 text-center text-xs text-[var(--muted-foreground)] italic">
-                        No se encontraron ventas de mostrador con los filtros aplicados.
-                      </div>
-                    ) : (
-                      <div className="border border-[var(--border)] rounded-2xl overflow-hidden overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-[#0F172A] text-white uppercase text-[10px] tracking-wider">
-                            <tr>
-                              <th className="py-3 px-4 font-bold">Nota / Comprobante</th>
-                              <th className="py-3 px-4 font-bold">Fecha / Hora</th>
-                              <th className="py-3 px-4 font-bold">Sucursal</th>
-                              <th className="py-3 px-4 font-bold">Cliente</th>
-                              <th className="py-3 px-4 font-bold">Vendedor</th>
-                              <th className="py-3 px-4 font-bold">Artículos Vendidos</th>
-                              <th className="py-3 px-4 font-bold">Método de Pago</th>
-                              <th className="py-3 px-4 font-bold text-right">Total</th>
-                              <th className="py-3 px-4 font-bold text-center">Acción</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-[var(--border)] bg-[var(--card)] text-[var(--foreground)]">
-                            {posData.ventas?.map((v: any) => (
-                              <tr key={v.id} className="hover:bg-[var(--muted)]/30 transition-colors">
-                                <td className="py-3 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                  {v.numeroNota}
-                                </td>
-                                <td className="py-3 px-4 text-[11px] text-[var(--muted-foreground)]">
-                                  {new Date(v.fecha).toLocaleString('es-EC', {
-                                    day: '2-digit',
-                                    month: 'short',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })}
-                                </td>
-                                <td className="py-3 px-4 font-semibold text-[11px]">
-                                  {v.sucursalNombre || 'Sucursal'}
-                                </td>
-                                <td className="py-3 px-4">
-                                  <div className="font-bold">{v.cliente?.nombre || 'Consumidor Final'}</div>
-                                  <div className="text-[10px] text-[var(--muted-foreground)]">
-                                    {v.cliente?.cedula && v.cliente.cedula !== '9999999999' ? `CI: ${v.cliente.cedula}` : 'Consumidor Final'}
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4 text-[11px]">
-                                  {v.vendedor?.nombre || 'Vendedor'}
-                                </td>
-                                <td className="py-3 px-4">
-                                  <div className="space-y-1 max-w-xs">
-                                    {v.lineas?.map((l: any, idx: number) => (
-                                      <div key={idx} className="flex items-center gap-1.5 text-[11px]">
-                                        <span className="font-bold text-emerald-600">{l.cantidad}x</span>
-                                        <span className="font-medium truncate">{l.modelName || l.nombre}</span>
-                                        {l.talla && (
-                                          <span className="px-1.5 py-0.2 bg-[var(--muted)] text-[10px] rounded font-mono font-bold">
-                                            T{l.talla}
-                                          </span>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4">
-                                  <span
-                                    className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
-                                      v.metodoPago === 'EFECTIVO'
-                                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                                        : v.metodoPago === 'TARJETA'
-                                        ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
-                                        : 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
-                                    }`}
-                                  >
-                                    {v.metodoPago}
-                                  </span>
-                                  {v.detallePago && (
-                                    <div className="text-[9px] text-[var(--muted-foreground)] mt-0.5 truncate max-w-[140px]" title={v.detallePago}>
-                                      {v.detallePago}
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="py-3 px-4 text-right font-mono font-black text-sm text-[var(--foreground)]">
-                                  ${Number(v.total).toFixed(2)}
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => setVentaPosDetalle(v)}
-                                    className="p-1.5 hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg transition-colors cursor-pointer"
-                                    title="Ver comprobante de venta"
-                                  >
-                                    <Eye size={14} />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB SUCURSALES: RENDIMIENTO DE SUCURSALES & VENTAS POR MODELO   */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'sucursales' && (
-            <div className="space-y-6">
-              {/* Encabezado y Acciones de PDF para Rendimiento de Sucursales */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl shadow-sm">
-                    <Building2 size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
-                      Rendimiento de Sucursales & Ventas por Modelo
-                    </h3>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      Desglose detallado del total de ventas de cada modelo de calzado en la sucursal seleccionada por el Admin General
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={cargarReporteSucursales}
-                    disabled={loadingSucursales}
-                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <RefreshCw size={14} className={loadingSucursales ? 'animate-spin' : ''} />
-                    <span>Actualizar</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteSucursalPdf('preview')}
-                    disabled={loadingSucursales || !sucursalesReporteData}
-                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Eye size={14} />
-                    <span>Previsualizar PDF</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteSucursalPdf('download')}
-                    disabled={loadingSucursales || !sucursalesReporteData}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Download size={14} />
-                    <span>Descargar PDF</span>
-                  </button>
-                </div>
-              </div>
-
-              {loadingSucursales ? (
-                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
-                  <Loader2 size={36} className="animate-spin text-blue-600" />
-                  <span className="text-xs font-bold">Analizando rendimiento y ventas por modelo de cada sucursal...</span>
-                </div>
-              ) : sucursalesReporteData ? (
-                <div className="space-y-6">
-                  {/* KPIs de la Sucursal Seleccionada */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
-                        <span className="text-[11px] font-bold uppercase">Ventas Sucursal</span>
-                        <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
-                          <DollarSign size={16} />
-                        </div>
-                      </div>
-                      <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                        ${sucursalesReporteData.totalesSucursalSeleccionada?.ingresos?.toFixed(2) || '0.00'}
-                      </div>
-                      <div className="text-[11px] text-[var(--muted-foreground)]">
-                        {sucursalesReporteData.sucursalSeleccionada?.nombre}
-                      </div>
-                    </div>
-
-                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
-                        <span className="text-[11px] font-bold uppercase">Pares Comercializados</span>
-                        <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
-                          <ShoppingBag size={16} />
-                        </div>
-                      </div>
-                      <div className="text-2xl font-black text-[var(--foreground)]">
-                        {sucursalesReporteData.totalesSucursalSeleccionada?.pares || 0} pares
-                      </div>
-                      <div className="text-[11px] text-[var(--muted-foreground)]">
-                        Volumen físico despachado
-                      </div>
-                    </div>
-
-                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
-                        <span className="text-[11px] font-bold uppercase">Pedidos / Transacciones</span>
-                        <div className="p-2 bg-indigo-500/10 text-indigo-600 rounded-xl">
-                          <Receipt size={16} />
-                        </div>
-                      </div>
-                      <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                        {sucursalesReporteData.totalesSucursalSeleccionada?.pedidos || 0}
-                      </div>
-                      <div className="text-[11px] text-[var(--muted-foreground)]">
-                        Operaciones comerciales cerradas
-                      </div>
-                    </div>
-
-                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
-                        <span className="text-[11px] font-bold uppercase">Modelos en Rotación</span>
-                        <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
-                          <Award size={16} />
-                        </div>
-                      </div>
-                      <div className="text-2xl font-black text-[var(--foreground)]">
-                        {sucursalesReporteData.totalesSucursalSeleccionada?.totalModelosVendidos || 0} modelos
-                      </div>
-                      <div className="text-[11px] text-[var(--muted-foreground)]">
-                        Catálogo activo con ventas
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Gráficas Estadísticas de Sucursales */}
-                  {sucursalesReporteData.sucursales && sucursalesReporteData.sucursales.length > 0 && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {/* Donut de Participación de Sucursales */}
-                      <GraficoDonutCircular
-                        items={sucursalesReporteData.sucursales.map((s: any, idx: number) => {
-                          const paleta = ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'];
-                          return {
-                            label: s.nombre,
-                            valor: s.totalVentas || 0,
-                            color: paleta[idx % paleta.length],
-                            subtexto: `${s.totalPares} pares (${s.porcentajeEmpresa}%)`,
-                          };
-                        })}
-                        titulo="Aportación a Ventas de la Empresa"
-                        subtitulo="Participación porcentual de ingresos por punto de venta"
-                        valorCentro={`$${(sucursalesReporteData.totalesEmpresa?.ingresos || 0).toFixed(0)}`}
-                        etiquetaCentro="Total Red"
-                      />
-
-                      {/* Barras de Despacho de Pares por Sucursal */}
-                      <GraficoBarrasModerno
-                        items={sucursalesReporteData.sucursales.map((s: any, idx: number) => ({
-                          label: s.nombre,
-                          valor: s.totalPares || 0,
-                          valorFormateado: `${s.totalPares} pares`,
-                          subtexto: `Ticket prom: $${s.ticketPromedio?.toFixed(2) || '0.00'}`,
-                          color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'][idx % 5],
-                        }))}
-                        titulo="Volumen Físico de Pares por Local"
-                        subtitulo="Calzado comercializado en cada establecimiento"
-                        unidad="pares"
-                      />
-                    </div>
-                  )}
-
-                  {/* Comparativa Comercial de Todas las Sucursales de la Empresa */}
-                  {sucursalesReporteData.sucursales?.length > 1 && (
-                    <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
-                      <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
-                        <div>
-                          <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
-                            Comparativa Comercial entre Sucursales de la Empresa
-                          </h4>
-                          <p className="text-[11px] text-[var(--muted-foreground)]">
-                            Participación de cada punto de venta en la facturación consolidada
-                          </p>
-                        </div>
-                        <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 dark:bg-slate-800 dark:text-slate-200 px-3 py-1 rounded-xl">
-                          Total Empresa: ${sucursalesReporteData.totalesEmpresa?.ingresos?.toFixed(2) || '0.00'}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {sucursalesReporteData.sucursales?.map((suc: any) => {
-                          const esSeleccionada = sucursalSeleccionada === suc.sucursalId;
-                          return (
-                            <div
-                              key={suc.sucursalId}
-                              onClick={() => setSucursalSeleccionada(suc.sucursalId)}
-                              className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-2 ${
-                                esSeleccionada
-                                  ? 'bg-blue-500/10 border-blue-500 shadow-xs'
-                                  : 'bg-[var(--background)] border-[var(--border)] hover:border-blue-400'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="font-black text-xs text-[var(--foreground)] flex items-center gap-1.5">
-                                  <Building2 size={13} className="text-blue-600" />
-                                  {suc.nombre}
-                                </span>
-                                <span className="px-2 py-0.5 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded-md text-[10px] font-black">
-                                  {suc.porcentajeEmpresa}% del total
-                                </span>
-                              </div>
-                              <div className="flex justify-between items-baseline pt-1">
-                                <span className="text-lg font-black font-mono text-emerald-600 dark:text-emerald-400">
-                                  ${suc.totalVentas?.toFixed(2)}
-                                </span>
-                                <span className="text-xs text-[var(--muted-foreground)] font-bold">
-                                  {suc.totalPares} pares · {suc.totalPedidos} pedidos
-                                </span>
-                              </div>
-                              <div className="w-full bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
-                                <div style={{ width: `${suc.porcentajeEmpresa}%` }} className="bg-blue-600 h-full rounded-full" />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* SECCIÓN PRINCIPAL: Ventas de Cada Modelo en la Sucursal */}
-                  <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-5 shadow-xs">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
-                      <div>
-                        <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center gap-1.5">
-                          <Award size={15} className="text-amber-500" />
-                          <span>Total de Ventas por Modelo en {sucursalesReporteData.sucursalSeleccionada?.nombre}</span>
-                        </h4>
-                        <p className="text-[11px] text-[var(--muted-foreground)]">
-                          Desglose de cada modelo de calzado comercializado en la sucursal con volumen de pares, ingresos y porcentaje
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {/* Buscador de modelos */}
-                        <div className="relative w-56">
-                          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
-                          <input
-                            type="text"
-                            placeholder="Buscar modelo o color..."
-                            value={filtroSucursalModeloTexto}
-                            onChange={(e) => setFiltroSucursalModeloTexto(e.target.value)}
-                            className="w-full pl-8 pr-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
-                          />
-                        </div>
-
-                        {/* Orden */}
-                        <select
-                          value={filtroSucursalOrden}
-                          onChange={(e: any) => setFiltroSucursalOrden(e.target.value)}
-                          className="px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                        >
-                          <option value="VENTAS_DESC">Mayor Facturación ($)</option>
-                          <option value="PARES_DESC">Más Pares Vendidos</option>
-                          <option value="PRECIO_DESC">Mayor Precio Promedio</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Top 5 Modelos Destacados en Cards */}
-                    {sucursalesReporteData.top5Modelos?.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase">
-                           Top 5 Modelos Estrella de la Sucursal
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                          {sucursalesReporteData.top5Modelos.map((m: any, idx: number) => {
-                            const medalColors = [
-                              'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
-                              'bg-slate-300/30 text-slate-700 dark:text-slate-200 border-slate-400/30',
-                              'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30',
-                              'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
-                              'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
-                            ];
-                            return (
-                              <div
-                                key={`${m.modelId}_${m.color}`}
-                                className="p-3.5 bg-[var(--background)] border border-[var(--border)] rounded-2xl space-y-2 relative overflow-hidden"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black border ${medalColors[idx] || medalColors[4]}`}>
-                                    #{idx + 1}
-                                  </span>
-                                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                                    {m.porcentajeSucursal}%
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 pt-1">
-                                  {m.imageUrl ? (
-                                    <img
-                                      src={m.imageUrl}
-                                      alt={m.modelName}
-                                      className="w-10 h-10 rounded-xl object-cover border border-[var(--border)] shrink-0"
-                                    />
-                                  ) : (
-                                    <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[var(--muted-foreground)] shrink-0">
-                                      <ShoppingBag size={18} />
-                                    </div>
-                                  )}
-                                  <div className="min-w-0">
-                                    <div className="font-extrabold text-xs text-[var(--foreground)] truncate uppercase">
-                                      {m.modelName}
-                                    </div>
-                                    <div className="text-[10px] text-[var(--muted-foreground)] truncate">
-                                      {m.color} · {formatearNombreSerie(m.serieNombre)}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex justify-between items-baseline pt-1 border-t border-[var(--border)] text-xs">
-                                  <span className="font-bold text-blue-600">{m.paresVendidos} pares</span>
-                                  <span className="font-mono font-black text-emerald-600">${m.montoTotal.toFixed(2)}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tabla de Todos los Modelos Vendidos */}
-                    {(() => {
-                      let lista = sucursalesReporteData.modelosVendidos || [];
-                      if (filtroSucursalModeloTexto.trim()) {
-                        const q = filtroSucursalModeloTexto.toLowerCase().trim();
-                        lista = lista.filter(
-                          (m: any) =>
-                            m.modelName?.toLowerCase().includes(q) ||
-                            m.color?.toLowerCase().includes(q) ||
-                            m.serieNombre?.toLowerCase().includes(q) ||
-                            m.baseCode?.toLowerCase().includes(q)
-                        );
-                      }
-                      if (filtroSucursalOrden === 'PARES_DESC') {
-                        lista = [...lista].sort((a, b) => b.paresVendidos - a.paresVendidos);
-                      } else if (filtroSucursalOrden === 'PRECIO_DESC') {
-                        lista = [...lista].sort((a, b) => b.precioPromedio - a.precioPromedio);
-                      } else {
-                        lista = [...lista].sort((a, b) => b.montoTotal - a.montoTotal);
-                      }
-
-                      if (lista.length === 0) {
-                        return (
-                          <div className="p-12 text-center text-xs text-[var(--muted-foreground)] italic">
-                            No se encontraron modelos con los criterios de búsqueda.
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="border border-[var(--border)] rounded-2xl overflow-hidden overflow-x-auto">
-                          <table className="w-full text-left text-xs">
-                            <thead className="bg-[#0F172A] text-white uppercase text-[10px] tracking-wider">
-                              <tr>
-                                <th className="py-3 px-4 font-bold text-center w-12">#</th>
-                                <th className="py-3 px-4 font-bold">Modelo de Calzado</th>
-                                <th className="py-3 px-4 font-bold">Variante / Serie</th>
-                                <th className="py-3 px-4 font-bold text-center">Pares Vendidos</th>
-                                <th className="py-3 px-4 font-bold text-right">Facturación ($)</th>
-                                <th className="py-3 px-4 font-bold text-right">Precio Prom.</th>
-                                <th className="py-3 px-4 font-bold text-center">Pedidos</th>
-                                <th className="py-3 px-4 font-bold">Contribución (%)</th>
-                                <th className="py-3 px-4 font-bold text-center">Stock Actual</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[var(--border)] bg-[var(--card)] text-[var(--foreground)]">
-                              {lista.map((m: any, idx: number) => (
-                                <tr key={`${m.modelId}_${m.color}`} className="hover:bg-[var(--muted)]/30 transition-colors">
-                                  <td className="py-3 px-4 text-center font-bold text-[var(--muted-foreground)]">
-                                    {m.ranking || idx + 1}
-                                  </td>
-                                  <td className="py-3 px-4">
-                                    <div className="flex items-center gap-2.5">
-                                      {m.imageUrl ? (
-                                        <img
-                                          src={m.imageUrl}
-                                          alt={m.modelName}
-                                          className="w-10 h-10 rounded-xl object-cover border border-[var(--border)] shrink-0"
-                                        />
-                                      ) : (
-                                        <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[var(--muted-foreground)] shrink-0">
-                                          <ShoppingBag size={18} />
-                                        </div>
-                                      )}
-                                      <div>
-                                        <div className="font-extrabold uppercase text-[var(--foreground)]">
-                                          {m.modelName}
-                                        </div>
-                                        {m.baseCode && (
-                                          <div className="text-[10px] text-[var(--muted-foreground)] font-mono">
-                                            Cód: {m.baseCode}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="py-3 px-4">
-                                    <div className="font-semibold text-[11px]">{m.color}</div>
-                                    <div className="text-[10px] text-[var(--muted-foreground)]">
-                                      Serie: {formatearNombreSerie(m.serieNombre)}
-                                    </div>
-                                  </td>
-                                  <td className="py-3 px-4 text-center">
-                                    <span className="px-2.5 py-1 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded-lg font-black text-xs">
-                                      {m.paresVendidos} pares
-                                    </span>
-                                  </td>
-                                  <td className="py-3 px-4 text-right font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
-                                    ${m.montoTotal.toFixed(2)}
-                                  </td>
-                                  <td className="py-3 px-4 text-right font-mono text-[11px] text-[var(--muted-foreground)]">
-                                    ${m.precioPromedio.toFixed(2)} / par
-                                  </td>
-                                  <td className="py-3 px-4 text-center font-bold text-[11px]">
-                                    {m.pedidosCount}
-                                  </td>
-                                  <td className="py-3 px-4">
-                                    <div className="space-y-1 w-32">
-                                      <div className="flex justify-between text-[10px] font-bold">
-                                        <span>{m.porcentajeSucursal}%</span>
-                                      </div>
-                                      <div className="w-full bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
-                                        <div
-                                          style={{ width: `${Math.min(100, m.porcentajeSucursal)}%` }}
-                                          className="bg-emerald-600 h-full rounded-full"
-                                        />
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="py-3 px-4 text-center">
-                                    <span
-                                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                                        m.stockActual > 10
-                                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                                          : m.stockActual > 0
-                                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
-                                          : 'bg-red-500/15 text-red-700 dark:text-red-300'
-                                      }`}
-                                    >
-                                      {m.stockActual} pares
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB 2: ROTACIÓN DE CALZADO & MODELOS                           */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB 2: ROTACIÓN DE CALZADO & MODELOS                           */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'modelos' && (() => {
-            const catalogoOriginal = (reporteData?.catalogoProductosCompleto as any[]) || [];
-            const rotResumen = reporteData?.rotacionResumen || {
-              totalProductos: catalogoOriginal.length,
-              totalConVentas: catalogoOriginal.filter((p: any) => p.paresVendidos > 0).length,
-              totalSinVentas: catalogoOriginal.filter((p: any) => p.paresVendidos === 0).length,
-              totalConStock: catalogoOriginal.filter((p: any) => p.stockTotal > 0).length,
-              totalSinStock: catalogoOriginal.filter((p: any) => p.stockTotal <= 0).length,
-              totalRotacionAlta: catalogoOriginal.filter((p: any) => p.rotacion === 'ALTA').length,
-              totalRotacionMedia: catalogoOriginal.filter((p: any) => p.rotacion === 'MEDIA').length,
-              totalRotacionBaja: catalogoOriginal.filter((p: any) => p.rotacion === 'BAJA').length,
-              totalSinMovimiento: catalogoOriginal.filter((p: any) => p.rotacion === 'SIN_MOVIMIENTO').length,
-              capitalEnRiesgo: catalogoOriginal
-                .filter((p: any) => p.rotacion === 'SIN_MOVIMIENTO' && p.stockTotal > 0)
-                .reduce((acc: number, p: any) => acc + (p.capitalRetenido || 0), 0),
-            };
-
-            const seriesDisponibles = (reporteData?.seriesDisponibles as { id: string; nombre: string }[]) || [];
-
-            // Filtrado dinámico
-            const catalogoFiltrado = catalogoOriginal.filter((p: any) => {
-              if (filtroRotacionTexto.trim()) {
-                const query = normalizarParaBusqueda(filtroRotacionTexto);
-                const mName = normalizarParaBusqueda(p.modelName || '');
-                const mColor = normalizarParaBusqueda(p.color || '');
-                const mSerie = normalizarParaBusqueda(p.serieNombre || '');
-                if (!mName.includes(query) && !mColor.includes(query) && !mSerie.includes(query)) {
-                  return false;
-                }
-              }
-
-              if (filtroRotacionSerie !== 'TODAS') {
-                if (p.serieId !== filtroRotacionSerie) return false;
-              }
-
-              if (filtroCategoriaModelo !== 'TODAS') {
-                const cat = p.categoria || p.material || '';
-                if (cat !== filtroCategoriaModelo) return false;
-              }
-
-              if (filtroRotacionEstado !== 'TODOS') {
-                if (filtroRotacionEstado === 'CON_STOCK') {
-                  if (p.stockTotal <= 0) return false;
-                } else if (filtroRotacionEstado === 'SIN_STOCK') {
-                  if (p.stockTotal > 0) return false;
-                } else {
-                  if (p.rotacion !== filtroRotacionEstado) return false;
-                }
-              }
-
-              return true;
-            }).sort((a: any, b: any) => {
-              if (filtroRotacionOrden === 'VENTAS_DESC') return b.paresVendidos - a.paresVendidos;
-              if (filtroRotacionOrden === 'VENTAS_ASC') return a.paresVendidos - b.paresVendidos;
-              if (filtroRotacionOrden === 'STOCK_DESC') return b.stockTotal - a.stockTotal;
-              if (filtroRotacionOrden === 'STOCK_ASC') return a.stockTotal - b.stockTotal;
-              if (filtroRotacionOrden === 'INGRESOS_DESC') return b.ingresos - a.ingresos;
-              if (filtroRotacionOrden === 'MARGEN_DESC') return b.margen - a.margen;
-              return 0;
-            });
-
-            const hayFiltrosActivos =
-              filtroRotacionTexto.trim() !== '' ||
-              filtroRotacionSerie !== 'TODAS' ||
-              filtroCategoriaModelo !== 'TODAS' ||
-              filtroRotacionEstado !== 'TODOS' ||
-              filtroRotacionOrden !== 'VENTAS_DESC';
-
-            return (
-              <div className="space-y-6">
-                {/* 1. Encabezado Ejecutivo y Botones de Descarga / Vista */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
-                      <ShoppingBag size={24} />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-base text-[var(--foreground)]">
-                        Reporte Profesional de Rotación de Calzado & Modelos
-                      </h3>
-                      <p className="text-xs text-[var(--muted-foreground)]">
-                        Auditoría completa de catálogo: artículos estrella, rotación regular y calzado inmóvil con capital estancado
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* Switch de modo vista */}
-                    <div className="flex items-center bg-[var(--muted)]/50 p-1 rounded-2xl border border-[var(--border)]">
-                      <button
-                        type="button"
-                        onClick={() => setFiltroRotacionVista('tabla')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                          filtroRotacionVista === 'tabla'
-                            ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs'
-                            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                        }`}
-                        title="Vista en tabla analítica"
-                      >
-                        <List size={14} />
-                        <span>Tabla</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFiltroRotacionVista('tarjetas')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                          filtroRotacionVista === 'tarjetas'
-                            ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs'
-                            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                        }`}
-                        title="Vista en tarjetas con curva de tallas"
-                      >
-                        <Grid size={14} />
-                        <span>Tarjetas</span>
-                      </button>
-                    </div>
-
-                    {/* Botón Preview PDF */}
-                    <button
-                      type="button"
-                      onClick={() => handleReporteModelosPdf('preview')}
-                      disabled={loading || !reporteData}
-                      className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                    >
-                      <Eye size={14} />
-                      <span>Previsualizar PDF</span>
-                    </button>
-
-                    {/* Botón Descargar PDF */}
-                    <button
-                      type="button"
-                      onClick={() => handleReporteModelosPdf('download')}
-                      disabled={loading || !reporteData}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                    >
-                      <Download size={14} />
-                      <span>Descargar PDF</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 1.1 FASE 8: Resumen Financiero y Margen FIFO Real */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-                    <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
-                      Pares Vendidos
-                    </span>
-                    <div className="text-xl font-black text-blue-600">
-                      {modelosMargenData?.metricas?.totalPares ?? rotResumen.totalConVentas} pares
-                    </div>
-                    <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
-                      En {modelosMargenData?.metricas?.totalModelosVendidos ?? rotResumen.totalConVentas} variantes
-                    </span>
-                  </div>
-
-                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-                    <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
-                      Facturación Total
-                    </span>
-                    <div className="text-xl font-black text-[var(--foreground)]">
-                      ${(modelosMargenData?.metricas?.totalIngresos ?? 0).toFixed(2)}
-                    </div>
-                    <span className="text-[10px] text-emerald-600 font-bold mt-1 block">
-                      Ingreso bruto cobrado
-                    </span>
-                  </div>
-
-                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-                    <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
-                      Costo Real FIFO
-                    </span>
-                    <div className="text-xl font-black text-amber-600">
-                      ${(modelosMargenData?.metricas?.totalCostoFifo ?? 0).toFixed(2)}
-                    </div>
-                    <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
-                      Costo por lote consumido
-                    </span>
-                  </div>
-
-                  <div className="p-4 bg-[var(--card)] border border-emerald-500/30 rounded-2xl shadow-xs bg-emerald-500/5">
-                    <span className="text-[10px] font-black uppercase text-emerald-600 tracking-wider block mb-1">
-                      Ganancia Neta Real
-                    </span>
-                    <div className="text-xl font-black text-emerald-600">
-                      ${(modelosMargenData?.metricas?.gananciaTotal ?? 0).toFixed(2)}
-                    </div>
-                    <span className="text-[10px] text-emerald-700/80 font-bold mt-1 block">
-                      Utilidad neta generada
-                    </span>
-                  </div>
-
-                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-                    <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
-                      Margen Promedio
-                    </span>
-                    <div className="text-xl font-black text-indigo-600">
-                      {modelosMargenData?.metricas?.margenPromedio ?? 0}%
-                    </div>
-                    <span className="text-[10px] text-indigo-600/80 font-bold mt-1 block">
-                      Rentabilidad sobre venta
-                    </span>
-                  </div>
-                </div>
-
-                {/* 1.2 FASE 8: Gráficas Comparativas (Barras Modernas + Donut de Participación %) */}
-                {(() => {
-                  const modelosGrafica = (modelosMargenData?.topModelosGrafica && modelosMargenData.topModelosGrafica.length > 0)
-                    ? modelosMargenData.topModelosGrafica
-                    : (reporteData?.topModelos || []).map((m: any, idx: number) => ({
-                        nombre: `${m.modelName || 'Calzado'} ${m.color ? `(${m.color})` : ''}`,
-                        paresVendidos: m.pares || 0,
-                        margenPorcentual: m.margen || 25,
-                        gananciaNeta: Math.round((m.ingresos || 0) * 0.25),
-                        porcentajeParticipacion: m.participacion || Math.max(3, 20 - idx * 3),
-                      }));
-
-                  if (modelosGrafica.length === 0) return null;
-
-                  return (
-                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-                      {/* Gráfica de Barras Combinada: Volumen vs Margen % */}
-                      <div className="xl:col-span-7">
-                        <GraficoBarrasModerno
-                          items={modelosGrafica.map((m: any, idx: number) => ({
-                            label: m.nombre,
-                            valor: m.paresVendidos,
-                            valorFormateado: `${m.paresVendidos} pares`,
-                            subtexto: `Margen: ${m.margenPorcentual}% • Utilidad: +$${Math.round(m.gananciaNeta || 0)}`,
-                            color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899', '#8B5CF6', '#14B8A6', '#F97316'][idx % 8],
-                          }))}
-                          titulo="Modelos con Mayor Demanda y Margen Real"
-                          subtitulo="Comparativa de pares despachados y porcentaje de utilidad FIFO"
-                          unidad="pares"
-                        />
-                      </div>
-
-                      {/* Gráfica Circular / Participación Porcentual SVG */}
-                      <div className="xl:col-span-5">
-                        <GraficoDonutCircular
-                          items={modelosGrafica.slice(0, 5).map((m: any, idx: number) => {
-                            const paleta = ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'];
-                            return {
-                              label: m.nombre,
-                              valor: m.paresVendidos,
-                              color: paleta[idx % paleta.length],
-                            };
-                          })}
-                          titulo="Participación por Modelo"
-                          subtitulo="Distribución porcentual del volumen de calzado comercializado"
-                          valorCentro={`${modelosMargenData?.metricas?.totalPares || reporteData?.totalParesVendidos || rotResumen.totalConVentas || 0}`}
-                          etiquetaCentro="Pares Totales"
-                          size={160}
-                        />
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* 2. Cuadrícula de Métricas y KPIs de Rotación */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Tarjeta 1: Total Artículos Analizados */}
-                  <div
-                    onClick={() => setFiltroRotacionEstado('TODOS')}
-                    className={`p-4 bg-[var(--card)] border rounded-2xl transition-all cursor-pointer shadow-xs hover:border-blue-500/50 ${
-                      filtroRotacionEstado === 'TODOS' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-[var(--border)]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
-                      <span className="text-xs font-bold uppercase tracking-wider">Catálogo Total</span>
-                      <Package size={16} className="text-blue-500" />
-                    </div>
-                    <div className="text-2xl font-black text-[var(--foreground)]">
-                      {rotResumen.totalProductos}
-                      <span className="text-xs font-medium text-[var(--muted-foreground)] ml-1.5">modelos</span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2 text-[11px] text-[var(--muted-foreground)]">
-                      <span className="text-emerald-600 font-bold">{rotResumen.totalConStock} con stock</span>
-                      <span>•</span>
-                      <span className="text-slate-400">{rotResumen.totalSinStock} agotados</span>
-                    </div>
-                  </div>
-
-                  {/* Tarjeta 2: Con Ventas Activas */}
-                  <div
-                    onClick={() => setFiltroRotacionEstado('ALTA')}
-                    className={`p-4 bg-[var(--card)] border rounded-2xl transition-all cursor-pointer shadow-xs hover:border-emerald-500/50 ${
-                      filtroRotacionEstado === 'ALTA' ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-[var(--border)]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
-                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">Con Salida Comercial</span>
-                      <Flame size={16} className="text-emerald-500" />
-                    </div>
-                    <div className="text-2xl font-black text-emerald-600">
-                      {rotResumen.totalConVentas}
-                      <span className="text-xs font-medium text-[var(--muted-foreground)] ml-1.5">
-                        ({rotResumen.totalProductos > 0 ? Math.round((rotResumen.totalConVentas / rotResumen.totalProductos) * 100) : 0}%)
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2 text-[11px] text-[var(--muted-foreground)]">
-                      <span className="text-emerald-600 font-bold">{rotResumen.totalRotacionAlta} Alta</span>
-                      <span>•</span>
-                      <span className="text-blue-600 font-bold">{rotResumen.totalRotacionMedia} Media</span>
-                      <span>•</span>
-                      <span className="text-amber-600 font-bold">{rotResumen.totalRotacionBaja} Baja</span>
-                    </div>
-                  </div>
-
-                  {/* Tarjeta 3: Sin Movimiento (0 ventas) */}
-                  <div
-                    onClick={() => setFiltroRotacionEstado('SIN_MOVIMIENTO')}
-                    className={`p-4 bg-[var(--card)] border rounded-2xl transition-all cursor-pointer shadow-xs hover:border-rose-500/50 ${
-                      filtroRotacionEstado === 'SIN_MOVIMIENTO' ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-500/5' : 'border-[var(--border)]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
-                      <span className="text-xs font-bold uppercase tracking-wider text-rose-600">Sin Salida (0 Ventas)</span>
-                      <TrendingDown size={16} className="text-rose-500" />
-                    </div>
-                    <div className="text-2xl font-black text-rose-600">
-                      {rotResumen.totalSinMovimiento}
-                      <span className="text-xs font-medium text-[var(--muted-foreground)] ml-1.5">modelos</span>
-                    </div>
-                    <div className="text-[11px] text-rose-500/80 mt-2 font-medium">
-                      Calzado sin salida comercial en el periodo
-                    </div>
-                  </div>
-
-                  {/* Tarjeta 4: Capital Estancado en Bodega */}
-                  <div
-                    onClick={() => {
-                      setFiltroRotacionEstado('SIN_MOVIMIENTO');
-                      setFiltroRotacionOrden('STOCK_DESC');
-                    }}
-                    className="p-4 bg-[var(--card)] border border-rose-500/30 rounded-2xl transition-all cursor-pointer shadow-xs hover:border-rose-500"
-                    title="Click para ver artículos estancados ordenados por stock"
-                  >
-                    <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
-                      <span className="text-xs font-bold uppercase tracking-wider text-rose-600">Capital en Riesgo</span>
-                      <AlertTriangle size={16} className="text-rose-500" />
-                    </div>
-                    <div className="text-2xl font-black text-rose-600">
-                      ${rotResumen.capitalEnRiesgo.toFixed(2)}
-                    </div>
-                    <div className="text-[11px] text-[var(--muted-foreground)] mt-2">
-                      Costo retenido en {rotResumen.totalSinMovimiento} modelos sin rotación
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Barra de Filtros, Series y Búsqueda */}
-                <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-3 shadow-xs">
-                  {/* Fila 1: Búsqueda */}
-                  <div className="relative w-full">
-                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
-                    <input
-                      type="text"
-                      value={filtroRotacionTexto}
-                      onChange={(e) => setFiltroRotacionTexto(e.target.value)}
-                      placeholder="Buscar por modelo, color o serie..."
-                      className="w-full pl-10 pr-4 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-hidden focus:border-blue-500 transition-colors"
-                    />
-                    {filtroRotacionTexto && (
-                      <button
-                        type="button"
-                        onClick={() => setFiltroRotacionTexto('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Fila 2: Filtros en línea con wrap */}
-                  <div className="flex flex-wrap items-center gap-3">
-                    {/* Filtro por Serie */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
-                        <Layers size={14} />
-                        Serie:
-                      </span>
-                      <select
-                        value={filtroRotacionSerie}
-                        onChange={(e) => setFiltroRotacionSerie(e.target.value)}
-                        className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
-                      >
-                        <option value="TODAS">Todas las Series ({seriesDisponibles.length})</option>
-                        {seriesDisponibles.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {formatearNombreSerie(s.nombre)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Filtro por Categoría / Material */}
-                    {(() => {
-                      const categoriasDelCatalogo = Array.from(new Set(
-                        catalogoOriginal.map((p: any) => p.categoria || p.material || '').filter((c: string) => c && c !== 'General' && c.trim())
-                      )).sort() as string[];
-                      return categoriasDelCatalogo.length > 0 ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
-                            <Tag size={14} />
-                            Categoría:
-                          </span>
-                          <select
-                            value={filtroCategoriaModelo}
-                            onChange={(e) => setFiltroCategoriaModelo(e.target.value)}
-                            className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
-                          >
-                            <option value="TODAS">Todas las Categorías</option>
-                            {categoriasDelCatalogo.map((cat: string) => (
-                              <option key={cat} value={cat}>
-                                {cat}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      ) : null;
-                    })()}
-
-                    {/* Filtro por Estado / Nivel de Rotación */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
-                        <Filter size={14} />
-                        Rotación:
-                      </span>
-                      <select
-                        value={filtroRotacionEstado}
-                        onChange={(e) => setFiltroRotacionEstado(e.target.value as any)}
-                        className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
-                      >
-                        <option value="TODOS">Todos los Estados</option>
-                        <option value="ALTA">Alta Rotación (Estrella)</option>
-                        <option value="MEDIA">Rotación Media</option>
-                        <option value="BAJA">Baja Rotación</option>
-                        <option value="SIN_MOVIMIENTO">Sin Movimiento (0 Ventas)</option>
-                        <option value="CON_STOCK">Solo con Stock Físico</option>
-                        <option value="SIN_STOCK">Solo Agotados</option>
-                      </select>
-                    </div>
-
-                    {/* Ordenación */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap">
-                        Ordenar:
-                      </span>
-                      <select
-                        value={filtroRotacionOrden}
-                        onChange={(e) => setFiltroRotacionOrden(e.target.value as any)}
-                        className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer max-w-[220px]"
-                      >
-                        <option value="VENTAS_DESC">Mayor Demanda (Más vendidos)</option>
-                        <option value="VENTAS_ASC">Menor Demanda (Menos vendidos)</option>
-                        <option value="STOCK_DESC">Mayor Stock en Bodega</option>
-                        <option value="STOCK_ASC">Menor Stock en Bodega</option>
-                        <option value="INGRESOS_DESC">Mayor Facturación</option>
-                        <option value="MARGEN_DESC">Mayor Margen Estimado</option>
-                      </select>
-                    </div>
-
-                    {/* Botón Reset */}
-                    {hayFiltrosActivos && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFiltroRotacionTexto('');
-                          setFiltroRotacionSerie('TODAS');
-                          setFiltroRotacionEstado('TODOS');
-                          setFiltroRotacionOrden('VENTAS_DESC');
-                          setFiltroCategoriaModelo('TODAS');
-                        }}
-                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 rounded-xl transition-all flex items-center gap-1 cursor-pointer shrink-0"
-                        title="Restaurar todos los filtros"
-                      >
-                        <RotateCcw size={13} />
-                        <span>Limpiar</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Contador de resultados */}
-                  <div className="flex items-center justify-between text-xs text-[var(--muted-foreground)] pt-2 border-t border-[var(--border)]">
-                    <span>
-                      Mostrando <strong className="text-[var(--foreground)]">{catalogoFiltrado.length}</strong> de{' '}
-                      <strong>{catalogoOriginal.length}</strong> artículos del catálogo
-                    </span>
-                    {filtroRotacionSerie !== 'TODAS' && (
-                      <span className="text-blue-600 font-bold bg-blue-500/10 px-2 py-0.5 rounded-md">
-                        Serie:{' '}
-                        {formatearNombreSerie(
-                          seriesDisponibles.find((s) => s.id === filtroRotacionSerie)?.nombre || filtroRotacionSerie
-                        )}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* 4. Lista de Productos: VISTA TABLA */}
-                {filtroRotacionVista === 'tabla' && (
-                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="bg-[var(--muted)]/40 border-b border-[var(--border)] text-[var(--muted-foreground)] font-black uppercase text-[10px] tracking-wider">
-                            <th className="py-3 px-4">Calzado / Modelo</th>
-                            <th className="py-3 px-3">Serie</th>
-                            <th className="py-3 px-3 text-center">Pares Vendidos</th>
-                            <th className="py-3 px-3 text-right">Precio Prom.</th>
-                            <th className="py-3 px-3 text-right">Costo FIFO</th>
-                            <th className="py-3 px-3 text-right">Ganancia Neta</th>
-                            <th className="py-3 px-3 text-center">Margen %</th>
-                            <th className="py-3 px-3 text-center">Stock Bodega</th>
-                            <th className="py-3 px-3">Curva de Tallas</th>
-                            <th className="py-3 px-3 text-center">Detalle</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[var(--border)]">
-                          {catalogoFiltrado.length === 0 ? (
-                            <tr>
-                              <td colSpan={10} className="py-12 text-center text-slate-400">
-                                <Package size={36} className="mx-auto mb-2 opacity-40" />
-                                <p className="font-bold text-sm">No se encontraron modelos con los filtros seleccionados</p>
-                                <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                                  Prueba cambiando los criterios de serie, rotación o el texto de búsqueda.
-                                </p>
-                              </td>
-                            </tr>
-                          ) : (
-                            catalogoFiltrado.map((p: any) => {
-                              const expandido = productoExpandidoId === p.productId;
-                              return (
-                                <React.Fragment key={p.productId}>
-                                  <tr className="hover:bg-[var(--muted)]/20 transition-colors">
-                                    {/* Calzado / Modelo con miniatura */}
-                                    <td className="py-3 px-4">
-                                      <div className="flex items-center gap-3">
-                                        {p.imageUrl ? (
-                                          <img
-                                            src={p.imageUrl}
-                                            alt={p.modelName}
-                                            className="w-11 h-11 rounded-xl object-cover border border-[var(--border)] shrink-0"
-                                          />
-                                        ) : (
-                                          <div className="w-11 h-11 rounded-xl bg-[var(--muted)] flex items-center justify-center text-lg shrink-0 border border-[var(--border)]">
-                                            
-                                          </div>
-                                        )}
-                                        <div className="min-w-0">
-                                          <span className="font-black text-xs text-[var(--foreground)] block truncate uppercase">
-                                            {p.modelName}
-                                          </span>
-                                          <span className="text-[11px] text-[var(--muted-foreground)] block truncate">
-                                            Color: <strong className="text-[var(--foreground)]">{p.color}</strong>
-                                          </span>
-                                          <span className="text-[10px] text-slate-400">
-                                            PVP: ${p.precioVenta.toFixed(2)} / par
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </td>
-
-                                    {/* Serie */}
-                                    <td className="py-3 px-3">
-                                      <span className="text-xs font-bold text-emerald-600 block">
-                                        {formatearNombreSerie(p.serieNombre)}
-                                      </span>
-                                    </td>
-
-                                    {/* Pares Vendidos */}
-                                    <td className="py-3 px-3 text-center">
-                                      {p.paresVendidos > 0 ? (
-                                        <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-blue-500/10 text-blue-600 border border-blue-500/20">
-                                          {p.paresVendidos} pares
-                                        </span>
-                                      ) : (
-                                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold text-rose-500 bg-rose-500/5 border border-rose-500/10">
-                                          0 ventas
-                                        </span>
-                                      )}
-                                    </td>
-
-                                    {/* Precio Promedio */}
-                                    <td className="py-3 px-3 text-right font-bold text-xs text-[var(--foreground)]">
-                                      ${(p.paresVendidos > 0 ? (p.ingresos / p.paresVendidos) : p.precioVenta).toFixed(2)}
-                                    </td>
-
-                                    {/* Costo FIFO */}
-                                    <td className="py-3 px-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400">
-                                      ${(p.paresVendidos > 0 ? (p.costo / p.paresVendidos) : p.precioCosto).toFixed(2)}
-                                    </td>
-
-                                    {/* Ganancia Neta */}
-                                    <td className="py-3 px-3 text-right font-black text-xs text-emerald-600">
-                                      ${((p.ingresos || 0) - (p.costo || 0)).toFixed(2)}
-                                    </td>
-
-                                    {/* Margen % */}
-                                    <td className="py-3 px-3 text-center">
-                                      {(() => {
-                                        const net = (p.ingresos || 0) - (p.costo || 0);
-                                        const mPct = p.ingresos > 0 ? Math.round((net / p.ingresos) * 100) : p.margen;
-                                        return (
-                                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
-                                            mPct >= 40
-                                              ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                                              : mPct >= 25
-                                              ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
-                                              : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                                          }`}>
-                                            {mPct}%
-                                          </span>
-                                        );
-                                      })()}
-                                    </td>
-
-                                    {/* Stock Físico */}
-                                    <td className="py-3 px-3 text-center">
-                                      {p.stockTotal <= 0 ? (
-                                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                          Agotado (0)
-                                        </span>
-                                      ) : (
-                                        <div>
-                                          <span className="font-black text-xs text-[var(--foreground)]">
-                                            {p.stockTotal} pares
-                                          </span>
-                                          {p.stockDisponible < p.stockTotal && (
-                                            <span className="block text-[10px] text-amber-600 font-medium">
-                                              ({p.stockDisponible} disp.)
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                    </td>
-
-                                    {/* Curva de Tallas Resumida */}
-                                    <td className="py-3 px-3 max-w-[260px]">
-                                      <div className="flex flex-wrap gap-1">
-                                        {p.tallasDetalle && p.tallasDetalle.length > 0 ? (
-                                          p.tallasDetalle.map((t: any) => (
-                                            <span
-                                              key={t.talla}
-                                              className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold border ${
-                                                t.disponible > 0
-                                                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
-                                                  : 'bg-rose-500/10 text-rose-500 border-rose-500/20 opacity-60'
-                                              }`}
-                                              title={`Talla ${t.talla}: ${t.disponible} disponibles`}
-                                            >
-                                              T{t.talla}:{t.disponible}
-                                            </span>
-                                          ))
-                                        ) : (
-                                          <span className="text-[10px] text-slate-400">Sin desglose</span>
-                                        )}
-                                      </div>
-                                    </td>
-
-                                    {/* Detalle Toggle */}
-                                    <td className="py-3 px-3 text-center">
-                                      <button
-                                        type="button"
-                                        onClick={() => setProductoExpandidoId(expandido ? null : p.productId)}
-                                        className="p-1.5 hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg transition-colors cursor-pointer"
-                                        title={expandido ? 'Ocultar desglose' : 'Ver curva detallada'}
-                                      >
-                                        <ChevronDown
-                                          size={16}
-                                          className={`transition-transform duration-200 ${expandido ? 'rotate-180' : ''}`}
-                                        />
-                                      </button>
-                                    </td>
-                                  </tr>
-
-                                  {/* Fila expandida con desglose de tallas y diagnóstico */}
-                                  {expandido && (
-                                    <tr className="bg-[var(--muted)]/30 border-b border-[var(--border)]">
-                                      <td colSpan={10} className="p-4">
-                                        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
-                                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)] pb-2">
-                                            <div>
-                                              <span className="font-black text-xs uppercase text-[var(--foreground)]">
-                                                Desglose de Curva de Tallas & Stock en Bodega: {p.modelName} ({p.color})
-                                              </span>
-                                              <span className="text-[11px] text-[var(--muted-foreground)] block">
-                                                Serie: <strong className="text-emerald-600">{formatearNombreSerie(p.serieNombre)}</strong> • Margen estimado: <strong className="text-emerald-600">{p.margen}%</strong>
-                                              </span>
-                                            </div>
-
-                                            {/* Diagnóstico Operativo */}
-                                            {p.rotacion === 'SIN_MOVIMIENTO' && p.stockTotal > 0 && (
-                                              <div className="px-3 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-600 rounded-xl text-xs font-bold flex items-center gap-1.5">
-                                                <AlertTriangle size={14} />
-                                                <span>Candidato a promoción de liquidación / combo</span>
-                                              </div>
-                                            )}
-                                            {p.rotacion === 'ALTA' && p.tallasAgotadas?.length > 0 && (
-                                              <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-xl text-xs font-bold flex items-center gap-1.5">
-                                                <AlertCircle size={14} />
-                                                <span>Reabastecer tallas agotadas: {p.tallasAgotadas.join(', ')}</span>
-                                              </div>
-                                            )}
-                                          </div>
-
-                                          {/* Curva de Tallas Detallada */}
-                                          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 pt-1">
-                                            {p.tallasDetalle?.map((t: any) => (
-                                              <div
-                                                key={t.talla}
-                                                className={`p-2.5 rounded-xl border text-center ${
-                                                  t.disponible > 0
-                                                    ? 'bg-[var(--muted)]/40 border-[var(--border)]'
-                                                    : 'bg-rose-500/5 border-rose-500/20 opacity-70'
-                                                }`}
-                                              >
-                                                <span className="font-black text-xs block text-[var(--foreground)]">
-                                                  Talla {t.talla}
-                                                </span>
-                                                <span
-                                                  className={`font-black text-sm block ${
-                                                    t.disponible > 0 ? 'text-emerald-600' : 'text-rose-500'
-                                                  }`}
-                                                >
-                                                  {t.disponible} pares
-                                                </span>
-                                                {t.reservado > 0 && (
-                                                  <span className="text-[9px] text-amber-600 block">
-                                                    ({t.reservado} reservado)
-                                                  </span>
-                                                )}
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  )}
-                                </React.Fragment>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* 5. Lista de Productos: VISTA TARJETAS (Cumple Estrictamente Regla 7 ModelTallaCurvaCard) */}
-                {filtroRotacionVista === 'tarjetas' && (
-                  <div className="space-y-4">
-                    {catalogoFiltrado.length === 0 ? (
-                      <div className="p-12 text-center bg-[var(--card)] border border-[var(--border)] rounded-3xl text-slate-400">
-                        <Package size={40} className="mx-auto mb-2 opacity-40" />
-                        <p className="font-bold text-sm">No se encontraron modelos con los filtros seleccionados</p>
-                        <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                          Prueba cambiando los criterios de serie, rotación o el texto de búsqueda.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {catalogoFiltrado.map((p: any) => {
-                          const docenasTotal = (p.stockTotal / 12).toFixed(1);
-                          return (
-                            <div
-                              key={p.productId}
-                              className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between gap-3 relative overflow-hidden"
-                            >
-                              {/* Header: Miniatura, Modelo en negrita mayúscula, Color y Serie (Regla 7) */}
-                              <div className="flex items-start gap-3">
-                                {p.imageUrl ? (
-                                  <img
-                                    src={p.imageUrl}
-                                    alt={p.modelName}
-                                    className="w-12 h-12 rounded-xl object-cover border border-[var(--border)] shrink-0"
-                                  />
-                                ) : (
-                                  <div className="w-12 h-12 rounded-xl bg-[var(--muted)] flex items-center justify-center text-xl shrink-0 border border-[var(--border)]">
-                                    
-                                  </div>
-                                )}
-
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center justify-between gap-1">
-                                    <h4 className="font-black uppercase text-xs text-[var(--foreground)] truncate">
-                                      {p.modelName}
-                                    </h4>
-                                    {/* Badge Rotación */}
-                                    {p.rotacion === 'ALTA' && (
-                                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shrink-0">
-                                        ALTA
-                                      </span>
-                                    )}
-                                    {p.rotacion === 'MEDIA' && (
-                                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-blue-500/10 text-blue-600 border border-blue-500/20 shrink-0">
-                                        MEDIA
-                                      </span>
-                                    )}
-                                    {p.rotacion === 'BAJA' && (
-                                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-amber-500/10 text-amber-600 border border-amber-500/20 shrink-0">
-                                        BAJA
-                                      </span>
-                                    )}
-                                    {p.rotacion === 'SIN_MOVIMIENTO' && (
-                                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-rose-500/10 text-rose-600 border border-rose-500/20 shrink-0">
-                                        SIN SALIDA
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <div className="text-[11px] text-[var(--muted-foreground)] truncate mt-0.5">
-                                    Color: <strong className="text-[var(--foreground)]">{p.color}</strong> •{' '}
-                                    <span className="text-emerald-600 font-bold">
-                                      Serie: {formatearNombreSerie(p.serieNombre)}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Curva de Tallas (Regla 7): Píldoras para cada talla con cantidades */}
-                              <div className="bg-[var(--muted)]/30 p-2.5 rounded-xl border border-[var(--border)]">
-                                <div className="text-[10px] font-bold text-[var(--muted-foreground)] mb-1.5 flex items-center justify-between">
-                                  <span>Curva de Tallas & Stock Bodega:</span>
-                                  <span className="text-slate-500">
-                                    {p.tallasConStock} de {p.tallasDetalle?.length || 0} tallas activas
-                                  </span>
-                                </div>
-                                <div className="flex flex-wrap gap-1">
-                                  {p.tallasDetalle && p.tallasDetalle.length > 0 ? (
-                                    p.tallasDetalle.map((t: any) => (
-                                      <div
-                                        key={t.talla}
-                                        className={`px-2 py-1 rounded-lg text-center border text-[10px] font-bold ${
-                                          t.disponible > 0
-                                            ? 'bg-[var(--card)] text-[var(--foreground)] border-[var(--border)]'
-                                            : 'bg-rose-500/5 text-rose-500 border-rose-500/20 opacity-50'
-                                        }`}
-                                      >
-                                        <span className="block text-[9px] text-[var(--muted-foreground)]">T{t.talla}</span>
-                                        <span>{t.disponible}</span>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <span className="text-[10px] text-slate-400">Sin tallas registradas</span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Resumen Comercial (Regla 7): Total pares, precio y subtotal */}
-                              <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between text-xs">
-                                <div>
-                                  <div className="font-bold text-[var(--foreground)]">
-                                    {p.stockTotal} pares en bodega
-                                    <span className="text-[10px] font-normal text-[var(--muted-foreground)] ml-1">
-                                      ({docenasTotal} Docenas)
-                                    </span>
-                                  </div>
-                                  <div className="text-[10px] text-[var(--muted-foreground)]">
-                                    Salidas en periodo:{' '}
-                                    <strong className={p.paresVendidos > 0 ? 'text-blue-600' : 'text-rose-500'}>
-                                      {p.paresVendidos} pares
-                                    </strong>
-                                  </div>
-                                </div>
-
-                                <div className="text-right">
-                                  <div className="text-[10px] text-[var(--muted-foreground)]">
-                                    ${p.precioVenta.toFixed(2)} / par
-                                  </div>
-                                  <div className="font-black text-sm text-emerald-600">
-                                    ${p.ingresos.toFixed(2)}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Alerta de mercadería sin rotación pero con stock */}
-                              {p.rotacion === 'SIN_MOVIMIENTO' && p.stockTotal > 0 && (
-                                <div className="px-2.5 py-1.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-[10px] text-rose-600 font-bold flex items-center justify-between">
-                                  <span>Mercadería Inmóvil</span>
-                                  <span>${p.capitalRetenido.toFixed(2)} en costo</span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB 3: PRODUCTIVIDAD POR TRABAJADOR                            */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'vendedores' && (
-            <div className="space-y-6">
-              {/* Encabezado y Acciones de PDF para Productividad */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
-                    <Users size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
-                      Reporte de Productividad por Trabajador
-                    </h3>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      Rendimiento individual, pedidos atendidos, pares comercializados y contribución al local
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => handleReporteProductividadPdf('preview')}
-                    disabled={loading || !reporteData?.rankingVendedores?.length}
-                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Eye size={14} />
-                    <span>Previsualizar PDF</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteProductividadPdf('download')}
-                    disabled={loading || !reporteData?.rankingVendedores?.length}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Download size={14} />
-                    <span>Descargar PDF</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Componente de Filtro Avanzado para Trabajadores */}
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col md:flex-row items-center gap-3 shadow-xs">
-                <div className="relative flex-1 w-full">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-                  <input
-                    type="text"
-                    value={filtroTrabajadorTexto}
-                    onChange={(e) => setFiltroTrabajadorTexto(e.target.value)}
-                    placeholder="Buscar trabajador por nombre o correo electrónico..."
-                    className="w-full pl-9 pr-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                  />
-                </div>
-
-                <div className="w-full md:w-48">
-                  <select
-                    value={filtroTrabajadorRol}
-                    onChange={(e) => setFiltroTrabajadorRol(e.target.value)}
-                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                  >
-                    <option value="TODOS">Todos los Roles</option>
-                    <option value="ADMIN">Administrador</option>
-                    <option value="VENDEDOR">Vendedor</option>
-                    <option value="BODEGUERO">Bodeguero</option>
-                    <option value="PRODUCCION">Producción</option>
-                  </select>
-                </div>
-
-                <div className="w-full md:w-56">
-                  <select
-                    value={filtroTrabajadorOrden}
-                    onChange={(e) => setFiltroTrabajadorOrden(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                  >
-                    <option value="VENTAS_DESC">Mayor Facturación ($)</option>
-                    <option value="PARES_DESC">Más Pares Vendidos</option>
-                    <option value="PEDIDOS_DESC">Más Pedidos Atendidos</option>
-                    <option value="VENTAS_ASC">Menor Facturación ($)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Gráficas Estadísticas de Productividad de Vendedores */}
-              {reporteData?.rankingVendedores && reporteData.rankingVendedores.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Barras de Facturación por Trabajador */}
-                  <GraficoBarrasModerno
-                    items={reporteData.rankingVendedores.slice(0, 6).map((v: any, idx: number) => ({
-                      label: capitalizarNombreCompleto(v.nombre),
-                      valor: v.ingresosFacturados || 0,
-                      valorFormateado: `$${(v.ingresosFacturados || 0).toFixed(2)}`,
-                      subtexto: `${v.paresVendidos} pares (${v.pedidosCount} pedidos)`,
-                      color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899', '#8B5CF6'][idx % 6],
-                    }))}
-                    titulo="Facturación Individual por Trabajador"
-                    subtitulo="Monto total facturado por cada colaborador en el periodo"
-                    unidad="$"
-                  />
-
-                  {/* Donut de Cuota de Ventas en Pares */}
-                  <GraficoDonutCircular
-                    items={reporteData.rankingVendedores.slice(0, 5).map((v: any, idx: number) => {
-                      const paleta = ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'];
-                      return {
-                        label: capitalizarNombreCompleto(v.nombre),
-                        valor: v.paresVendidos || 0,
-                        color: paleta[idx % paleta.length],
-                        subtexto: `${v.paresVendidos} pares despachados`,
-                      };
-                    })}
-                    titulo="Participación en Volumen de Pares"
-                    subtitulo="Distribución porcentual de calzado comercializado por vendedor"
-                    valorCentro={`${kpis.totalParesVendidos || 0}`}
-                    etiquetaCentro="Pares Totales"
-                  />
-                </div>
-              )}
-
-              {/* Tabla de Ranking y Productividad */}
-              <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
-                      <Users className="text-[#0F172A]" size={18} />
-                      <span>Ranking y Rendimiento del Personal de Ventas</span>
-                    </h3>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      Desglose de pedidos, pares comercializados y volumen facturado por cada colaborador
-                    </p>
-                  </div>
-                  <span className="text-xs font-bold text-[var(--muted-foreground)] px-3 py-1 bg-[var(--muted)]/40 rounded-xl">
-                    {reporteData?.rankingVendedores?.length || 0} trabajadores
-                  </span>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-                      <tr>
-                        <th className="px-4 py-3">Posición / Trabajador</th>
-                        <th className="px-4 py-3 text-center">Rol</th>
-                        <th className="px-4 py-3 text-center">Pedidos Realizados</th>
-                        <th className="px-4 py-3 text-center">Pares Vendidos</th>
-                        <th className="px-4 py-3 text-right">Monto Total Facturado</th>
-                        <th className="px-4 py-3 text-right">% Contribución Sucursal</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--border)]">
-                      {(() => {
-                        const listaTrabajadores: any[] = (reporteData?.rankingVendedores || []).filter((v: any) => {
-                          const matchTexto =
-                            !filtroTrabajadorTexto ||
-                            v.nombre?.toLowerCase().includes(filtroTrabajadorTexto.toLowerCase()) ||
-                            v.email?.toLowerCase().includes(filtroTrabajadorTexto.toLowerCase());
-                          const matchRol =
-                            filtroTrabajadorRol === 'TODOS' ||
-                            v.rol === filtroTrabajadorRol ||
-                            v.rol === `ROL_${filtroTrabajadorRol}`;
-                          return matchTexto && matchRol;
-                        }).sort((a: any, b: any) => {
-                          if (filtroTrabajadorOrden === 'VENTAS_DESC') return (b.ingresosFacturados || 0) - (a.ingresosFacturados || 0);
-                          if (filtroTrabajadorOrden === 'PARES_DESC') return (b.paresVendidos || 0) - (a.paresVendidos || 0);
-                          if (filtroTrabajadorOrden === 'PEDIDOS_DESC') return (b.pedidosCount || 0) - (a.pedidosCount || 0);
-                          if (filtroTrabajadorOrden === 'VENTAS_ASC') return (a.ingresosFacturados || 0) - (b.ingresosFacturados || 0);
-                          return 0;
-                        });
-
-                        if (listaTrabajadores.length === 0) {
-                          return (
-                            <tr>
-                              <td colSpan={6} className="p-8 text-center text-xs text-[var(--muted-foreground)]">
-                                No se encontraron colaboradores que coincidan con los filtros de búsqueda.
-                              </td>
-                            </tr>
-                          );
-                        }
-
-                        return listaTrabajadores.map((v: any, index: number) => {
-                          const contribucionPct = kpis.totalIngresos > 0 ? (v.ingresosFacturados / kpis.totalIngresos) * 100 : 0;
-                          return (
-                            <tr key={v.userId ? `vend-${v.userId}` : `vend-${index}`} className="hover:bg-[var(--muted)]/20">
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2.5">
-                                  <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] ${
-                                    index === 0 ? 'bg-amber-500 text-white' : index === 1 ? 'bg-slate-400 text-white' : 'bg-slate-200 text-slate-700'
-                                  }`}>
-                                    #{index + 1}
-                                  </span>
-                                  <div>
-                                    <span className="font-extrabold text-xs text-[var(--foreground)] block">{capitalizarNombreCompleto(v.nombre)}</span>
-                                    <span className="text-[10px] text-[var(--muted-foreground)]">{v.email || 'Sin correo'}</span>
-                                  </div>
-                                </div>
-                              </td>
-
-                              <td className="px-4 py-3 text-center">
-                                <span className="px-2 py-0.5 bg-[#0F172A]/10 text-[#0F172A] rounded-md font-bold text-[10px]">
-                                  {v.rol.replace('ROL_', '')}
-                                </span>
-                              </td>
-
-                              <td className="px-4 py-3 text-center font-bold">{v.pedidosCount} pedidos</td>
-
-                              <td className="px-4 py-3 text-center font-black text-indigo-600 dark:text-indigo-400">
-                                {v.paresVendidos} pares
-                              </td>
-
-                              <td className="px-4 py-3 text-right font-black text-emerald-600 text-sm">
-                                ${v.ingresosFacturados.toFixed(2)}
-                              </td>
-
-                              <td className="px-4 py-3 text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <div className="w-16 bg-[var(--muted)] h-2 rounded-full overflow-hidden">
-                                    <div style={{ width: `${contribucionPct}%` }} className="bg-[#0F172A] h-full rounded-full" />
-                                  </div>
-                                  <span className="font-bold text-[11px] text-[var(--foreground)]">{contribucionPct.toFixed(1)}%</span>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        });
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB: REPORTE DE COBRANZAS — CLIENTES QUE DEBEN                */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'cobranzas' && (
-            <div className="space-y-6">
-              {/* Encabezado y Acciones de PDF */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
-                    <Receipt size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
-                      Reporte de Cobranzas — Clientes Deudores
-                    </h3>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      Detalle nominal de clientes con saldo pendiente, notas de entrega a crédito y antigüedad de deuda
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={cargarCobranzas}
-                    disabled={loadingCobranzas}
-                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <RefreshCw size={13} className={loadingCobranzas ? 'animate-spin' : ''} />
-                    <span>Actualizar</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteCobranzasPdf('preview')}
-                    disabled={loadingCobranzas || !cobranzasData?.clientes?.length}
-                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Eye size={14} />
-                    <span>Previsualizar PDF</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteCobranzasPdf('download')}
-                    disabled={loadingCobranzas || !cobranzasData?.clientes?.length}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Download size={14} />
-                    <span>Descargar PDF</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* KPIs de Cobranzas */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Cartera Pendiente Total</span>
-                  <div className="text-2xl font-black text-red-600">
-                    ${(cobranzasData?.totalCartera || 0).toFixed(2)}
-                  </div>
-                  <p className="text-[10px] text-[var(--muted-foreground)]">Monto total por recaudar en el negocio</p>
-                </div>
-
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Clientes con Deuda</span>
-                  <div className="text-2xl font-black text-[var(--foreground)]">
-                    {cobranzasData?.totalClientes || 0}
-                  </div>
-                  <p className="text-[10px] text-[var(--muted-foreground)]">Clientes con notas o créditos pendientes</p>
-                </div>
-
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Deuda Promedio / Cliente</span>
-                  <div className="text-2xl font-black text-amber-600">
-                    ${cobranzasData?.totalClientes > 0 ? ((cobranzasData.totalCartera || 0) / cobranzasData.totalClientes).toFixed(2) : '0.00'}
-                  </div>
-                  <p className="text-[10px] text-[var(--muted-foreground)]">Promedio adeudado por comprador activo</p>
-                </div>
-
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Recaudado en Periodo</span>
-                  <div className="text-2xl font-black text-emerald-600">
-                    ${kpis.totalRecaudadoCobros.toFixed(2)}
-                  </div>
-                  <p className="text-[10px] text-[var(--muted-foreground)]">Abonos y pagos ingresados efectivamente</p>
-                </div>
-              </div>
-
-              {/* Gráficos Estadísticos de Cartera y Recuperación */}
-              {cobranzasData && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Donut de Recuperación vs Cartera */}
-                  <GraficoDonutCircular
-                    items={[
-                      {
-                        label: 'Recaudado Efectivo',
-                        valor: kpis.totalRecaudadoCobros || 0,
-                        color: '#10B981',
-                        subtexto: 'Abonos y cobros ingresados en el periodo',
-                      },
-                      {
-                        label: 'Cartera por Cobrar',
-                        valor: cobranzasData.totalCartera || 0,
-                        color: '#EF4444',
-                        subtexto: `${cobranzasData.totalClientes || 0} compradores con saldo pendiente`,
-                      },
-                    ]}
-                    titulo="Ratio de Recuperación de Liquidez"
-                    subtitulo="Comparativa entre abonos recaudados y saldo deudor activo"
-                    valorCentro={
-                      (kpis.totalRecaudadoCobros + (cobranzasData.totalCartera || 0)) > 0
-                        ? `${(
-                            (kpis.totalRecaudadoCobros /
-                              (kpis.totalRecaudadoCobros + (cobranzasData.totalCartera || 0))) *
-                            100
-                          ).toFixed(0)}%`
-                        : '100%'
-                    }
-                    etiquetaCentro="Recuperado"
-                  />
-
-                  {/* Barras de Exposición por Nivel de Riesgo Crediticio */}
-                  {(() => {
-                    const niveles: Record<string, { cant: number; deuda: number }> = {
-                      EXCELENTE: { cant: 0, deuda: 0 },
-                      BUENO: { cant: 0, deuda: 0 },
-                      REGULAR: { cant: 0, deuda: 0 },
-                      CRITICO: { cant: 0, deuda: 0 },
-                    };
-
-                    (cobranzasData.clientes || []).forEach((c: any) => {
-                      const niv = (c.nivelCredito || '').toUpperCase();
-                      if (niv.includes('EXCELENTE') || (c.scoreCrediticio && c.scoreCrediticio >= 80)) {
-                        niveles.EXCELENTE.cant += 1;
-                        niveles.EXCELENTE.deuda += c.totalDeuda || 0;
-                      } else if (niv.includes('BUENO') || (c.scoreCrediticio && c.scoreCrediticio >= 60)) {
-                        niveles.BUENO.cant += 1;
-                        niveles.BUENO.deuda += c.totalDeuda || 0;
-                      } else if (niv.includes('REGULAR') || (c.scoreCrediticio && c.scoreCrediticio >= 40)) {
-                        niveles.REGULAR.cant += 1;
-                        niveles.REGULAR.deuda += c.totalDeuda || 0;
-                      } else {
-                        niveles.CRITICO.cant += 1;
-                        niveles.CRITICO.deuda += c.totalDeuda || 0;
-                      }
-                    });
-
-                    const barItems = [
-                      {
-                        label: 'Excelente (Bajo Riesgo)',
-                        valor: niveles.EXCELENTE.deuda,
-                        valorFormateado: `$${niveles.EXCELENTE.deuda.toFixed(2)}`,
-                        subtexto: `${niveles.EXCELENTE.cant} clientes`,
-                        color: '#10B981',
-                      },
-                      {
-                        label: 'Bueno (Riesgo Normal)',
-                        valor: niveles.BUENO.deuda,
-                        valorFormateado: `$${niveles.BUENO.deuda.toFixed(2)}`,
-                        subtexto: `${niveles.BUENO.cant} clientes`,
-                        color: '#0EA5E9',
-                      },
-                      {
-                        label: 'Regular (En Observación)',
-                        valor: niveles.REGULAR.deuda,
-                        valorFormateado: `$${niveles.REGULAR.deuda.toFixed(2)}`,
-                        subtexto: `${niveles.REGULAR.cant} clientes`,
-                        color: '#F59E0B',
-                      },
-                      {
-                        label: 'Crítico (Mora / Alto Riesgo)',
-                        valor: niveles.CRITICO.deuda,
-                        valorFormateado: `$${niveles.CRITICO.deuda.toFixed(2)}`,
-                        subtexto: `${niveles.CRITICO.cant} clientes`,
-                        color: '#EF4444',
-                      },
-                    ].filter((b) => b.valor > 0 || (cobranzasData.clientes || []).length === 0);
-
-                    return (
-                      <GraficoBarrasModerno
-                        items={barItems}
-                        titulo="Exposición de Cartera por Nivel de Riesgo"
-                        subtitulo="Monto total adeudado según el scoring y comportamiento de pago"
-                        unidad="$"
-                        emptyMessage="Sin deudas pendientes registradas."
-                      />
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* Filtros de búsqueda de deudores */}
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row items-center gap-3 shadow-xs">
-                <div className="relative flex-1 w-full">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-                  <input
-                    type="text"
-                    value={filtroDeudor}
-                    onChange={(e) => setFiltroDeudor(e.target.value)}
-                    placeholder="Buscar por nombre, cédula o teléfono..."
-                    className="w-full pl-9 pr-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                  />
-                </div>
-
-                <div className="w-full sm:w-56">
-                  <select
-                    value={filtroScoreDeudor}
-                    onChange={(e) => setFiltroScoreDeudor(e.target.value)}
-                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                  >
-                    <option value="TODOS">Todos los Niveles Crediticios</option>
-                    <option value="EXCELENTE">Nivel Excelente</option>
-                    <option value="BUENO">Nivel Bueno</option>
-                    <option value="REGULAR">Nivel Regular</option>
-                    <option value="RIESGO">Nivel Riesgo</option>
-                    <option value="CRITICO">Nivel Crítico</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Tabla de Clientes Deudores */}
-              <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
-                {loadingCobranzas ? (
-                  <div className="p-14 text-center text-xs text-[var(--muted-foreground)] flex flex-col items-center justify-center gap-2">
-                    <Loader2 size={30} className="animate-spin text-blue-600" />
-                    <span>Cargando estado de cartera y notas pendientes...</span>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-                        <tr>
-                          <th className="px-4 py-3">Cliente / Identificación</th>
-                          <th className="px-4 py-3 text-center">Nivel / Score</th>
-                          <th className="px-4 py-3 text-center">Notas Pendientes</th>
-                          <th className="px-4 py-3 text-right">Saldo Deudor Total</th>
-                          <th className="px-4 py-3 text-center">Último Abono</th>
-                          <th className="px-4 py-3 text-center">Acción</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--border)]">
-                        {(() => {
-                          const clientesFiltrados = (cobranzasData?.clientes || []).filter((c: ClienteDeudor) => {
-                            const matchTexto =
-                              !filtroDeudor ||
-                              normalizarParaBusqueda(c.nombre).includes(normalizarParaBusqueda(filtroDeudor)) ||
-                              c.cedula?.includes(filtroDeudor) ||
-                              c.telefono?.includes(filtroDeudor);
-                            const matchNivel =
-                              filtroScoreDeudor === 'TODOS' ||
-                              c.nivelCredito?.toUpperCase() === filtroScoreDeudor;
-                            return matchTexto && matchNivel;
-                          });
-
-                          if (clientesFiltrados.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan={6} className="p-10 text-center text-xs text-[var(--muted-foreground)]">
-                                  No se encontraron clientes deudores con los criterios seleccionados.
-                                </td>
-                              </tr>
-                            );
-                          }
-
-                          return clientesFiltrados.map((c: ClienteDeudor) => {
-                            const expandido = clienteExpandidoId === c.clienteId;
-                            return (
-                              <React.Fragment key={c.clienteId}>
-                                <tr className="hover:bg-[var(--muted)]/20 transition-colors">
-                                  <td className="px-4 py-3.5">
-                                    <div className="font-extrabold text-[var(--foreground)] text-xs">
-                                      {c.nombre}
-                                    </div>
-                                    <div className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-2 mt-0.5">
-                                      <span>C.I./RUC: {c.cedula}</span>
-                                      {c.telefono && <span>• Tel: {c.telefono}</span>}
-                                    </div>
-                                  </td>
-
-                                  <td className="px-4 py-3.5 text-center">
-                                    <div className="inline-flex flex-col items-center">
-                                      <span className="px-2 py-0.5 bg-[#0F172A]/10 text-[#0F172A] rounded-md font-extrabold text-[10px] uppercase">
-                                        {c.nivelCredito || 'REGULAR'}
-                                      </span>
-                                      <span className="text-[10px] text-[var(--muted-foreground)] font-semibold mt-0.5">
-                                        Score: {c.scoreCrediticio ?? 50}/100
-                                      </span>
-                                    </div>
-                                  </td>
-
-                                  <td className="px-4 py-3.5 text-center">
-                                    <span className="px-2.5 py-1 bg-amber-500/10 text-amber-700 dark:text-amber-300 font-extrabold text-xs rounded-lg">
-                                      {c.notasPendientes} {c.notasPendientes === 1 ? 'nota' : 'notas'}
-                                    </span>
-                                  </td>
-
-                                  <td className="px-4 py-3.5 text-right font-black text-sm text-red-600">
-                                    ${c.totalDeuda.toFixed(2)}
-                                  </td>
-
-                                  <td className="px-4 py-3.5 text-center">
-                                    {c.ultimoAbono ? (
-                                      <div>
-                                        <span className="font-bold text-[var(--foreground)] text-[11px]">
-                                          ${(c.ultimoAbonoMonto || 0).toFixed(2)}
-                                        </span>
-                                        <div className="text-[10px] text-[var(--muted-foreground)]">
-                                          {c.ultimoAbono}
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin abonos</span>
-                                    )}
-                                  </td>
-
-                                  <td className="px-4 py-3.5 text-center">
-                                    {c.detalleNotas && c.detalleNotas.length > 0 ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => setClienteExpandidoId(expandido ? null : c.clienteId)}
-                                        className="px-2.5 py-1 bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-[var(--foreground)] text-[11px] font-bold rounded-lg border border-[var(--border)] transition-all cursor-pointer inline-flex items-center gap-1"
-                                      >
-                                        <span>{expandido ? 'Ocultar' : 'Ver Notas'}</span>
-                                        <ChevronDown size={12} className={`transition-transform ${expandido ? 'rotate-180' : ''}`} />
-                                      </button>
-                                    ) : (
-                                      <span className="text-[10px] text-[var(--muted-foreground)]">—</span>
-                                    )}
-                                  </td>
-                                </tr>
-
-                                {/* Desglose expandido de notas */}
-                                {expandido && c.detalleNotas && (
-                                  <tr className="bg-[var(--muted)]/10">
-                                    <td colSpan={6} className="px-6 py-3 border-y border-[var(--border)]">
-                                      <div className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] mb-2">
-                                        Desglose de Comprobantes Pendientes:
-                                      </div>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                        {c.detalleNotas.map((n, i) => (
-                                          <div key={i} className="p-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl flex items-center justify-between text-xs shadow-2xs">
-                                            <div>
-                                              <span className="font-extrabold text-[var(--foreground)] block">
-                                                {n.numero}
-                                              </span>
-                                              <span className="text-[10px] text-[var(--muted-foreground)]">
-                                                Fecha: {n.fecha}
-                                              </span>
-                                            </div>
-                                            <div className="text-right">
-                                              <span className="text-[10px] text-[var(--muted-foreground)] block">
-                                                Total: ${n.montoTotal.toFixed(2)}
-                                              </span>
-                                              <span className="font-extrabold text-red-600">
-                                                Saldo: ${n.saldoPendiente.toFixed(2)}
-                                              </span>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )}
-                              </React.Fragment>
-                            );
-                          });
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB: REPORTE DE CAMPAÑAS Y PROMOCIONES                        */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'campanas' && (
-            <div className="space-y-6">
-              {/* Encabezado y Acciones de PDF */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
-                    <Megaphone size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
-                      Reporte de Campañas & Promociones
-                    </h3>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      Métricas de efectividad, cupones canjeados, volumen de calzado comercializado y ROI
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={cargarCampanas}
-                    disabled={loadingCampanas}
-                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <RefreshCw size={13} className={loadingCampanas ? 'animate-spin' : ''} />
-                    <span>Actualizar</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteCampanasPdf('preview')}
-                    disabled={loadingCampanas || !campanasData?.campanas?.length}
-                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Eye size={14} />
-                    <span>Previsualizar PDF</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteCampanasPdf('download')}
-                    disabled={loadingCampanas || !campanasData?.campanas?.length}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Download size={14} />
-                    <span>Descargar PDF</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* KPIs de Campañas */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Total Campañas Registradas</span>
-                  <div className="text-2xl font-black text-[var(--foreground)]">
-                    {campanasData?.totalCampanas || 0}
-                  </div>
-                  <p className="text-[10px] text-[var(--muted-foreground)]">Estrategias promocionales creadas</p>
-                </div>
-
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Campañas Activas</span>
-                  <div className="text-2xl font-black text-purple-600">
-                    {campanasData?.campanasActivas || 0}
-                  </div>
-                  <p className="text-[10px] text-[var(--muted-foreground)]">Vigentes para canje en venta y POS</p>
-                </div>
-
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Total Canjes Usados</span>
-                  <div className="text-2xl font-black text-indigo-600">
-                    {campanasData?.totalCanjes || 0}
-                  </div>
-                  <p className="text-[10px] text-[var(--muted-foreground)]">Cupones y promociones redimidos</p>
-                </div>
-
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Ingresos Brutos Asociados</span>
-                  <div className="text-2xl font-black text-emerald-600">
-                    ${(campanasData?.montoGeneradoTotal || 0).toFixed(2)}
-                  </div>
-                  <p className="text-[10px] text-[var(--muted-foreground)]">Facturación generada con campañas</p>
-                </div>
-              </div>
-
-              {/* Gráficas Estadísticas de Campañas */}
-              {campanasData?.campanas && campanasData.campanas.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Barras de Facturación por Campaña */}
-                  <GraficoBarrasModerno
-                    items={campanasData.campanas.slice(0, 5).map((c: any, idx: number) => ({
-                      label: c.titulo,
-                      valor: c.montoTotalGenerado || 0,
-                      valorFormateado: `$${(c.montoTotalGenerado || 0).toFixed(2)}`,
-                      subtexto: `${c.canjesUsados} canjes (${c.paresVendidos} pares)`,
-                      color: ['#8B5CF6', '#10B981', '#0EA5E9', '#F59E0B', '#EC4899'][idx % 5],
-                    }))}
-                    titulo="Facturación Generada por Campaña"
-                    subtitulo="Ingresos brutos atribuibles a cada cupón o descuento aplicado"
-                    unidad="$"
-                  />
-
-                  {/* Donut de Consumo de Cupos */}
-                  {(() => {
-                    const totalCanjes = campanasData.campanas.reduce((s: number, c: any) => s + (c.canjesUsados || 0), 0);
-                    const totalCupos = campanasData.campanas.reduce((s: number, c: any) => s + (c.maximoCanjes || 0), 0);
-                    const disponibles = Math.max(0, totalCupos - totalCanjes);
-
-                    return (
-                      <GraficoDonutCircular
-                        items={[
-                          {
-                            label: 'Canjes Redimidos',
-                            valor: totalCanjes,
-                            color: '#10B981',
-                            subtexto: `${totalCanjes} clientes beneficiados`,
-                          },
-                          {
-                            label: 'Cupos Disponibles',
-                            valor: disponibles,
-                            color: '#8B5CF6',
-                            subtexto: `${disponibles} canjes aún por redimir`,
-                          },
-                        ]}
-                        titulo="Eficiencia y Consumo de Cupos"
-                        subtitulo="Proporción de beneficios comerciales consumidos vs capacidad"
-                        valorCentro={totalCupos > 0 ? `${((totalCanjes / totalCupos) * 100).toFixed(0)}%` : '100%'}
-                        etiquetaCentro="Tasa de Uso"
-                      />
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* Filtros de campañas */}
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row items-center gap-3 shadow-xs">
-                <div className="relative flex-1 w-full">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-                  <input
-                    type="text"
-                    value={busquedaCampana}
-                    onChange={(e) => setBusquedaCampana(e.target.value)}
-                    placeholder="Buscar por código promocional o título..."
-                    className="w-full pl-9 pr-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                  />
-                </div>
-
-                <div className="w-full sm:w-48">
-                  <select
-                    value={filtroCampanaEstado}
-                    onChange={(e) => setFiltroCampanaEstado(e.target.value)}
-                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                  >
-                    <option value="TODAS">Todos los Estados</option>
-                    <option value="ACTIVAS">Solo Activas</option>
-                    <option value="INACTIVAS">Solo Finalizadas / Inactivas</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Tabla de Rendimiento de Campañas */}
-              <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
-                {loadingCampanas ? (
-                  <div className="p-14 text-center text-xs text-[var(--muted-foreground)] flex flex-col items-center justify-center gap-2">
-                    <Loader2 size={30} className="animate-spin text-purple-600" />
-                    <span>Analizando métricas de campañas y canjes...</span>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-                        <tr>
-                          <th className="px-4 py-3">Campaña / Código</th>
-                          <th className="px-4 py-3 text-center">Tipo de Descuento</th>
-                          <th className="px-4 py-3 text-center">Canjes / Límite</th>
-                          <th className="px-4 py-3 text-center">Efectividad</th>
-                          <th className="px-4 py-3 text-right">Venta Generada</th>
-                          <th className="px-4 py-3 text-center">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--border)]">
-                        {(() => {
-                          const campanasFiltradas = (campanasData?.campanas || []).filter((c: CampanaReporte) => {
-                            const matchTexto =
-                              !busquedaCampana ||
-                              c.titulo?.toLowerCase().includes(busquedaCampana.toLowerCase()) ||
-                              c.codigo?.toLowerCase().includes(busquedaCampana.toLowerCase());
-                            const matchEstado =
-                              filtroCampanaEstado === 'TODAS' ||
-                              (filtroCampanaEstado === 'ACTIVAS' && c.activo) ||
-                              (filtroCampanaEstado === 'INACTIVAS' && !c.activo);
-                            return matchTexto && matchEstado;
-                          });
-
-                          if (campanasFiltradas.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan={6} className="p-10 text-center text-xs text-[var(--muted-foreground)]">
-                                  No se encontraron campañas promocionales con los filtros seleccionados.
-                                </td>
-                              </tr>
-                            );
-                          }
-
-                          return campanasFiltradas.map((c: CampanaReporte) => {
-                            const usoPct = c.maximoCanjes > 0 ? (c.canjesUsados / c.maximoCanjes) * 100 : 0;
-                            const funciono = c.canjesUsados > 0;
-                            return (
-                              <tr key={c.id} className="hover:bg-[var(--muted)]/20 transition-colors">
-                                <td className="px-4 py-3.5">
-                                  <div className="font-extrabold text-[var(--foreground)] text-xs">
-                                    {c.titulo}
-                                  </div>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-700 dark:text-purple-300 rounded font-mono font-bold text-[10px]">
-                                      {c.codigo}
-                                    </span>
-                                    <span className="text-[10px] text-[var(--muted-foreground)]">
-                                      Desde {new Date(c.fechaInicio).toLocaleDateString('es-EC')}
-                                    </span>
-                                  </div>
-                                </td>
-
-                                <td className="px-4 py-3.5 text-center">
-                                  <span className="font-bold text-[var(--foreground)] text-[11px]">
-                                    {c.tipoDescuento === 'PORCENTAJE' && `${c.valorDescuento}% de descuento`}
-                                    {c.tipoDescuento === 'MONTO_FIJO' && `$${c.valorDescuento.toFixed(2)} fijos`}
-                                    {c.tipoDescuento === 'DESCUENTO_POR_PAR' && `$${c.valorDescuento.toFixed(2)} por par`}
-                                  </span>
-                                </td>
-
-                                <td className="px-4 py-3.5 text-center">
-                                  <div className="space-y-1">
-                                    <div className="font-bold text-xs">
-                                      {c.canjesUsados} / {c.maximoCanjes > 0 ? c.maximoCanjes : '∞'}
-                                    </div>
-                                    {c.maximoCanjes > 0 && (
-                                      <div className="w-20 mx-auto bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
-                                        <div
-                                          style={{ width: `${Math.min(usoPct, 100)}%` }}
-                                          className={`h-full rounded-full ${usoPct >= 80 ? 'bg-emerald-500' : 'bg-purple-600'}`}
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-
-                                <td className="px-4 py-3.5 text-center">
-                                  {funciono ? (
-                                    <span className={`px-2 py-0.5 rounded-md font-extrabold text-[10px] ${
-                                      usoPct >= 50
-                                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                                        : 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300'
-                                    }`}>
-                                      {usoPct >= 50 ? 'Alta Efectividad' : 'Desempeño Positivo'}
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 bg-slate-500/15 text-slate-600 dark:text-slate-400 rounded-md font-bold text-[10px]">
-                                      Sin Canjes
-                                    </span>
-                                  )}
-                                </td>
-
-                                <td className="px-4 py-3.5 text-right">
-                                  <div className="font-black text-sm text-emerald-600">
-                                    ${(c.montoTotalGenerado || 0).toFixed(2)}
-                                  </div>
-                                  <div className="text-[10px] text-[var(--muted-foreground)]">
-                                    {c.paresVendidos || 0} pares comercializados
-                                  </div>
-                                </td>
-
-                                <td className="px-4 py-3.5 text-center">
-                                  <span className={`px-2 py-0.5 rounded-full font-extrabold text-[10px] ${
-                                    c.activo
-                                      ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
-                                      : 'bg-slate-500/10 text-slate-600 border border-slate-500/20'
-                                  }`}>
-                                    {c.activo ? 'ACTIVA' : 'FINALIZADA'}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          });
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB 4: FINANZAS & MÉTODOS DE PAGO                              */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'finanzas' && (
-            <div className="space-y-6">
-              {/* Encabezado y Acciones de PDF para Finanzas */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
-                    <DollarSign size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
-                      Reporte Financiero & Canales de Recaudación
-                    </h3>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      Desglose de liquidez por método de abono, efectivo, transferencias bancarias y cartera pendiente
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => handleReporteFinanzasPdf('preview')}
-                    disabled={loading || !reporteData}
-                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Eye size={14} />
-                    <span>Previsualizar PDF</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteFinanzasPdf('download')}
-                    disabled={loading || !reporteData}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Download size={14} />
-                    <span>Descargar PDF</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Barra de Filtros Activos para Finanzas */}
-              <div className="flex flex-wrap items-center gap-2 p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl text-xs shadow-2xs">
-                <span className="font-bold text-[var(--muted-foreground)] flex items-center gap-1.5 mr-1">
-                  <Filter size={13} className="text-blue-600" />
-                  <span>Filtros Activos:</span>
-                </span>
-                <span className="px-2.5 py-1 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg font-bold">
-                   {periodo} {periodo === 'PERSONALIZADO' && `(${fechaDesde || 'Inicio'} a ${fechaHasta || 'Fin'})`}
-                </span>
-                <span className="px-2.5 py-1 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg font-bold">
-                  {sucursalSeleccionada === 'TODAS' ? 'Todas las Sucursales' : (sucursales.find(s => s.id === sucursalSeleccionada)?.name || 'Sucursal Seleccionada')}
-                </span>
-                <span className={`px-2.5 py-1 rounded-lg font-bold border ${
-                  vendedorSeleccionado !== 'TODOS' ? 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-300' : 'bg-[var(--muted)]/50 border-[var(--border)]'
-                }`}>
-                  {vendedorSeleccionado === 'TODOS' ? 'Todos los Trabajadores' : capitalizarNombreCompleto(vendedores.find(v => v.id === vendedorSeleccionado)?.nombre || 'Trabajador')}
-                </span>
-                <span className={`px-2.5 py-1 rounded-lg font-bold border ${
-                  canalSeleccionado !== 'TODOS' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300' : 'bg-[var(--muted)]/50 border-[var(--border)]'
-                }`}>
-                  canalSeleccionado === 'TODOS' ? 'Todos los Canales' : canalSeleccionado === 'MANUAL' ? 'POS Mostrador' : canalSeleccionado === 'WHATSAPP' ? 'Pedidos WhatsApp' : 'Catálogo Digital'
-                </span>
-                {(vendedorSeleccionado !== 'TODOS' || canalSeleccionado !== 'TODOS' || sucursalSeleccionada !== 'TODAS') && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setVendedorSeleccionado('TODOS');
-                      setCanalSeleccionado('TODOS');
-                      if (isGlobalAdmin) setSucursalSeleccionada('TODAS');
-                    }}
-                    className="ml-auto text-[11px] font-bold text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
-                  >
-                    <RotateCcw size={12} />
-                    <span>Restablecer Filtros</span>
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Donut de Métodos de Abono y Cobro */}
-                <GraficoDonutCircular
-                  items={Object.entries(reporteData?.distribucionMetodosAbono || {}).map(([met, d]: [string, any], idx: number) => {
-                    const paleta = ['#10B981', '#0EA5E9', '#6366F1', '#F59E0B', '#EC4899'];
-                    const labelTexto =
-                      met === 'EFECTIVO' ? 'Efectivo en Caja'
-                      : met === 'TRANSFERENCIA' ? 'Transferencia Bancaria'
-                      : met === 'DEPOSITO' ? 'Depósito Bancario'
-                      : met === 'CHEQUE' ? 'Cheque / Documento'
-                      : met.replace('_', ' ');
-
-                    return {
-                      label: labelTexto,
-                      valor: d.monto || 0,
-                      color: paleta[idx % paleta.length],
-                      subtexto: `${d.count} abonos recibidos`,
-                    };
-                  })}
-                  titulo="Recaudación por Método de Abono"
-                  subtitulo="Flujo de liquidez cobrado en el periodo según la forma de pago"
-                  valorCentro={`$${kpis.totalRecaudadoCobros.toFixed(0)}`}
-                  etiquetaCentro="Total Cobrado"
-                />
-
-                {/* Resumen de Cartera e Índices Financieros */}
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs flex flex-col justify-between">
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
-                    Índices Financieros & Cartera de Clientes
-                  </h3>
-
-                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl space-y-1">
-                    <span className="text-[11px] font-bold text-red-600 uppercase">Saldo Deudor Pendiente en Cartera:</span>
-                    <div className="text-2xl font-black text-red-600">
-                      ${kpis.saldoCarteraTotal.toFixed(2)}
-                    </div>
-                    <p className="text-[10px] text-red-700/80">
-                      Total adeudado por clientes en notas y compras a crédito activas ({kpis.clientesConDeudaCount || 0} clientes deudores).
-                    </p>
-                  </div>
-
-                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-1">
-                    <span className="text-[11px] font-bold text-emerald-600 uppercase">Efectividad de Recaudación en el Periodo:</span>
-                    <div className="text-2xl font-black text-emerald-600">
-                      ${kpis.totalRecaudadoCobros.toFixed(2)}
-                    </div>
-                    <p className="text-[10px] text-emerald-700/80">
-                      Monto líquido ingresado a caja por concepto de cobros y abonos en estas fechas.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Ventas y Recaudación por Canal de Venta & Contado vs Crédito */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Ventas por Canal de Entrada */}
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
-                    <span>Ventas por Canal de Entrada</span>
-                    <span className="text-[10px] text-[var(--muted-foreground)] font-normal">Facturación total</span>
-                  </h3>
-                  <div className="space-y-2 text-xs">
-                    {[
-                      { key: 'MANUAL', label: 'POS Mostrador / Venta Directa', data: reporteData?.distribucionCanales?.MANUAL, color: 'bg-emerald-600' },
-                      { key: 'WHATSAPP', label: 'Pedidos WhatsApp / Comercial', data: reporteData?.distribucionCanales?.WHATSAPP, color: 'bg-blue-600' },
-                      { key: 'CATALOGO', label: 'Catálogo Digital Web', data: reporteData?.distribucionCanales?.CATALOGO, color: 'bg-purple-600' },
-                    ].map((c) => {
-                      const monto = c.data?.monto || 0;
-                      const pares = c.data?.pares || 0;
-                      const pct = kpis.totalIngresos > 0 ? (monto / kpis.totalIngresos) * 100 : 0;
-                      return (
-                        <div key={c.key} className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-1">
-                          <div className="flex justify-between items-center font-bold">
-                            <span>{c.label}</span>
-                            <span>${monto.toFixed(2)} ({pct.toFixed(0)}%)</span>
-                          </div>
-                          <div className="w-full bg-[var(--muted)] h-2 rounded-full overflow-hidden">
-                            <div style={{ width: `${pct}%` }} className={`${c.color} h-full rounded-full`} />
-                          </div>
-                          <div className="text-[10px] text-[var(--muted-foreground)] flex justify-between">
-                            <span>{c.data?.count || 0} pedidos registrados</span>
-                            <span>{pares} pares vendidos</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Formas de Pago: Contado vs Crédito */}
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
-                    <span>Distribución Contado vs Crédito</span>
-                    <span className="text-[10px] text-[var(--muted-foreground)] font-normal">Forma comercial</span>
-                  </h3>
-                  <div className="space-y-2 text-xs">
-                    {[
-                      { key: 'CONTADO', label: 'Ventas de Contado', data: reporteData?.distribucionFormasPago?.CONTADO, color: 'bg-emerald-600' },
-                      { key: 'CREDITO', label: 'Ventas a Crédito', data: reporteData?.distribucionFormasPago?.CREDITO, color: 'bg-blue-600' },
-                    ].map((f) => {
-                      const monto = f.data?.monto || 0;
-                      const pct = kpis.totalIngresos > 0 ? (monto / kpis.totalIngresos) * 100 : 0;
-                      return (
-                        <div key={f.key} className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-1">
-                          <div className="flex justify-between items-center font-bold">
-                            <span>{f.label}</span>
-                            <span>${monto.toFixed(2)} ({pct.toFixed(0)}%)</span>
-                          </div>
-                          <div className="w-full bg-[var(--muted)] h-2 rounded-full overflow-hidden">
-                            <div style={{ width: `${pct}%` }} className={`${f.color} h-full rounded-full`} />
-                          </div>
-                          <div className="text-[10px] text-[var(--muted-foreground)]">
-                            {f.data?.count || 0} transacciones realizadas
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Cobros y Recaudación por Trabajador / Vendedor */}
-              {reporteData?.recaudacionPorVendedor && reporteData.recaudacionPorVendedor.length > 0 && (
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
-                    <span>Cobros y Recaudación por Trabajador</span>
-                    <span className="text-[10px] text-[var(--muted-foreground)] font-normal">Abonos recaudados</span>
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {reporteData.recaudacionPorVendedor.map((v: any) => {
-                      const pct = kpis.totalRecaudadoCobros > 0 ? (v.totalAbonos / kpis.totalRecaudadoCobros) * 100 : 0;
-                      return (
-                        <div key={v.userId} className="p-3.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="font-black text-xs text-[var(--foreground)] truncate">{capitalizarNombreCompleto(v.nombre)}</span>
-                            <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-blue-500/10 text-blue-600">
-                              {v.rol?.replace('ROL_', '') || 'VENDEDOR'}
-                            </span>
-                          </div>
-                          <div className="flex items-baseline justify-between">
-                            <span className="text-lg font-black text-emerald-600 font-mono">
-                              ${v.totalAbonos.toFixed(2)}
-                            </span>
-                            <span className="text-xs font-bold text-[var(--muted-foreground)]">
-                              {pct.toFixed(0)}% del total
-                            </span>
-                          </div>
-                          <div className="w-full bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
-                            <div style={{ width: `${pct}%` }} className="bg-emerald-500 h-full rounded-full" />
-                          </div>
-                          <p className="text-[10px] text-[var(--muted-foreground)]">
-                            {v.count} abonos recibidos
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Historial Detallado de Transacciones de Cobro y Abonos */}
-              {reporteData?.abonosRecientes && reporteData.abonosRecientes.length > 0 && (
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
-                        Historial de Transacciones de Cobro y Abonos
-                      </h3>
-                      <p className="text-xs text-[var(--muted-foreground)]">
-                        Últimos movimientos financieros registrados en el periodo según los filtros activos
-                      </p>
-                    </div>
-
-                    <div className="relative w-full sm:w-64">
-                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
-                      <input
-                        type="text"
-                        value={filtroAbonosFinanzasTexto}
-                        onChange={(e) => setFiltroAbonosFinanzasTexto(e.target.value)}
-                        placeholder="Buscar por cliente, cobrador..."
-                        className="w-full pl-8 pr-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-[var(--muted)]/60 text-[var(--muted-foreground)] text-[10px] uppercase font-bold tracking-wider border-b border-[var(--border)]">
-                        <tr>
-                          <th className="py-2.5 px-3.5">Fecha</th>
-                          <th className="py-2.5 px-3.5">Cliente</th>
-                          <th className="py-2.5 px-3.5">Recaudador / Vendedor</th>
-                          <th className="py-2.5 px-3.5">Canal</th>
-                          <th className="py-2.5 px-3.5">Método</th>
-                          <th className="py-2.5 px-3.5 text-right">Monto</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--border)] font-medium">
-                        {reporteData.abonosRecientes
-                          .filter((ab: any) => {
-                            if (!filtroAbonosFinanzasTexto.trim()) return true;
-                            const t = filtroAbonosFinanzasTexto.toLowerCase();
-                            return (
-                              ab.clienteNombre?.toLowerCase().includes(t) ||
-                              ab.usuarioNombre?.toLowerCase().includes(t) ||
-                              ab.metodo?.toLowerCase().includes(t) ||
-                              ab.notas?.toLowerCase().includes(t)
-                            );
-                          })
-                          .map((ab: any) => (
-                            <tr key={ab.id} className="hover:bg-[var(--muted)]/20 transition-colors">
-                              <td className="py-2.5 px-3.5 text-[var(--muted-foreground)] font-mono text-[11px]">
-                                {new Date(ab.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                              </td>
-                              <td className="py-2.5 px-3.5 font-bold text-[var(--foreground)]">
-                                {ab.clienteNombre}
-                                {ab.notaNumero && (
-                                  <span className="block text-[10px] font-mono text-[var(--muted-foreground)]">
-                                    Nota #{ab.notaNumero}
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-2.5 px-3.5 text-[var(--foreground)]">
-                                {ab.usuarioNombre}
-                              </td>
-                              <td className="py-2.5 px-3.5">
-                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                                  ab.canal === 'MANUAL' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' :
-                                  ab.canal === 'WHATSAPP' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' :
-                                  'bg-purple-500/10 text-purple-700 dark:text-purple-300'
-                                }`}>
-                                  {ab.canal === 'MANUAL' ? 'POS Mostrador' : ab.canal === 'WHATSAPP' ? 'WhatsApp' : 'Catálogo Web'}
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-3.5">
-                                <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-[var(--muted)] text-[var(--foreground)]">
-                                  {ab.metodo}
-                                </span>
-                                {ab.notas && (
-                                  <span className="block text-[9px] text-[var(--muted-foreground)] truncate max-w-[120px]" title={ab.notas}>
-                                    {ab.notas}
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-2.5 px-3.5 text-right font-mono font-black text-emerald-600 text-sm">
-                                +${ab.monto.toFixed(2)}
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB 5: PROYECCIÓN IA / MACHINE LEARNING                        */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'proyeccion_ml' && (
-            <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-5 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl shadow-sm">
-                    <BrainCircuit size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
-                      Motor Predictivo de Demanda de Calzado (Nexora ML)
-                    </h3>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      Proyección estadística e inferencia basada en patrones de consumo del cantón Cevallos
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={cargarProyeccionMl}
-                    disabled={loadingMl}
-                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <Sparkles size={14} className={loadingMl ? 'animate-spin text-blue-600' : 'text-blue-600'} />
-                    <span>{loadingMl ? 'Calculando...' : 'Recalcular Proyección'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteProyeccionMlPdf('preview')}
-                    disabled={loadingMl || !proyeccionMl}
-                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Eye size={14} />
-                    <span>Previsualizar PDF</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteProyeccionMlPdf('download')}
-                    disabled={loadingMl || !proyeccionMl}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Download size={14} />
-                    <span>Descargar PDF</span>
-                  </button>
-                </div>
-              </div>
-
-              {loadingMl ? (
-                <div className="p-12 text-center text-xs text-[var(--muted-foreground)] flex flex-col items-center justify-center gap-2">
-                  <Loader2 size={32} className="animate-spin text-blue-600" />
-                  <span>Procesando serie temporal y curvas estacionales...</span>
-                </div>
-              ) : proyeccionMl ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl">
-                      <span className="text-[10px] font-bold uppercase text-purple-700 dark:text-purple-300 block mb-1">
-                        Pares Proyectados (Próx. 30 Días):
-                      </span>
-                      <span className="text-2xl font-black text-purple-900 dark:text-purple-200">
-                        {proyeccionMl.totalParesProyectados || 0} pares
-                      </span>
-                    </div>
-
-                    <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl">
-                      <span className="text-[10px] font-bold uppercase text-indigo-700 dark:text-indigo-300 block mb-1">
-                        Nivel de Confianza del Modelo:
-                      </span>
-                      <span className="text-2xl font-black text-indigo-900 dark:text-indigo-200">
-                        {proyeccionMl.confianza || '89.4%'}
-                      </span>
-                    </div>
-
-                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
-                      <span className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300 block mb-1">
-                        Recomendación Operativa:
-                      </span>
-                      <span className="text-xs font-extrabold text-emerald-900 dark:text-emerald-200 block">
-                        Abastecer series juveniles y adulto para pico de fin de semana
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Gráfico de Curva Predictiva */}
-                  {Array.isArray(proyeccionMl.proyecciones) && proyeccionMl.proyecciones.length > 1 && (
-                    <GraficoCurvaTendencia
-                      puntos={proyeccionMl.proyecciones.map((p: any) => ({
-                        label: p.diaLabel || p.fecha?.slice(5) || '',
-                        valor: Number(p.demandaEsperadaPares) || 0,
-                      }))}
-                      titulo="Curva de Demanda Proyectada (Próx. 30 Días)"
-                      subtitulo="Pares de calzado estimados por día según el modelo predictivo"
-                      primaryColor="#9333EA"
-                      secondaryColor="#7C3AED"
-                      serie1Nombre="Pares proyectados"
-                      altura={220}
-                    />
-                  )}
-
-                  {/* Tabla de proyección diaria */}
-                  <div className="border border-[var(--border)] rounded-2xl overflow-hidden">
-                    <div className="p-3 bg-[var(--muted)]/40 text-xs font-extrabold text-[var(--foreground)] border-b border-[var(--border)]">
-                      Demanda Proyectada Día por Día
-                    </div>
-                    <div className="max-h-60 overflow-y-auto divide-y divide-[var(--border)] text-xs">
-                      {proyeccionMl.proyecciones?.map((p: any, i: number) => (
-                        <div key={i} className="p-2.5 flex items-center justify-between hover:bg-[var(--muted)]/20">
-                          <span className="font-bold text-[var(--foreground)]">{p.diaLabel || p.fecha}</span>
-                          <div className="flex items-center gap-3">
-                            <span className="text-[10px] text-[var(--muted-foreground)]">
-                              Rango: {p.limiteInferior} - {p.limiteSuperior} pares
-                            </span>
-                            <span className="px-2 py-0.5 bg-purple-500/15 text-purple-700 dark:text-purple-300 rounded-md font-black">
-                              {p.demandaEsperadaPares} pares
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
-                  Presiona «Recalcular Proyección IA» para consultar la predicción de ventas.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ════════════════════════════════════════════════════════════════ */}
-          {/* TAB 10: ABASTECIMIENTO DE PROVEEDORES                           */}
-          {/* ════════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'proveedores' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Cabecera del Módulo */}
-              <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
-                      CICLO COMPLETO DE COMERCIALIZACIÓN
-                    </span>
-                    <span className="text-xs text-[var(--muted-foreground)] font-mono">
-                      Proveedores → Stock → Ventas → Cobranzas
-                    </span>
-                  </div>
-                  <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
-                    <Package size={18} className="text-emerald-600" />
-                    <span>Reporte de Abastecimiento & Proveedores</span>
-                  </h3>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    Control de compras a proveedores de calzado, lotes recibidos, anticipos entregados y cuentas pendientes del local.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleReporteProveedoresPdf('preview')}
-                    disabled={generandoProveedoresPdf || loadingProveedores}
-                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
-                  >
-                    {generandoProveedoresPdf ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
-                    <span>Previsualizar</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReporteProveedoresPdf('download')}
-                    disabled={generandoProveedoresPdf || loadingProveedores}
-                    className="px-3.5 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
-                  >
-                    <Download size={13} />
-                    <span>Descargar PDF</span>
-                  </button>
-                </div>
-              </div>
-
-              {loadingProveedores ? (
-                <div className="p-12 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-2">
-                  <Loader2 size={24} className="animate-spin text-emerald-600" />
-                  <span>Cargando datos de abastecimiento de proveedores...</span>
-                </div>
-              ) : proveedoresData ? (
-                <>
-                  {/* Tarjetas KPI de Abastecimiento */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
-                      <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
-                        Total Comprado a Proveedores
-                      </span>
-                      <div className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-                        ${Number(proveedoresData.kpis?.totalComprado || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
-                      </div>
-                      <span className="text-[10px] text-[var(--muted-foreground)] block">
-                        {proveedoresData.kpis?.totalLotes || 0} lotes / {proveedoresData.kpis?.totalPares || 0} pares de calzado
-                      </span>
-                    </div>
-
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
-                      <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
-                        Deuda Pendiente a Proveedores
-                      </span>
-                      <div className="text-2xl font-black font-mono text-orange-500">
-                        ${Number(proveedoresData.kpis?.deudaTotal || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
-                      </div>
-                      <span className="text-[10px] text-[var(--muted-foreground)] block">
-                        Cuentas por pagar del local a proveedores
-                      </span>
-                    </div>
-
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
-                      <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
-                        Anticipos Entregados (A Favor)
-                      </span>
-                      <div className="text-2xl font-black font-mono text-indigo-600 dark:text-indigo-400">
-                        +${Number(proveedoresData.kpis?.anticiposTotal || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
-                      </div>
-                      <span className="text-[10px] text-[var(--muted-foreground)] block">
-                        Dinero adelantado a proveedores
-                      </span>
-                    </div>
-
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
-                      <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
-                        Devoluciones / Garantías
-                      </span>
-                      <div className="text-2xl font-black font-mono text-red-500">
-                        ${Number(proveedoresData.kpis?.montoDevoluciones || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
-                      </div>
-                      <span className="text-[10px] text-[var(--muted-foreground)] block">
-                        {proveedoresData.kpis?.totalDevoluciones || 0} pares con observación de proveedor
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Gráficos Estadísticos de Abastecimiento */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Barras: Compras por Proveedor */}
-                    {Array.isArray(proveedoresData.porProveedor) && proveedoresData.porProveedor.length > 0 && (
-                      <GraficoBarrasModerno
-                        items={proveedoresData.porProveedor
-                          .sort((a: any, b: any) => (Number(b.totalComprado) || 0) - (Number(a.totalComprado) || 0))
-                          .slice(0, 8)
-                          .map((p: any) => ({
-                            label: p.nombre || 'Sin nombre',
-                            valor: Number(p.totalComprado) || 0,
-                          }))}
-                        titulo="Volumen de Compras por Proveedor"
-                        subtitulo="Monto total comprado a cada proveedor en el período"
-                        primaryColor={negocioInfo?.primaryColor || '#0EA5E9'}
-                        orientacion="horizontal"
-                        unidad="$"
-                      />
-                    )}
-
-                    {/* Donut: Pagado vs Pendiente */}
-                    <GraficoDonutCircular
-                      items={[
-                        {
-                          label: 'Pagado',
-                          valor: Math.max(0, (Number(proveedoresData.kpis?.totalComprado) || 0) - (Number(proveedoresData.kpis?.deudaTotal) || 0)),
-                          color: negocioInfo?.primaryColor || '#0EA5E9',
-                        },
-                        {
-                          label: 'Deuda Pendiente',
-                          valor: Number(proveedoresData.kpis?.deudaTotal) || 0,
-                          color: '#F97316',
-                        },
-                        {
-                          label: 'Anticipos a Favor',
-                          valor: Number(proveedoresData.kpis?.anticiposTotal) || 0,
-                          color: '#6366F1',
-                        },
-                      ].filter(d => d.valor > 0)}
-                      titulo="Estado de Cuentas a Proveedores"
-                      subtitulo="Distribución del capital pagado, deuda y anticipos"
-                    />
-                  </div>
-
-                  {/* Tabla de Proveedores */}
-                  <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
-                      <div>
-                        <h4 className="text-sm font-bold text-[var(--foreground)]">
-                          Relación de Proveedores & Estado de Cuenta
-                        </h4>
-                        <p className="text-[11px] text-[var(--muted-foreground)]">
-                          {(proveedoresData.porProveedor || []).length} proveedores registrados del local
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {/* Buscador */}
-                        <div className="relative">
-                          <input
-                            type="text"
-                            placeholder="Buscar proveedor o RUC..."
-                            value={filtroProveedorBusqueda}
-                            onChange={(e) => setFiltroProveedorBusqueda(e.target.value)}
-                            className="text-xs px-3 py-1.5 pl-8 bg-[var(--background)] border border-[var(--border)] rounded-xl w-48 focus:outline-none focus:border-emerald-500"
-                          />
-                          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
-                        </div>
-
-                        {/* Filtro Solvencia */}
-                        <select
-                          value={filtroProveedorSolvencia}
-                          onChange={(e) => setFiltroProveedorSolvencia(e.target.value)}
-                          className="text-xs px-2.5 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl font-bold cursor-pointer focus:outline-none"
-                        >
-                          <option value="TODOS">Todos los Estados</option>
-                          <option value="AL_DIA">Al Día</option>
-                          <option value="CON_ANTICIPO">Con Saldo a Favor</option>
-                          <option value="CON_DEUDA">Con Deuda Pendiente</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs text-left">
-                        <thead>
-                          <tr className="border-b border-[var(--border)] text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
-                            <th className="py-2.5 px-3">Proveedor</th>
-                            <th className="py-2.5 px-3">RUC / Cédula</th>
-                            <th className="py-2.5 px-3">Ubicación</th>
-                            <th className="py-2.5 px-3 text-center">Lotes Recibidos</th>
-                            <th className="py-2.5 px-3 text-right">Total Comprado</th>
-                            <th className="py-2.5 px-3 text-right">Saldo a Favor</th>
-                            <th className="py-2.5 px-3 text-right">Deuda Pendiente</th>
-                            <th className="py-2.5 px-3 text-center">Estado</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[var(--border)]">
-                          {(proveedoresData.porProveedor || [])
-                            .filter((p: any) => {
-                              if (filtroProveedorSolvencia !== 'TODOS' && p.estadoSolvencia !== filtroProveedorSolvencia) return false;
-                              if (filtroProveedorBusqueda.trim()) {
-                                const q = filtroProveedorBusqueda.toLowerCase().trim();
-                                const nom = (p.nombre || '').toLowerCase();
-                                const ruc = (p.rucCedula || '').toLowerCase();
-                                const ciu = (p.ciudad || '').toLowerCase();
-                                if (!nom.includes(q) && !ruc.includes(q) && !ciu.includes(q)) return false;
-                              }
-                              return true;
-                            })
-                            .map((p: any) => (
-                              <tr key={p.id} className="hover:bg-[var(--muted)]/30 transition-colors">
-                                <td className="py-3 px-3 font-bold text-[var(--foreground)]">
-                                  {p.nombre}
-                                </td>
-                                <td className="py-3 px-3 font-mono text-[var(--muted-foreground)]">
-                                  {p.rucCedula || 'S/RUC'}
-                                </td>
-                                <td className="py-3 px-3 text-[var(--muted-foreground)]">
-                                  {p.ciudad || 'Cevallos'}
-                                </td>
-                                <td className="py-3 px-3 text-center">
-                                  <span className="font-bold">{p.totalLotes}</span>
-                                  <span className="text-[10px] text-[var(--muted-foreground)] block">({p.totalPares} pares)</span>
-                                </td>
-                                <td className="py-3 px-3 text-right font-black font-mono text-emerald-600 dark:text-emerald-400">
-                                  ${Number(p.totalComprado || 0).toFixed(2)}
-                                </td>
-                                <td className="py-3 px-3 text-right font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                                  {Number(p.saldoAFavor || 0) > 0 ? `+$${Number(p.saldoAFavor).toFixed(2)}` : '—'}
-                                </td>
-                                <td className="py-3 px-3 text-right font-mono font-bold text-orange-500">
-                                  {Number(p.saldoPendiente || 0) > 0 ? `$${Number(p.saldoPendiente).toFixed(2)}` : '$0.00'}
-                                </td>
-                                <td className="py-3 px-3 text-center">
-                                  {p.estadoSolvencia === 'CON_ANTICIPO' ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">
-                                      Saldo a Favor
-                                    </span>
-                                  ) : p.estadoSolvencia === 'AL_DIA' ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                                      Al Día
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/10 text-orange-600 border border-orange-500/20">
-                                      Con Deuda
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Lotes Recientes de Calzado Recibidos */}
-                  {Array.isArray(proveedoresData.lotesRecientes) && proveedoresData.lotesRecientes.length > 0 && (
-                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs space-y-3">
-                      <h4 className="text-sm font-bold text-[var(--foreground)]">
-                        Lotes y Comprobantes de Calzado Recibidos Recientemente
-                      </h4>
-                      <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-2xl overflow-hidden">
-                        {proveedoresData.lotesRecientes.slice(0, 8).map((lote: any) => (
-                          <div key={lote.id} className="p-3 flex items-center justify-between text-xs bg-[var(--card)]">
-                            <div>
-                              <div className="font-bold text-[var(--foreground)]">
-                                Comprobante #{lote.numeroFactura || 'S/N'} — {lote.proveedorNombre}
-                              </div>
-                              <div className="text-[10px] text-[var(--muted-foreground)]">
-                                Fecha: {new Date(lote.fechaCompra).toLocaleDateString('es-EC')} · {lote.itemsCount || 0} modelos/curvas
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-xs font-black font-mono text-emerald-600 dark:text-emerald-400">
-                                ${Number(lote.total || 0).toFixed(2)}
-                              </span>
-                              <span className="text-[10px] text-[var(--muted-foreground)] block">
-                                Estado: {lote.estado || 'RECIBIDO'}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="p-8 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl">
-                  Selecciona la pestaña para consultar el abastecimiento de proveedores.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB 11: REPORTE DE INVENTARIO CON VALORACIÓN FIFO            */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'inventario_fifo' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Cabecera del Módulo */}
-              <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
-                      MÉTODO DE COSTEO FIFO (FIRST-IN, FIRST-OUT)
-                    </span>
-                    <span className="text-xs text-[var(--muted-foreground)] font-mono">
-                      Lotes de Compra → PVP → Margen Real
-                    </span>
-                  </div>
-                  <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
-                    <Boxes size={18} className="text-emerald-600" />
-                    <span>Reporte de Inventario con Valoración FIFO</span>
-                  </h3>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    Control físico de existencias valoradas según el costo de cada lote de compra, cálculo de ganancia estimada y alertas de reposición.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleReporteInventarioFifoPdf('preview')}
-                    disabled={generandoFifoPdf || loadingInventarioFifo || !inventarioFifoData}
-                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
-                  >
-                    {generandoFifoPdf ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
-                    <span>Previsualizar</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleReporteInventarioFifoPdf('download')}
-                    disabled={generandoFifoPdf || loadingInventarioFifo || !inventarioFifoData}
-                    className="px-3.5 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
-                  >
-                    {generandoFifoPdf ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-                    <span>Descargar PDF</span>
-                  </button>
-                </div>
-              </div>
-
-              {loadingInventarioFifo ? (
-                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
-                  <Loader2 size={32} className="animate-spin text-emerald-600" />
-                  <span className="text-xs font-bold">Calculando valoración FIFO de inventario...</span>
-                </div>
-              ) : inventarioFifoData ? (
-                <>
-                  {/* Tarjetas de Resumen (KPIs en Cabecera) */}
-                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                    {/* KPI 1: Total Pares */}
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
-                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
-                        <span>Pares en Bodega</span>
-                        <Package size={14} className="text-sky-500" />
-                      </div>
-                      <div className="text-xl font-black font-mono text-[var(--foreground)]">
-                        {inventarioFifoData.kpis.totalParesBodega} <span className="text-xs font-normal text-[var(--muted-foreground)]">pares</span>
-                      </div>
-                      <p className="text-[10px] text-[var(--muted-foreground)]">
-                        En {inventarioFifoData.kpis.totalModelos} variantes de calzado
-                      </p>
-                    </div>
-
-                    {/* KPI 2: Valor Total FIFO */}
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
-                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
-                        <span>Inversión FIFO</span>
-                        <DollarSign size={14} className="text-emerald-500" />
-                      </div>
-                      <div className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-                        ${inventarioFifoData.kpis.valorTotalFifo.toFixed(2)}
-                      </div>
-                      <p className="text-[10px] text-[var(--muted-foreground)]">
-                        Al costo de compra de cada lote
-                      </p>
-                    </div>
-
-                    {/* KPI 3: Valor en Venta PVP */}
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
-                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
-                        <span>Valor PVP</span>
-                        <ShoppingBag size={14} className="text-indigo-500" />
-                      </div>
-                      <div className="text-xl font-black font-mono text-indigo-600 dark:text-indigo-400">
-                        ${inventarioFifoData.kpis.valorTotalPvp.toFixed(2)}
-                      </div>
-                      <p className="text-[10px] text-[var(--muted-foreground)]">
-                        Estimado a precio de venta
-                      </p>
-                    </div>
-
-                    {/* KPI 4: Ganancia Estimada */}
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
-                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
-                        <span>Ganancia Proyectada</span>
-                        <TrendingUp size={14} className="text-emerald-600" />
-                      </div>
-                      <div className="text-xl font-black font-mono text-emerald-700 dark:text-emerald-300">
-                        ${inventarioFifoData.kpis.gananciaEstimada.toFixed(2)}
-                      </div>
-                      <p className="text-[10px] font-bold text-emerald-600">
-                        Margen rentabilidad: {inventarioFifoData.kpis.margenEstimadoPct}%
-                      </p>
-                    </div>
-
-                    {/* KPI 5: Alertas de Stock */}
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1 col-span-2 lg:col-span-1">
-                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
-                        <span>Alertas de Stock</span>
-                        <AlertTriangle size={14} className="text-amber-500" />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-black text-red-600">
-                          {inventarioFifoData.kpis.modelosAgotadosCount} agotados
-                        </span>
-                        <span className="text-xs text-[var(--muted-foreground)]">·</span>
-                        <span className="text-sm font-black text-amber-600">
-                          {inventarioFifoData.kpis.modelosStockBajoCount} en mínimo
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-[var(--muted-foreground)]">
-                        Pares críticos (&le; 2 pares)
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Gráficos Estadísticos */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Gráfico 1: Top 5 Inversión FIFO vs PVP */}
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-3 flex items-center justify-between">
-                        <span>Top 5 Inversión en Bodega</span>
-                        <BarChart3 size={13} className="text-emerald-500" />
-                      </h4>
-                      <div className="space-y-2.5">
-                        {inventarioFifoData.graficos?.topInversion?.map((item: any, idx: number) => {
-                          const maxVal = inventarioFifoData.graficos.topInversion[0]?.costoTotalFifo || 1;
-                          const pct = Math.min(Math.round((item.costoTotalFifo / maxVal) * 100), 100);
-                          return (
-                            <div key={idx} className="space-y-1">
-                              <div className="flex justify-between text-[11px]">
-                                <span className="font-bold truncate max-w-[170px] text-[var(--foreground)]">{item.nombre}</span>
-                                <span className="font-mono text-emerald-600 font-bold">${item.costoTotalFifo.toFixed(0)}</span>
-                              </div>
-                              <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                              </div>
-                              <div className="flex justify-between text-[9px] text-[var(--muted-foreground)]">
-                                <span>{item.stockTotal} pares</span>
-                                <span>PVP: ${item.valorTotalPvp.toFixed(0)}</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Gráfico 2: Distribución por Serie */}
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-3 flex items-center justify-between">
-                        <span>Distribución de Pares por Serie</span>
-                        <PieChart size={13} className="text-sky-500" />
-                      </h4>
-                      <div className="space-y-2.5">
-                        {inventarioFifoData.graficos?.distribucionSerie?.map((item: any, idx: number) => {
-                          const paleta = ['bg-sky-500', 'bg-emerald-500', 'bg-indigo-500', 'bg-amber-500', 'bg-purple-500'];
-                          const colorCls = paleta[idx % paleta.length];
-                          return (
-                            <div key={idx} className="space-y-1">
-                              <div className="flex justify-between text-[11px]">
-                                <span className="font-bold text-[var(--foreground)]">{item.serie}</span>
-                                <span className="font-mono font-bold text-[var(--foreground)]">{item.pares} p ({item.porcentaje}%)</span>
-                              </div>
-                              <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden">
-                                <div className={`h-full ${colorCls} rounded-full transition-all`} style={{ width: `${item.porcentaje}%` }} />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Gráfico 3: Semáforo del Estado del Inventario */}
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs flex flex-col justify-between">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-3 flex items-center justify-between">
-                        <span>Estado de Existencias</span>
-                        <Activity size={13} className="text-amber-500" />
-                      </h4>
-
-                      <div className="space-y-3 my-auto">
-                        {/* Óptimo */}
-                        <div className="flex items-center justify-between p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Stock Óptimo (&gt; 2 pares)</span>
-                          </div>
-                          <span className="text-xs font-black font-mono text-emerald-700 dark:text-emerald-400">
-                            {inventarioFifoData.graficos?.estadoInventario?.optimoCount || 0} mod ({inventarioFifoData.graficos?.estadoInventario?.optimoPct || 0}%)
-                          </span>
-                        </div>
-
-                        {/* Mínimo */}
-                        <div className="flex items-center justify-between p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                            <span className="text-xs font-bold text-amber-700 dark:text-amber-400">Stock Mínimo (1-2 pares)</span>
-                          </div>
-                          <span className="text-xs font-black font-mono text-amber-700 dark:text-amber-400">
-                            {inventarioFifoData.graficos?.estadoInventario?.minimoCount || 0} mod ({inventarioFifoData.graficos?.estadoInventario?.minimoPct || 0}%)
-                          </span>
-                        </div>
-
-                        {/* Agotado */}
-                        <div className="flex items-center justify-between p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                            <span className="text-xs font-bold text-red-700 dark:text-red-400">Sin Stock (0 pares)</span>
-                          </div>
-                          <span className="text-xs font-black font-mono text-red-700 dark:text-red-400">
-                            {inventarioFifoData.graficos?.estadoInventario?.agotadoCount || 0} mod ({inventarioFifoData.graficos?.estadoInventario?.agotadoPct || 0}%)
-                          </span>
-                        </div>
-                      </div>
-
-                      <p className="text-[10px] text-[var(--muted-foreground)] mt-2">
-                        Alimentado en tiempo real con salidas de bodega y mostrador.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Barra de Filtros del Reporte de Inventario */}
-                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                      {/* Buscador */}
-                      <div className="relative">
-                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
-                          Buscar Calzado
-                        </label>
-                        <div className="relative">
-                          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
-                          <input
-                            type="text"
-                            placeholder="Modelo, color, código o taller..."
-                            value={filtroFifoBusqueda}
-                            onChange={(e) => setFiltroFifoBusqueda(e.target.value)}
-                            className="w-full pl-8 pr-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
-                          />
-                          {filtroFifoBusqueda && (
-                            <button
-                              type="button"
-                              onClick={() => setFiltroFifoBusqueda('')}
-                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                            >
-                              <X size={12} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Filtro por Rotación */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
-                          Por Rotación
-                        </label>
-                        <select
-                          value={filtroFifoRotacion}
-                          onChange={(e) => setFiltroFifoRotacion(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none"
-                        >
-                          <option value="TODOS">Todos los estados</option>
-                          <option value="MAS_VENDIDOS">Más vendidos (&gt; 5 pares)</option>
-                          <option value="MENOS_VENDIDOS">Menos vendidos (&le; 5 pares)</option>
-                          <option value="STOCK_BAJO"> Stock mínimo (&le; 2 pares)</option>
-                          <option value="SIN_STOCK">Agotados (0 pares)</option>
-                        </select>
-                      </div>
-
-                      {/* Filtro por Orden */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
-                          Ordenar Por
-                        </label>
-                        <select
-                          value={filtroFifoOrden}
-                          onChange={(e: any) => setFiltroFifoOrden(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none"
-                        >
-                          <option value="NOMBRE_ASC">Nombre (A → Z)</option>
-                          <option value="NOMBRE_DESC">Nombre (Z → A)</option>
-                          <option value="INVERSION_DESC">Mayor Inversión FIFO</option>
-                          <option value="PARES_DESC">Mayor Cantidad de Pares</option>
-                        </select>
-                      </div>
-
-                      {/* Filtro por Serie */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
-                          Serie
-                        </label>
-                        <select
-                          value={filtroFifoSerie}
-                          onChange={(e) => setFiltroFifoSerie(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none"
-                        >
-                          <option value="TODAS">Todas las Series</option>
-                          {inventarioFifoData.filtrosDisponibles?.series?.map((s: string) => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Filtro por Taller Proveedor */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
-                          Taller Artesanal
-                        </label>
-                        <select
-                          value={filtroFifoProveedor}
-                          onChange={(e) => setFiltroFifoProveedor(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none"
-                        >
-                          <option value="TODOS">Todos los Talleres</option>
-                          {inventarioFifoData.filtrosDisponibles?.proveedores?.map((p: any) => (
-                            <option key={p.id} value={p.id}>{p.nombre}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Tabla Detallada con Desglose de Lotes FIFO */}
-                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
-                    <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Package size={16} className="text-emerald-600" />
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--foreground)]">
-                          Modelos y Lotes en Bodega ({inventarioFifoData.modelos?.length || 0})
-                        </h4>
-                      </div>
-                      <span className="text-[11px] text-[var(--muted-foreground)]">
-                        Haz clic en &quot;Ver Lotes FIFO&quot; para inspeccionar costos de compra unitarios
-                      </span>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-[var(--muted)]/50 text-[10px] uppercase tracking-wider text-[var(--muted-foreground)] border-b border-[var(--border)]">
-                          <tr>
-                            <th className="py-3 px-3">Calzado / Modelo</th>
-                            <th className="py-3 px-3">Serie & Taller</th>
-                            <th className="py-3 px-3">Curva de Tallas</th>
-                            <th className="py-3 px-3 text-right">Costo FIFO</th>
-                            <th className="py-3 px-3 text-right">PVP</th>
-                            <th className="py-3 px-3 text-center">Stock</th>
-                            <th className="py-3 px-3 text-right">Valor FIFO</th>
-                            <th className="py-3 px-3 text-right">Ganancia</th>
-                            <th className="py-3 px-3 text-center">Estado</th>
-                            <th className="py-3 px-3 text-center">Lotes</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[var(--border)]">
-                          {inventarioFifoData.modelos?.length === 0 ? (
-                            <tr>
-                              <td colSpan={10} className="py-8 text-center text-[var(--muted-foreground)]">
-                                No se encontraron modelos con los filtros seleccionados.
-                              </td>
-                            </tr>
-                          ) : (
-                            inventarioFifoData.modelos.map((m: any) => {
-                              const expandido = modeloFifoExpandidoId === m.id;
-                              return (
-                                <React.Fragment key={m.id}>
-                                  <tr className={`hover:bg-[var(--muted)]/30 transition-colors ${expandido ? 'bg-emerald-500/5' : ''}`}>
-                                    {/* Modelo */}
-                                    <td className="py-3 px-3">
-                                      <div className="flex items-center gap-2.5">
-                                        {m.imageUrl ? (
-                                          <img
-                                            src={m.imageUrl}
-                                            alt={m.nombre}
-                                            className="w-10 h-10 rounded-xl object-cover border border-[var(--border)] shrink-0"
-                                          />
-                                        ) : (
-                                          <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-slate-400">
-                                            <Package size={18} />
-                                          </div>
-                                        )}
-                                        <div>
-                                          <div className="font-bold text-[var(--foreground)]">{m.nombre}</div>
-                                          <div className="text-[10px] text-[var(--muted-foreground)] font-mono">
-                                            {m.color} · Cód: {m.baseCode}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </td>
-
-                                    {/* Serie & Taller */}
-                                    <td className="py-3 px-3">
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-600 border border-sky-500/20 block w-fit mb-1">
-                                        {m.serieNombre}
-                                      </span>
-                                      <span className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[140px] block">
-                                        {m.proveedorNombre}
-                                      </span>
-                                    </td>
-
-                                    {/* Curva de Tallas */}
-                                    <td className="py-3 px-3">
-                                      <div className="flex flex-wrap gap-1 max-w-[200px]">
-                                        {m.curvaTallas?.map((t: any) => (
-                                          <span
-                                            key={t.numero}
-                                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
-                                              t.cantidad === 0
-                                                ? 'bg-red-500/10 text-red-600'
-                                                : t.cantidad <= 2
-                                                ? 'bg-amber-500/10 text-amber-600'
-                                                : 'bg-emerald-500/10 text-emerald-600'
-                                            }`}
-                                          >
-                                            T{t.numero}:{t.cantidad}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    </td>
-
-                                    {/* Costo FIFO Activo */}
-                                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-700 dark:text-slate-300">
-                                      ${m.costoFifoActivo.toFixed(2)}
-                                    </td>
-
-                                    {/* PVP */}
-                                    <td className="py-3 px-3 text-right font-mono font-bold text-indigo-600">
-                                      ${m.pvp.toFixed(2)}
-                                    </td>
-
-                                    {/* Stock Total */}
-                                    <td className="py-3 px-3 text-center">
-                                      <span className="font-mono font-black text-sm">
-                                        {m.stockTotal}
-                                      </span>
-                                      <span className="text-[9px] text-[var(--muted-foreground)] block">pares</span>
-                                    </td>
-
-                                    {/* Valor Total FIFO */}
-                                    <td className="py-3 px-3 text-right font-mono font-black text-emerald-600 dark:text-emerald-400">
-                                      ${m.valorTotalFifo.toFixed(2)}
-                                    </td>
-
-                                    {/* Ganancia Total */}
-                                    <td className="py-3 px-3 text-right">
-                                      <div className="font-mono font-black text-emerald-600">
-                                        ${m.gananciaTotal.toFixed(2)}
-                                      </div>
-                                      <div className="text-[9px] text-emerald-600/80 font-bold">
-                                        {m.margenPct}% marg.
-                                      </div>
-                                    </td>
-
-                                    {/* Estado */}
-                                    <td className="py-3 px-3 text-center">
-                                      {m.estadoStock === 'AGOTADO' ? (
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-600 border border-red-500/20">
-                                          Agotado
-                                        </span>
-                                      ) : m.estadoStock === 'MINIMO' ? (
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                                          Mínimo
-                                        </span>
-                                      ) : (
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                                          Óptimo
-                                        </span>
-                                      )}
-                                    </td>
-
-                                    {/* Botón Lotes */}
-                                    <td className="py-3 px-3 text-center">
-                                      <button
-                                        type="button"
-                                        onClick={() => setModeloFifoExpandidoId(expandido ? null : m.id)}
-                                        className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all flex items-center gap-1 mx-auto cursor-pointer ${
-                                          expandido
-                                            ? 'bg-emerald-600 text-white shadow-2xs'
-                                            : 'bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)]'
-                                        }`}
-                                      >
-                                        <span>Lotes ({m.lotes?.length || 0})</span>
-                                        {expandido ? <ChevronDown size={12} className="rotate-180 transition-transform" /> : <ChevronDown size={12} />}
-                                      </button>
-                                    </td>
-                                  </tr>
-
-                                  {/* Subfila Desplegable de Lotes FIFO */}
-                                  {expandido && (
-                                    <tr className="bg-slate-50/70 dark:bg-slate-900/40">
-                                      <td colSpan={10} className="p-4">
-                                        <div className="space-y-2 border border-emerald-500/20 bg-[var(--card)] rounded-2xl p-3.5 shadow-2xs">
-                                          <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
-                                            <span className="text-[11px] font-black uppercase text-emerald-600 tracking-wider flex items-center gap-1.5">
-                                              <Boxes size={13} />
-                                              Trazabilidad FIFO de Lotes: {m.nombre} ({m.color})
-                                            </span>
-                                            <span className="text-[10px] text-[var(--muted-foreground)]">
-                                              El sistema consume primero los lotes con fecha más antigua
-                                            </span>
-                                          </div>
-
-                                          {m.lotes && m.lotes.length > 0 ? (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
-                                              {m.lotes.map((lote: any) => (
-                                                <div
-                                                  key={lote.id}
-                                                  className={`p-3 rounded-xl border text-xs space-y-1.5 ${
-                                                    lote.estado === 'ACTIVO'
-                                                      ? 'bg-emerald-500/10 border-emerald-500/30'
-                                                      : lote.estado === 'EN_ESPERA'
-                                                      ? 'bg-blue-500/5 border-blue-500/20'
-                                                      : 'bg-slate-100/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 opacity-60'
-                                                  }`}
-                                                >
-                                                  <div className="flex items-center justify-between">
-                                                    <span className="font-mono font-black text-xs text-[var(--foreground)]">{lote.codigo}</span>
-                                                    {lote.estado === 'ACTIVO' ? (
-                                                      <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-600 text-white animate-pulse">
-                                                        EN CONSUMO (ACTIVO)
-                                                      </span>
-                                                    ) : lote.estado === 'EN_ESPERA' ? (
-                                                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/20 text-blue-700 dark:text-blue-300">
-                                                        EN ESPERA
-                                                      </span>
-                                                    ) : (
-                                                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
-                                                        AGOTADO
-                                                      </span>
-                                                    )}
-                                                  </div>
-
-                                                  <div className="text-[10px] text-[var(--muted-foreground)] flex justify-between">
-                                                    <span>Ingreso: {new Date(lote.entryDate).toLocaleDateString('es-EC')}</span>
-                                                    {lote.tallaNumero && <span>Talla: T{lote.tallaNumero}</span>}
-                                                  </div>
-
-                                                  <div className="flex justify-between items-center pt-1 border-t border-[var(--border)] text-[11px]">
-                                                    <span className="text-[var(--muted-foreground)]">Pares restantes:</span>
-                                                    <span className="font-mono font-black text-xs">
-                                                      {lote.cantidadDisponible} de {lote.cantidadRecibida} p
-                                                    </span>
-                                                  </div>
-
-                                                  <div className="grid grid-cols-3 gap-1 pt-1 text-[10px] text-center bg-[var(--background)]/70 p-1.5 rounded-lg">
-                                                    <div>
-                                                      <span className="text-[9px] text-[var(--muted-foreground)] block">Costo</span>
-                                                      <span className="font-mono font-bold">${lote.unitCost.toFixed(2)}</span>
-                                                    </div>
-                                                    <div>
-                                                      <span className="text-[9px] text-[var(--muted-foreground)] block">PVP</span>
-                                                      <span className="font-mono font-bold text-indigo-600">${lote.pvp.toFixed(2)}</span>
-                                                    </div>
-                                                    <div>
-                                                      <span className="text-[9px] text-[var(--muted-foreground)] block">Ganancia</span>
-                                                      <span className="font-mono font-black text-emerald-600">+${lote.gananciaPar.toFixed(2)}</span>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          ) : (
-                                            <div className="py-4 text-center text-xs text-[var(--muted-foreground)]">
-                                              No hay lotes FIFO específicos registrados; este modelo utiliza el costo base del producto.
-                                            </div>
-                                          )}
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  )}
-                                </React.Fragment>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="p-8 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl">
-                  Selecciona la pestaña para consultar el inventario FIFO.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB 12: REPORTE DE ENTREGAS Y PEDIDOS PENDIENTES             */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'entregas_pedidos' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Cabecera del Módulo */}
-              <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
-                      CONTROL OPERATIVO DE PEDIDOS Y ENTREGAS
-                    </span>
-                    <span className="text-xs text-[var(--muted-foreground)] font-mono">
-                      Cliente → Tallas Faltantes → Liquidación
-                    </span>
-                  </div>
-                  <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
-                    <Truck size={18} className="text-amber-600" />
-                    <span>Reporte de Entregas y Pedidos Pendientes</span>
-                  </h3>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    Identifica de inmediato a qué clientes se les adeuda calzado, qué curvas o números específicos faltan entregar y saldos por cobrar.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleReporteEntregasPdf('preview')}
-                    disabled={generandoEntregasPdf || loadingEntregas || !entregasData}
-                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
-                  >
-                    {generandoEntregasPdf ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
-                    <span>Previsualizar</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleReporteEntregasPdf('download')}
-                    disabled={generandoEntregasPdf || loadingEntregas || !entregasData}
-                    className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
-                    title="Exportar y descargar el reporte de todos los pedidos y pares pendientes de entrega"
-                  >
-                    {generandoEntregasPdf ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-                    <span>Exportar Pendientes de Entrega</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Subpestañas Simples de Trabajo */}
-              <div className="flex items-center gap-2 p-1.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl w-fit shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => setSubTabEntregas('PENDIENTES')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                    subTabEntregas === 'PENDIENTES'
-                      ? 'bg-amber-500 text-slate-950 shadow-xs'
-                      : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                  }`}
-                >
-                  <span>Pendientes de Entrega</span>
-                  {entregasData?.kpis?.totalPedidosPendientes !== undefined && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-slate-900/20 text-slate-950 font-black">
-                      {entregasData.kpis.totalPedidosPendientes}
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSubTabEntregas('ENTREGADOS')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                    subTabEntregas === 'ENTREGADOS'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                  }`}
-                >
-                  <span>Pedidos Entregados</span>
-                  {entregasData?.kpis?.totalPedidosEntregados !== undefined && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white/20 text-white font-black">
-                      {entregasData.kpis.totalPedidosEntregados}
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSubTabEntregas('TODOS')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                    subTabEntregas === 'TODOS'
-                      ? 'bg-[#0F172A] text-white shadow-xs'
-                      : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                  }`}
-                >
-                  <span>Todos los Pedidos</span>
-                </button>
-              </div>
-
-              {loadingEntregas ? (
-                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
-                  <Loader2 size={32} className="animate-spin text-amber-600" />
-                  <span className="text-xs font-bold">Cargando estado operativo de entregas...</span>
-                </div>
-              ) : entregasData ? (
-                <>
-                  {/* Tarjetas KPI de Entregas */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    {/* KPI 1: Pedidos con Saldo Pendiente */}
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
-                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
-                        <span>Pedidos Pendientes</span>
-                        <Clock size={14} className="text-amber-500" />
-                      </div>
-                      <div className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">
-                        {entregasData.kpis.totalPedidosPendientes} <span className="text-xs font-normal text-[var(--muted-foreground)]">órdenes</span>
-                      </div>
-                      <p className="text-[10px] text-[var(--muted-foreground)]">
-                        Con pares pendientes de retiro
-                      </p>
-                    </div>
-
-                    {/* KPI 2: Total Pares que Faltan */}
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
-                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
-                        <span>Pares por Entregar</span>
-                        <Package size={14} className="text-red-500" />
-                      </div>
-                      <div className="text-xl font-black font-mono text-red-600 dark:text-red-400">
-                        {entregasData.kpis.totalParesPendientes} <span className="text-xs font-normal text-[var(--muted-foreground)]">pares</span>
-                      </div>
-                      <p className="text-[10px] text-[var(--muted-foreground)]">
-                        Adeudados a clientes en Cevallos
-                      </p>
-                    </div>
-
-                    {/* KPI 3: Pedidos Completados */}
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
-                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
-                        <span>Pedidos Entregados</span>
-                        <CheckCircle2 size={14} className="text-emerald-500" />
-                      </div>
-                      <div className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-                        {entregasData.kpis.totalPedidosEntregados} <span className="text-xs font-normal text-[var(--muted-foreground)]">órdenes</span>
-                      </div>
-                      <p className="text-[10px] text-[var(--muted-foreground)]">
-                        {entregasData.kpis.totalParesEntregados} pares despachados
-                      </p>
-                    </div>
-
-                    {/* KPI 4: Saldo Pendiente de Cobro */}
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
-                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
-                        <span>Saldo por Cobrar</span>
-                        <DollarSign size={14} className="text-indigo-500" />
-                      </div>
-                      <div className="text-xl font-black font-mono text-indigo-600 dark:text-indigo-400">
-                        ${entregasData.kpis.saldoPendienteCobro.toFixed(2)}
-                      </div>
-                      <p className="text-[10px] text-[var(--muted-foreground)]">
-                        Cobro al liquidar los pares restantes
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Buscador Rápido de Entregas */}
-                  <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs flex items-center justify-between gap-3">
-                    <div className="relative flex-1 max-w-md">
-                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
-                      <input
-                        type="text"
-                        placeholder="Buscar por cliente, teléfono, número de nota o calzado..."
-                        value={filtroEntregasBusqueda}
-                        onChange={(e) => setFiltroEntregasBusqueda(e.target.value)}
-                        className="w-full pl-9 pr-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
-                      />
-                      {filtroEntregasBusqueda && (
-                        <button
-                          type="button"
-                          onClick={() => setFiltroEntregasBusqueda('')}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                        >
-                          <X size={12} />
-                        </button>
-                      )}
-                    </div>
-
-                    <span className="text-xs font-bold text-[var(--muted-foreground)]">
-                      Mostrando {entregasData.pedidos?.length || 0} pedidos
-                    </span>
-                  </div>
-
-                  {/* Tabla de Pedidos y Entregas Pendientes */}
-                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-[var(--muted)]/50 text-[10px] uppercase tracking-wider text-[var(--muted-foreground)] border-b border-[var(--border)]">
-                          <tr>
-                            <th className="py-3 px-3">N° Pedido / Fecha</th>
-                            <th className="py-3 px-3">Cliente & Contacto</th>
-                            <th className="py-3 px-3">Calzado Solicitado</th>
-                            <th className="py-3 px-3">Pares que Faltan Entregar</th>
-                            <th className="py-3 px-3">Progreso de Entrega</th>
-                            <th className="py-3 px-3 text-right">Saldo de Dinero</th>
-                            <th className="py-3 px-3 text-center">Acción Rápida</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[var(--border)]">
-                          {entregasData.pedidos?.length === 0 ? (
-                            <tr>
-                              <td colSpan={7} className="py-12 text-center text-[var(--muted-foreground)]">
-                                <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-500 opacity-80" />
-                                <div className="font-bold text-sm text-[var(--foreground)]">No hay pedidos pendientes en esta vista</div>
-                                <div className="text-xs">¡Todas las entregas de calzado están al día!</div>
-                              </td>
-                            </tr>
-                          ) : (
-                            entregasData.pedidos.map((p: any) => {
-                              const estaLiquidando = liquidandoPedidoId === p.id;
-                              return (
-                                <tr key={p.id} className="hover:bg-[var(--muted)]/30 transition-colors">
-                                  {/* N° Pedido & Fecha */}
-                                  <td className="py-3.5 px-3">
-                                    <div className="font-mono font-black text-xs text-[var(--foreground)]">{p.numeroPedido}</div>
-                                    <div className="text-[10px] text-[var(--muted-foreground)]">
-                                      {new Date(p.createdAt).toLocaleDateString('es-EC')}
-                                    </div>
-                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-[var(--muted-foreground)] mt-0.5 inline-block">
-                                      {p.tipoPago}
-                                    </span>
-                                  </td>
-
-                                  {/* Cliente & Contacto */}
-                                  <td className="py-3.5 px-3">
-                                    <div className="font-bold text-[var(--foreground)]">{p.cliente?.nombre}</div>
-                                    <div className="flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)] mt-0.5">
-                                      {p.cliente?.telefono ? (
-                                        <a
-                                          href={`https://wa.me/593${p.cliente.telefono.replace(/^0/, '')}`}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="text-emerald-600 hover:underline flex items-center gap-1 font-mono"
-                                          title="Escribir al cliente por WhatsApp"
-                                        >
-                                          <Phone size={11} />
-                                          {p.cliente.telefono}
-                                        </a>
-                                      ) : (
-                                        <span>Sin teléfono</span>
-                                      )}
-                                      <span className="px-1 py-0.2 rounded text-[9px] font-extrabold bg-blue-500/10 text-blue-600">
-                                        Score {p.cliente?.scoring || 'B'}
-                                      </span>
-                                    </div>
-                                  </td>
-
-                                  {/* Calzado Solicitado */}
-                                  <td className="py-3.5 px-3">
-                                    <div className="font-bold text-[var(--foreground)]">{p.calzadoResumen}</div>
-                                    <div className="text-[10px] text-[var(--muted-foreground)]">
-                                      {p.lineasDetalle?.length || 1} curva(s) en orden
-                                    </div>
-                                  </td>
-
-                                  {/* Pares que Faltan Entregar (DESTACADO) */}
-                                  <td className="py-3.5 px-3">
-                                    {p.paresPendientes > 0 ? (
-                                      <div className="p-2 bg-amber-500/10 border border-amber-500/25 rounded-xl space-y-0.5 max-w-[220px]">
-                                        <div className="text-[10px] font-extrabold uppercase text-amber-700 dark:text-amber-400">
-                                          {p.paresPendientes} {p.paresPendientes === 1 ? 'par adeudado' : 'pares adeudados'}
-                                        </div>
-                                        <div className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                                          {p.resumenPendientesTexto}
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600">
-                                        <CheckCircle2 size={14} />
-                                        <span>Entregado Completo</span>
-                                      </div>
-                                    )}
-                                  </td>
-
-                                  {/* Progreso de Entrega */}
-                                  <td className="py-3.5 px-3">
-                                    <div className="space-y-1 w-[130px]">
-                                      <div className="flex justify-between text-[10px] font-mono">
-                                        <span className="font-bold">{p.paresEntregados} de {p.totalPares} p</span>
-                                        <span className="text-[var(--muted-foreground)]">{p.porcentajeEntrega}%</span>
-                                      </div>
-                                      <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden">
-                                        <div
-                                          className={`h-full rounded-full transition-all ${
-                                            p.porcentajeEntrega === 100
-                                              ? 'bg-emerald-500'
-                                              : p.porcentajeEntrega > 0
-                                              ? 'bg-amber-500'
-                                              : 'bg-red-400'
-                                          }`}
-                                          style={{ width: `${p.porcentajeEntrega}%` }}
-                                        />
-                                      </div>
-                                      <span className="text-[9px] text-[var(--muted-foreground)] block">
-                                        {p.paresPendientes > 0 ? `Faltan ${p.paresPendientes} pares` : 'Completado'}
-                                      </span>
-                                    </div>
-                                  </td>
-
-                                  {/* Saldo de Dinero */}
-                                  <td className="py-3.5 px-3 text-right font-mono">
-                                    <div className="font-black text-sm text-[var(--foreground)]">
-                                      ${p.saldoPendiente.toFixed(2)}
-                                    </div>
-                                    <div className="text-[10px] text-[var(--muted-foreground)]">
-                                      Total: ${p.montoTotal.toFixed(2)}
-                                    </div>
-                                  </td>
-
-                                  {/* Acción Rápida */}
-                                  <td className="py-3.5 px-3 text-center">
-                                    {p.paresPendientes > 0 ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleLiquidarEntrega(p.id)}
-                                        disabled={estaLiquidando}
-                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 mx-auto cursor-pointer shadow-2xs disabled:opacity-50"
-                                        title="Registrar la entrega de los pares restantes al cliente"
-                                      >
-                                        {estaLiquidando ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-                                        <span>Entregar Pares Restantes</span>
-                                      </button>
-                                    ) : (
-                                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                                        Liquidado 100%
-                                      </span>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="p-8 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl">
-                  Selecciona la pestaña para consultar las entregas pendientes.
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Modal de Detalle de Venta POS / Ticket Térmico */}
-      {ventaPosDetalle && (
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setVentaPosDetalle(null); }}
-          onClick={(e) => { if (e.target === e.currentTarget) setVentaPosDetalle(null); }}
-        >
-          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl max-w-md w-full h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-4 bg-[var(--muted)]/40 border-b border-[var(--border)] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Receipt size={16} className="text-emerald-600" />
-                <span className="font-extrabold text-xs uppercase tracking-wider">
-                  Detalle de Venta {ventaPosDetalle.numeroNota}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setVentaPosDetalle(null)}
-                className="p-1 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="p-5 overflow-y-auto space-y-4 text-xs">
-              <div className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-2xl space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-[var(--muted-foreground)]">Fecha:</span>
-                  <span className="font-bold">{new Date(ventaPosDetalle.fecha).toLocaleString('es-EC')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--muted-foreground)]">Sucursal:</span>
-                  <span className="font-bold">{ventaPosDetalle.sucursalNombre}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--muted-foreground)]">Cliente:</span>
-                  <span className="font-bold">{ventaPosDetalle.cliente?.nombre} ({ventaPosDetalle.cliente?.cedula})</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--muted-foreground)]">Vendedor:</span>
-                  <span className="font-bold">{ventaPosDetalle.vendedor?.nombre}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--muted-foreground)]">Método de Pago:</span>
-                  <span className="font-bold text-emerald-600">{ventaPosDetalle.metodoPago}</span>
-                </div>
-                {ventaPosDetalle.detallePago && (
-                  <div className="flex justify-between text-[11px] pt-1 border-t border-[var(--border)]">
-                    <span className="text-[var(--muted-foreground)]">Ref/Voucher:</span>
-                    <span className="font-medium truncate max-w-[200px]">{ventaPosDetalle.detallePago}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <span className="font-extrabold uppercase text-[10px] tracking-wider text-[var(--muted-foreground)]">
-                  Líneas de Calzado Vendidas
-                </span>
-                <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-2xl overflow-hidden">
-                  {ventaPosDetalle.lineas?.map((l: any, i: number) => (
-                    <div key={i} className="p-2.5 flex items-center justify-between bg-[var(--card)] text-xs">
-                      <div>
-                        <div className="font-bold">{l.modelName || l.nombre}</div>
-                        <div className="text-[10px] text-[var(--muted-foreground)]">
-                          Talla: {l.talla} · {l.color} {l.serie ? `· Serie ${formatearNombreSerie(l.serie)}` : ''}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold">{l.cantidad} par(es) x ${Number(l.precioUnitario).toFixed(2)}</div>
-                        <div className="font-mono font-black text-emerald-600">${Number(l.subtotal).toFixed(2)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex justify-between items-center text-sm font-black">
-                <span>TOTAL VENTA:</span>
-                <span className="text-emerald-600 font-mono text-base">${Number(ventaPosDetalle.total).toFixed(2)}</span>
-              </div>
-            </div>
-
-            <div className="p-4 bg-[var(--muted)]/40 border-t border-[var(--border)] flex justify-end">
-              <button
-                type="button"
-                onClick={() => setVentaPosDetalle(null)}
-                className="px-4 py-2 bg-[#0F172A] text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Universal de Previsualización de PDF */}
-      <PdfPreviewModal
-        isOpen={previewModalOpen}
-        onClose={() => setPreviewModalOpen(false)}
-        pdfDoc={pdfDocPreview}
-        titulo={previewTitulo}
-        nombreArchivo={previewNombreArchivo}
-      />
-    </div>
-  );
-}
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import {
+  BarChart3,
+  TrendingUp,
+  Calendar,
+  Users,
+  Package,
+  DollarSign,
+  Printer,
+  Download,
+  Filter,
+  RefreshCw,
+  ShoppingBag,
+  CreditCard,
+  Building2,
+  BrainCircuit,
+  ArrowUpRight,
+  ArrowDownRight,
+  Sparkles,
+  Award,
+  AlertTriangle,
+  Receipt,
+  Store,
+  ChevronDown,
+  Loader2,
+  CheckCircle2,
+  Eye,
+  Search,
+  Megaphone,
+  Percent,
+  Tag,
+  AlertCircle,
+  FileSpreadsheet,
+  FileText,
+  ShieldAlert,
+  ChevronRight,
+  UserCheck,
+  X,
+  RotateCcw,
+  Layers,
+  Grid,
+  List,
+  Flame,
+  TrendingDown,
+  Boxes,
+  Truck,
+  Phone,
+  PieChart,
+  Activity,
+  Clock,
+} from 'lucide-react';
+import { ApiService } from '@/services/api.service';
+import { useToast } from '@/components/ui/toast';
+import PdfPreviewModal from '@/components/ui/pdf-preview-modal';
+import { normalizarParaBusqueda } from '@/utils/text-formatters';
+import {
+  generarReporteCobranzasPdf,
+  generarReporteCampanasPdf,
+  generarReporteResumenEjecutivoPdf,
+  generarReporteModelosRotacionPdf,
+  generarReporteProductividadVendedoresPdf,
+  generarReporteFinanzasMetodosPdf,
+  generarReporteProyeccionMlPdf,
+  generarReporteGeneralIntegralPdf,
+  generarReportePosPdf,
+  generarReporteRendimientoSucursalesPdf,
+  generarReporteAbastecimientoPdf,
+  generarReporteInventarioFifoPdf,
+  generarReporteEntregasPendientesPdf,
+  generarReporteVentasPorClientePdf,
+  generarReporteConsolidadoModelosPdf,
+  descargarReporteVentasPorClientePdf,
+  descargarReporteConsolidadoModelosPdf,
+  ReporteInventarioFifoPdfData,
+  ReporteEntregasPendientesPdfData,
+  ReporteVentasPorClientePdfData,
+  ReporteConsolidadoModelosPdfData,
+  ClienteDeudor,
+  CampanaReporte,
+  ModeloReporte,
+  VendedorReporte,
+  ProveedorAbastecimientoReporte,
+  ModeloVendidoConsolidado,
+  VentaAgrupadaCliente,
+} from '@/services/pdf-reportes.service';
+import { formatearNombreSerie, capitalizarNombreCompleto } from '@/utils/text-formatters';
+import {
+  GraficoBarrasModerno,
+  GraficoCurvaTendencia,
+  GraficoDonutCircular,
+} from './ui/reporte-charts';
+import { jsPDF } from 'jspdf';
+
+type PeriodoTipo = 'HOY' | 'SEMANAL' | 'MENSUAL' | 'TRIMESTRAL' | 'ANUAL' | 'PERSONALIZADO';
+type TabReporte =
+  | 'resumen'
+  | 'pos'
+  | 'sucursales'
+  | 'modelos'
+  | 'vendedores'
+  | 'finanzas'
+  | 'cobranzas'
+  | 'campanas'
+  | 'proyeccion_ml'
+  | 'proveedores'
+  | 'inventario_fifo'
+  | 'entregas_pedidos'
+  | 'ventas_cliente'
+  | 'ventas_modelos_foto';
+
+interface Vendedor {
+  id: string;
+  nombre: string;
+  email: string;
+  rol: string;
+  activo: boolean;
+}
+
+interface ReportesComponentProps {
+  user?: any;
+  activeSucursalId?: string;
+  sucursales?: any[];
+}
+
+export default function ReportesComponent({
+  user: propUser,
+  activeSucursalId: propActiveSucursalId,
+  sucursales: propSucursales,
+}: ReportesComponentProps = {}) {
+  const { showToast } = useToast();
+
+  // Usuario y Rol del usuario autenticado
+  const [currentUser, setCurrentUser] = useState<any>(propUser || null);
+
+  // Estados de Filtros Globales
+  const [periodo, setPeriodo] = useState<PeriodoTipo>('MENSUAL');
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('TODAS');
+  const [vendedorSeleccionado, setVendedorSeleccionado] = useState<string>('TODOS');
+  const [canalSeleccionado, setCanalSeleccionado] = useState<string>('TODOS');
+
+  // Estados de Datos Generales
+  const [loading, setLoading] = useState(true);
+  const [reporteData, setReporteData] = useState<any>(null);
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+  const [sucursales, setSucursales] = useState<any[]>(propSucursales || []);
+  const [tabActiva, setTabActiva] = useState<TabReporte>('resumen');
+  const [negocioInfo, setNegocioInfo] = useState<any>(null);
+
+  // Estados específicos para Reporte Punto de Venta (POS)
+  const [loadingPos, setLoadingPos] = useState(false);
+  const [posData, setPosData] = useState<any>(null);
+  const [filtroPosMetodo, setFiltroPosMetodo] = useState('TODOS');
+  const [filtroPosBusqueda, setFiltroPosBusqueda] = useState('');
+  const [filtroPosModelo, setFiltroPosModelo] = useState('TODOS');
+  const [generandoPosPdf, setGenerandoPosPdf] = useState(false);
+  const [ventaPosDetalle, setVentaPosDetalle] = useState<any | null>(null);
+
+  // Estados específicos para Reporte Rendimiento de Sucursales
+  const [loadingSucursales, setLoadingSucursales] = useState(false);
+  const [sucursalesReporteData, setSucursalesReporteData] = useState<any>(null);
+  const [filtroSucursalModeloTexto, setFiltroSucursalModeloTexto] = useState('');
+  const [filtroSucursalOrden, setFiltroSucursalOrden] = useState<'VENTAS_DESC' | 'PARES_DESC' | 'PRECIO_DESC'>('VENTAS_DESC');
+  const [generandoSucursalPdf, setGenerandoSucursalPdf] = useState(false);
+
+  // Filtros específicos para Productividad por Trabajador
+  const [filtroTrabajadorTexto, setFiltroTrabajadorTexto] = useState('');
+  const [filtroTrabajadorRol, setFiltroTrabajadorRol] = useState('TODOS');
+  const [filtroTrabajadorOrden, setFiltroTrabajadorOrden] = useState<'VENTAS_DESC' | 'PARES_DESC' | 'PEDIDOS_DESC' | 'VENTAS_ASC'>('VENTAS_DESC');
+  const [filtroAbonosFinanzasTexto, setFiltroAbonosFinanzasTexto] = useState('');
+
+  // Filtros específicos para Rotación de Calzado & Modelos (Catálogo Completo)
+  const [filtroRotacionTexto, setFiltroRotacionTexto] = useState('');
+  const [filtroRotacionSerie, setFiltroRotacionSerie] = useState('TODAS');
+  const [filtroRotacionEstado, setFiltroRotacionEstado] = useState<'TODOS' | 'ALTA' | 'MEDIA' | 'BAJA' | 'SIN_MOVIMIENTO' | 'CON_STOCK' | 'SIN_STOCK'>('TODOS');
+  const [filtroRotacionOrden, setFiltroRotacionOrden] = useState<'VENTAS_DESC' | 'VENTAS_ASC' | 'STOCK_DESC' | 'STOCK_ASC' | 'INGRESOS_DESC' | 'MARGEN_DESC'>('VENTAS_DESC');
+  const [filtroRotacionVista, setFiltroRotacionVista] = useState<'tabla' | 'tarjetas'>('tabla');
+  const [productoExpandidoId, setProductoExpandidoId] = useState<string | null>(null);
+
+  // FASE 8: Estados para Reporte de Ventas por Modelo y Margen FIFO Real
+  const [loadingModelosMargen, setLoadingModelosMargen] = useState(false);
+  const [modelosMargenData, setModelosMargenData] = useState<any>(null);
+  const [filtroCategoriaModelo, setFiltroCategoriaModelo] = useState('TODAS');
+
+  // Estado de Reporte de Cobranzas (Clientes Deudores)
+  const [loadingCobranzas, setLoadingCobranzas] = useState(false);
+  const [cobranzasData, setCobranzasData] = useState<any>(null);
+  const [filtroDeudor, setFiltroDeudor] = useState('');
+  const [filtroScoreDeudor, setFiltroScoreDeudor] = useState('TODOS');
+  const [clienteExpandidoId, setClienteExpandidoId] = useState<string | null>(null);
+
+  // Estado de Reporte de Campañas
+  const [loadingCampanas, setLoadingCampanas] = useState(false);
+  const [campanasData, setCampanasData] = useState<any>(null);
+  const [filtroCampanaEstado, setFiltroCampanaEstado] = useState('TODAS');
+  const [busquedaCampana, setBusquedaCampana] = useState('');
+
+  // Estado de Proyección ML
+  const [loadingMl, setLoadingMl] = useState(false);
+  const [proyeccionMl, setProyeccionMl] = useState<any>(null);
+
+  // Estado de Reporte de Abastecimiento de Proveedores / Fabricantes
+  const [loadingProveedores, setLoadingProveedores] = useState(false);
+  const [proveedoresData, setProveedoresData] = useState<any>(null);
+  const [filtroProveedorBusqueda, setFiltroProveedorBusqueda] = useState('');
+  const [filtroProveedorSolvencia, setFiltroProveedorSolvencia] = useState('TODOS');
+  const [generandoProveedoresPdf, setGenerandoProveedoresPdf] = useState(false);
+
+  // Estado de Reporte de Inventario con Valoración FIFO
+  const [loadingInventarioFifo, setLoadingInventarioFifo] = useState(false);
+  const [inventarioFifoData, setInventarioFifoData] = useState<any>(null);
+  const [filtroFifoSerie, setFiltroFifoSerie] = useState('TODAS');
+  const [filtroFifoProveedor, setFiltroFifoProveedor] = useState('TODOS');
+  const [filtroFifoRotacion, setFiltroFifoRotacion] = useState('TODOS');
+  const [filtroFifoOrden, setFiltroFifoOrden] = useState<'NOMBRE_ASC' | 'NOMBRE_DESC' | 'INVERSION_DESC' | 'PARES_DESC'>('NOMBRE_ASC');
+  const [filtroFifoBusqueda, setFiltroFifoBusqueda] = useState('');
+  const [modeloFifoExpandidoId, setModeloFifoExpandidoId] = useState<string | null>(null);
+  const [generandoFifoPdf, setGenerandoFifoPdf] = useState(false);
+
+  // Estado de Reporte de Entregas y Pedidos Pendientes
+  const [loadingEntregas, setLoadingEntregas] = useState(false);
+  const [entregasData, setEntregasData] = useState<any>(null);
+  const [subTabEntregas, setSubTabEntregas] = useState<'PENDIENTES' | 'ENTREGADOS' | 'TODOS'>('PENDIENTES');
+  const [filtroEntregasBusqueda, setFiltroEntregasBusqueda] = useState('');
+  const [generandoEntregasPdf, setGenerandoEntregasPdf] = useState(false);
+  const [liquidandoPedidoId, setLiquidandoPedidoId] = useState<string | null>(null);
+
+  // Estado del Modal de Previsualización de PDF Universal
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [pdfDocPreview, setPdfDocPreview] = useState<jsPDF | null>(null);
+  const [previewTitulo, setPreviewTitulo] = useState('Previsualización de Documento');
+  const [previewNombreArchivo, setPreviewNombreArchivo] = useState('reporte-nexora.pdf');
+  const [generandoGeneralPdf, setGenerandoGeneralPdf] = useState(false);
+
+  // Estados específicos para Reportes de Ventas Detalladas y Consolidadas
+  const [categoriaActiva, setCategoriaActiva] = useState<'comercial' | 'inventario' | 'clientes' | 'estrategia'>('comercial');
+  const [loadingVentasDetalladas, setLoadingVentasDetalladas] = useState(false);
+  const [ventasDetalladasData, setVentasDetalladasData] = useState<any>(null);
+  const [generandoVentasClientePdf, setGenerandoVentasClientePdf] = useState(false);
+  const [generandoConsolidadoModelosPdf, setGenerandoConsolidadoModelosPdf] = useState(false);
+  const [filtroVentasClienteBusqueda, setFiltroVentasClienteBusqueda] = useState('');
+  const [filtroVentasModeloBusqueda, setFiltroVentasModeloBusqueda] = useState('');
+  const [clienteDetalleExpandidoId, setClienteDetalleExpandidoId] = useState<string | null>(null);
+  const [vistaModelosConsolidados, setVistaModelosConsolidados] = useState<'tabla' | 'tarjetas'>('tabla');
+
+  // Inicialización de usuario y permisos por rol
+  useEffect(() => {
+    let activeUser = propUser;
+    if (!activeUser && typeof window !== 'undefined') {
+      const rawUser = localStorage.getItem('user');
+      if (rawUser) {
+        try {
+          activeUser = JSON.parse(rawUser);
+        } catch {}
+      }
+    }
+    if (activeUser) {
+      setCurrentUser(activeUser);
+      const isGlobal = activeUser.rol === 'ROL_SUPER_ADMIN' || (activeUser.rol === 'ROL_ADMIN' && activeUser.esAdminGeneral === true);
+      if (!isGlobal) {
+        const localSucursal = (propActiveSucursalId && propActiveSucursalId !== 'TODAS')
+          ? propActiveSucursalId
+          : (activeUser.tenantId || activeUser.sucursalId || '');
+        if (localSucursal) {
+          setSucursalSeleccionada(localSucursal);
+        }
+      }
+      if (activeUser.rol === 'ROL_VENDEDOR') {
+        setVendedorSeleccionado(activeUser.id || activeUser.sub || '');
+      }
+    }
+  }, [propUser, propActiveSucursalId]);
+
+  const isSuperAdmin = currentUser?.rol === 'ROL_SUPER_ADMIN';
+  const isGlobalAdmin = isSuperAdmin || (currentUser?.rol === 'ROL_ADMIN' && currentUser?.esAdminGeneral === true);
+  const isVendedor = currentUser?.rol === 'ROL_VENDEDOR';
+
+  useEffect(() => {
+    cargarSucursales();
+    cargarVendedores();
+    cargarNegocioInfo();
+  }, []);
+
+  useEffect(() => {
+    cargarReporte();
+    if (tabActiva === 'pos') {
+      cargarReportePos();
+    } else if (tabActiva === 'sucursales') {
+      cargarReporteSucursales();
+    } else if (tabActiva === 'modelos') {
+      cargarReporteModelosMargen();
+    } else if (tabActiva === 'cobranzas') {
+      cargarCobranzas();
+    } else if (tabActiva === 'campanas') {
+      cargarCampanas();
+    } else if (tabActiva === 'proveedores') {
+      cargarReporteProveedores();
+    } else if (tabActiva === 'inventario_fifo') {
+      cargarReporteInventarioFifo();
+    } else if (tabActiva === 'entregas_pedidos') {
+      cargarReporteEntregas();
+    } else if (tabActiva === 'ventas_cliente' || tabActiva === 'ventas_modelos_foto') {
+      cargarReporteVentasDetalladas();
+    }
+  }, [
+    periodo,
+    fechaDesde,
+    fechaHasta,
+    sucursalSeleccionada,
+    vendedorSeleccionado,
+    canalSeleccionado,
+    filtroCategoriaModelo,
+    filtroFifoSerie,
+    filtroFifoProveedor,
+    filtroFifoRotacion,
+    filtroFifoOrden,
+    filtroFifoBusqueda,
+    subTabEntregas,
+    filtroEntregasBusqueda,
+  ]);
+
+  useEffect(() => {
+    if (tabActiva === 'pos') {
+      if (!posData) cargarReportePos();
+    } else if (tabActiva === 'sucursales') {
+      if (!sucursalesReporteData) cargarReporteSucursales();
+    } else if (tabActiva === 'modelos') {
+      if (!modelosMargenData) cargarReporteModelosMargen();
+    } else if (tabActiva === 'cobranzas') {
+      if (!cobranzasData) cargarCobranzas();
+    } else if (tabActiva === 'campanas') {
+      if (!campanasData) cargarCampanas();
+    } else if (tabActiva === 'proveedores') {
+      if (!proveedoresData) cargarReporteProveedores();
+    } else if (tabActiva === 'proyeccion_ml') {
+      if (!proyeccionMl) cargarProyeccionMl();
+    } else if (tabActiva === 'inventario_fifo') {
+      if (!inventarioFifoData) cargarReporteInventarioFifo();
+    } else if (tabActiva === 'entregas_pedidos') {
+      if (!entregasData) cargarReporteEntregas();
+    } else if (tabActiva === 'ventas_cliente' || tabActiva === 'ventas_modelos_foto') {
+      if (!ventasDetalladasData) cargarReporteVentasDetalladas();
+    }
+  }, [tabActiva]);
+
+  // Sincronizar automáticamente la categoría superior al cambiar tabActiva
+  useEffect(() => {
+    if (['ventas_cliente', 'ventas_modelos_foto', 'pos', 'entregas_pedidos'].includes(tabActiva)) {
+      setCategoriaActiva('comercial');
+    } else if (['modelos', 'inventario_fifo', 'proveedores'].includes(tabActiva)) {
+      setCategoriaActiva('inventario');
+    } else if (['cobranzas', 'campanas', 'vendedores'].includes(tabActiva)) {
+      setCategoriaActiva('clientes');
+    } else if (['resumen', 'finanzas', 'sucursales', 'proyeccion_ml'].includes(tabActiva)) {
+      setCategoriaActiva('estrategia');
+    }
+  }, [tabActiva]);
+
+  const cargarSucursales = async () => {
+    try {
+      const data = await ApiService.get('/configuracion/sucursales');
+      if (Array.isArray(data)) {
+        setSucursales(data);
+      }
+    } catch (err: any) {
+      console.warn('No se pudo cargar sucursales:', err?.message);
+    }
+  };
+
+  const cargarNegocioInfo = async () => {
+    try {
+      const data = await ApiService.get('/configuracion/negocio');
+      if (data) {
+        setNegocioInfo(data);
+      }
+    } catch (err: any) {
+      console.warn('No se pudo cargar config negocio:', err?.message);
+    }
+  };
+
+  const cargarVendedores = async () => {
+    try {
+      const data = await ApiService.get('/reportes/vendedores');
+      if (Array.isArray(data)) {
+        setVendedores(data);
+      }
+    } catch (err: any) {
+      console.error('Error al cargar lista de vendedores:', err);
+    }
+  };
+
+  const cargarReporte = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('periodo', periodo);
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) params.append('fechaDesde', fechaDesde);
+        if (fechaHasta) params.append('fechaHasta', fechaHasta);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      if (vendedorSeleccionado && vendedorSeleccionado !== 'TODOS') {
+        params.append('vendedorId', vendedorSeleccionado);
+      }
+      if (canalSeleccionado && canalSeleccionado !== 'TODOS') {
+        params.append('canal', canalSeleccionado);
+      }
+
+      const data = await ApiService.get(`/reportes/resumen-ejecutivo?${params.toString()}`);
+      if (data) {
+        setReporteData(data);
+      }
+    } catch (err: any) {
+      console.warn('Reportes: esperando backend o error de red:', err?.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cargarReportePos = async () => {
+    setLoadingPos(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('periodo', periodo);
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) params.append('fechaDesde', fechaDesde);
+        if (fechaHasta) params.append('fechaHasta', fechaHasta);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      if (vendedorSeleccionado && vendedorSeleccionado !== 'TODOS') {
+        params.append('vendedorId', vendedorSeleccionado);
+      }
+      if (canalSeleccionado && canalSeleccionado !== 'TODOS') {
+        params.append('canal', canalSeleccionado);
+      }
+      if (filtroPosMetodo && filtroPosMetodo !== 'TODOS') {
+        params.append('metodoPago', filtroPosMetodo);
+      }
+      if (filtroPosModelo && filtroPosModelo !== 'TODOS') {
+        params.append('modelo', filtroPosModelo);
+      }
+      if (filtroPosBusqueda && filtroPosBusqueda.trim()) {
+        params.append('busqueda', filtroPosBusqueda.trim());
+      }
+
+      const data = await ApiService.get(`/reportes/pos?${params.toString()}`);
+      setPosData(data);
+    } catch (err: any) {
+      console.error('Error al cargar reporte POS:', err);
+      showToast('Error al cargar reporte del Punto de Venta.', 'warning');
+    } finally {
+      setLoadingPos(false);
+    }
+  };
+
+  const cargarReporteSucursales = async () => {
+    setLoadingSucursales(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('periodo', periodo);
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) params.append('fechaDesde', fechaDesde);
+        if (fechaHasta) params.append('fechaHasta', fechaHasta);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      if (vendedorSeleccionado && vendedorSeleccionado !== 'TODOS') {
+        params.append('vendedorId', vendedorSeleccionado);
+      }
+      if (canalSeleccionado && canalSeleccionado !== 'TODOS') {
+        params.append('canal', canalSeleccionado);
+      }
+
+      const data = await ApiService.get(`/reportes/rendimiento-sucursales?${params.toString()}`);
+      setSucursalesReporteData(data);
+    } catch (err: any) {
+      console.error('Error al cargar reporte de sucursales:', err);
+      showToast('Error al cargar reporte de rendimiento por sucursal.', 'warning');
+    } finally {
+      setLoadingSucursales(false);
+    }
+  };
+
+  const cargarCobranzas = async () => {
+    setLoadingCobranzas(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('periodo', periodo);
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) params.append('fechaDesde', fechaDesde);
+        if (fechaHasta) params.append('fechaHasta', fechaHasta);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      if (vendedorSeleccionado && vendedorSeleccionado !== 'TODOS') {
+        params.append('vendedorId', vendedorSeleccionado);
+      }
+      if (canalSeleccionado && canalSeleccionado !== 'TODOS') {
+        params.append('canal', canalSeleccionado);
+      }
+      const data = await ApiService.get(`/reportes/cobranzas?${params.toString()}`);
+      setCobranzasData(data);
+    } catch (err: any) {
+      console.error('Error al cargar reporte de cobranzas:', err);
+      showToast('Error al obtener reporte de clientes deudores.', 'warning');
+    } finally {
+      setLoadingCobranzas(false);
+    }
+  };
+
+  const cargarCampanas = async () => {
+    setLoadingCampanas(true);
+    try {
+      const params = new URLSearchParams();
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      const data = await ApiService.get(`/reportes/campanas?${params.toString()}`);
+      setCampanasData(data);
+    } catch (err: any) {
+      console.error('Error al cargar reporte de campañas:', err);
+      showToast('Error al obtener reporte de campañas promocionales.', 'warning');
+    } finally {
+      setLoadingCampanas(false);
+    }
+  };
+
+  const cargarProyeccionMl = async () => {
+    setLoadingMl(true);
+    try {
+      const data = await ApiService.get('/reportes/proyeccion-ml?horizonteDias=30');
+      setProyeccionMl(data);
+      showToast('Proyección de demanda generada exitosamente con Inteligencia Artificial.', 'success');
+    } catch (err: any) {
+      showToast('Error al conectar con el motor de predicción ML.', 'warning');
+    } finally {
+      setLoadingMl(false);
+    }
+  };
+
+  const cargarReporteProveedores = async () => {
+    setLoadingProveedores(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('periodo', periodo);
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) params.append('fechaDesde', fechaDesde);
+        if (fechaHasta) params.append('fechaHasta', fechaHasta);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      const data = await ApiService.get(`/reportes/abastecimiento-proveedores?${params.toString()}`);
+      if (data) {
+        setProveedoresData(data);
+      }
+    } catch (err: any) {
+      console.warn('Error al cargar reporte de abastecimiento:', err);
+      showToast('Error al obtener reporte de abastecimiento de proveedores.', 'warning');
+    } finally {
+      setLoadingProveedores(false);
+    }
+  };
+
+  const cargarReporteModelosMargen = async () => {
+    setLoadingModelosMargen(true);
+    try {
+      const params = new URLSearchParams();
+      if (periodo) params.append('periodo', periodo);
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) params.append('fechaDesde', fechaDesde);
+        if (fechaHasta) params.append('fechaHasta', fechaHasta);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      if (filtroCategoriaModelo && filtroCategoriaModelo !== 'TODAS') {
+        params.append('categoria', filtroCategoriaModelo);
+      }
+      const data = await ApiService.get(`/reportes/ventas-modelos-margen?${params.toString()}`);
+      if (data) {
+        setModelosMargenData(data);
+      }
+    } catch (err: any) {
+      console.warn('Error al cargar ventas por modelo y margen:', err);
+    } finally {
+      setLoadingModelosMargen(false);
+    }
+  };
+
+  const cargarReporteInventarioFifo = async () => {
+    setLoadingInventarioFifo(true);
+    try {
+      const params = new URLSearchParams();
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      if (filtroFifoSerie && filtroFifoSerie !== 'TODAS') {
+        params.append('serie', filtroFifoSerie);
+      }
+      if (filtroFifoProveedor && filtroFifoProveedor !== 'TODOS') {
+        params.append('proveedorId', filtroFifoProveedor);
+      }
+      if (filtroFifoRotacion && filtroFifoRotacion !== 'TODOS') {
+        params.append('rotacion', filtroFifoRotacion);
+      }
+      if (filtroFifoOrden) {
+        params.append('orden', filtroFifoOrden);
+      }
+      if (filtroFifoBusqueda) {
+        params.append('busqueda', filtroFifoBusqueda);
+      }
+      const data = await ApiService.get(`/reportes/inventario-fifo?${params.toString()}`);
+      if (data) {
+        setInventarioFifoData(data);
+      }
+    } catch (err: any) {
+      console.warn('Error al cargar reporte de inventario FIFO:', err);
+    } finally {
+      setLoadingInventarioFifo(false);
+    }
+  };
+
+  const cargarReporteEntregas = async () => {
+    setLoadingEntregas(true);
+    try {
+      const params = new URLSearchParams();
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      params.append('estadoVista', subTabEntregas);
+      if (filtroEntregasBusqueda) {
+        params.append('clienteBusqueda', filtroEntregasBusqueda);
+      }
+      const data = await ApiService.get(`/reportes/entregas-pedidos?${params.toString()}`);
+      if (data) {
+        setEntregasData(data);
+      }
+    } catch (err: any) {
+      console.warn('Error al cargar reporte de entregas:', err);
+    } finally {
+      setLoadingEntregas(false);
+    }
+  };
+
+  const handleLiquidarEntrega = async (pedidoId: string) => {
+    if (!confirm('¿Confirma registrar la entrega completa de los pares restantes de este pedido?')) return;
+    setLiquidandoPedidoId(pedidoId);
+    try {
+      await ApiService.post(`/pedidos/${pedidoId}/confirmar-entrega`, {});
+      showToast('Entrega completada y registrada exitosamente.', 'success');
+      cargarReporteEntregas();
+    } catch (err: any) {
+      showToast(err?.message || 'Error al confirmar la entrega del pedido.', 'error');
+    } finally {
+      setLiquidandoPedidoId(null);
+    }
+  };
+
+  const handleReporteInventarioFifoPdf = async (modo: 'preview' | 'download') => {
+    if (!inventarioFifoData) return;
+    setGenerandoFifoPdf(true);
+    try {
+      const payload: ReporteInventarioFifoPdfData = {
+        negocio: obtenerNegocioPayload(),
+        periodo: periodo,
+        fechaGeneracion: new Date().toLocaleDateString('es-EC'),
+        kpis: inventarioFifoData.kpis,
+        modelos: (inventarioFifoData.modelos || []).map((m: any) => ({
+          nombre: m.nombre,
+          color: m.color,
+          serieNombre: m.serieNombre,
+          stockTotal: m.stockTotal,
+          pvp: m.pvp,
+          costoFifoActivo: m.costoFifoActivo,
+          valorTotalFifo: m.valorTotalFifo,
+          valorTotalPvp: m.valorTotalPvp,
+          gananciaTotal: m.gananciaTotal,
+          margenPct: m.margenPct,
+          estadoStock: m.estadoStock,
+          proveedorNombre: m.proveedorNombre,
+          lotes: m.lotes,
+        })),
+      };
+
+      const doc = generarReporteInventarioFifoPdf(payload);
+      if (modo === 'download') {
+        doc.save(`reporte-inventario-fifo-${new Date().toISOString().split('T')[0]}.pdf`);
+        showToast('Reporte de inventario FIFO descargado correctamente.', 'success');
+      } else {
+        setPdfDocPreview(doc);
+        setPreviewTitulo('Reporte de Inventario con Valoración FIFO');
+        setPreviewNombreArchivo(`reporte-inventario-fifo-${new Date().toISOString().split('T')[0]}.pdf`);
+        setPreviewModalOpen(true);
+      }
+    } catch (err: any) {
+      showToast('Error al generar PDF de inventario FIFO: ' + err?.message, 'error');
+    } finally {
+      setGenerandoFifoPdf(false);
+    }
+  };
+
+  const handleReporteEntregasPdf = async (modo: 'preview' | 'download') => {
+    if (!entregasData) return;
+    setGenerandoEntregasPdf(true);
+    try {
+      const payload: ReporteEntregasPendientesPdfData = {
+        negocio: obtenerNegocioPayload(),
+        fechaGeneracion: new Date().toLocaleDateString('es-EC'),
+        kpis: entregasData.kpis,
+        pedidos: (entregasData.pedidos || []).map((p: any) => ({
+          numeroPedido: p.numeroPedido,
+          createdAt: p.createdAt,
+          clienteNombre: p.cliente?.nombre || 'Cliente Mostrador',
+          clienteTelefono: p.cliente?.telefono || '',
+          calzadoResumen: p.calzadoResumen,
+          resumenPendientesTexto: p.resumenPendientesTexto,
+          totalPares: p.totalPares,
+          paresEntregados: p.paresEntregados,
+          paresPendientes: p.paresPendientes,
+          saldoPendiente: p.saldoPendiente,
+          estadoEntrega: p.estadoEntrega,
+        })),
+      };
+
+      const doc = generarReporteEntregasPendientesPdf(payload);
+      if (modo === 'download') {
+        doc.save(`reporte-entregas-pendientes-${new Date().toISOString().split('T')[0]}.pdf`);
+        showToast('Reporte de entregas pendientes descargado correctamente.', 'success');
+      } else {
+        setPdfDocPreview(doc);
+        setPreviewTitulo('Reporte de Entregas y Pedidos Pendientes');
+        setPreviewNombreArchivo(`reporte-entregas-pendientes-${new Date().toISOString().split('T')[0]}.pdf`);
+        setPreviewModalOpen(true);
+      }
+    } catch (err: any) {
+      showToast('Error al generar PDF de entregas pendientes: ' + err?.message, 'error');
+    } finally {
+      setGenerandoEntregasPdf(false);
+    }
+  };
+
+  // ── Cargador de Ventas Detalladas y Consolidadas ──
+  const cargarReporteVentasDetalladas = async () => {
+    setLoadingVentasDetalladas(true);
+    try {
+      const params = new URLSearchParams();
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) params.append('fechaDesde', fechaDesde);
+        if (fechaHasta) params.append('fechaHasta', fechaHasta);
+      } else {
+        const hoy = new Date();
+        let fInicio = new Date();
+        if (periodo === 'HOY') {
+          fInicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+        } else if (periodo === 'SEMANAL') {
+          fInicio.setDate(hoy.getDate() - 7);
+        } else if (periodo === 'MENSUAL') {
+          fInicio.setDate(hoy.getDate() - 30);
+        } else if (periodo === 'TRIMESTRAL') {
+          fInicio.setDate(hoy.getDate() - 90);
+        } else if (periodo === 'ANUAL') {
+          fInicio.setDate(hoy.getDate() - 365);
+        }
+        params.append('fechaDesde', fInicio.toISOString().split('T')[0]);
+        params.append('fechaHasta', hoy.toISOString().split('T')[0]);
+      }
+
+      if (canalSeleccionado && canalSeleccionado !== 'TODOS') {
+        params.append('canal', canalSeleccionado);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+
+      const data = await ApiService.get(`/reportes/ventas-detalladas?${params.toString()}`);
+      setVentasDetalladasData(data);
+    } catch (err: any) {
+      console.error('Error cargando ventas detalladas:', err);
+      showToast('Error al cargar ventas detalladas: ' + (err?.message || 'Error del servidor'), 'error');
+    } finally {
+      setLoadingVentasDetalladas(false);
+    }
+  };
+
+  // ── Generador PDF: Ventas Detalladas por Cliente ──
+  const handleReporteVentasPorClientePdf = async (modo: 'preview' | 'download') => {
+    if (!ventasDetalladasData) {
+      showToast('No hay datos disponibles para generar el PDF.', 'warning');
+      return;
+    }
+    setGenerandoVentasClientePdf(true);
+    try {
+      const payload: ReporteVentasPorClientePdfData = {
+        negocio: obtenerNegocioPayload(),
+        filtros: {
+          fechaDesde: ventasDetalladasData.filtros?.fechaDesde || fechaDesde || null,
+          fechaHasta: ventasDetalladasData.filtros?.fechaHasta || fechaHasta || null,
+          canal: canalSeleccionado,
+          diasPeriodo: ventasDetalladasData.filtros?.diasPeriodo,
+        },
+        resumenKpis: ventasDetalladasData.resumenKpis,
+        ventasPorCliente: ventasDetalladasData.ventasPorCliente || [],
+        modelosConsolidados: ventasDetalladasData.modelosConsolidados || [],
+      };
+
+      const doc = await generarReporteVentasPorClientePdf(payload);
+      const nombreArchivo = `reporte_ventas_clientes_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      if (modo === 'preview') {
+        setPdfDocPreview(doc);
+        setPreviewTitulo('Reporte de Ventas por Cliente & Transacción');
+        setPreviewNombreArchivo(nombreArchivo);
+        setPreviewModalOpen(true);
+      } else {
+        doc.save(nombreArchivo);
+        showToast('Reporte de ventas por cliente descargado exitosamente.', 'success');
+      }
+    } catch (err: any) {
+      console.error('Error generando PDF de ventas por cliente:', err);
+      showToast('Error al generar PDF: ' + (err?.message || 'Error desconocido'), 'error');
+    } finally {
+      setGenerandoVentasClientePdf(false);
+    }
+  };
+
+  // ── Generador PDF: Consolidado de Modelos con Fotos ──
+  const handleReporteConsolidadoModelosPdf = async (modo: 'preview' | 'download') => {
+    if (!ventasDetalladasData) {
+      showToast('No hay datos disponibles para generar el PDF.', 'warning');
+      return;
+    }
+    setGenerandoConsolidadoModelosPdf(true);
+    try {
+      const payload: ReporteConsolidadoModelosPdfData = {
+        negocio: obtenerNegocioPayload(),
+        filtros: {
+          fechaDesde: ventasDetalladasData.filtros?.fechaDesde || fechaDesde || null,
+          fechaHasta: ventasDetalladasData.filtros?.fechaHasta || fechaHasta || null,
+          canal: canalSeleccionado,
+          diasPeriodo: ventasDetalladasData.filtros?.diasPeriodo,
+        },
+        resumenKpis: ventasDetalladasData.resumenKpis,
+        ventasPorCliente: ventasDetalladasData.ventasPorCliente || [],
+        modelosConsolidados: ventasDetalladasData.modelosConsolidados || [],
+      };
+
+      const doc = await generarReporteConsolidadoModelosPdf(payload);
+      const nombreArchivo = `reporte_consolidado_modelos_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      if (modo === 'preview') {
+        setPdfDocPreview(doc);
+        setPreviewTitulo('Reporte Consolidado de Calzado Vendido (con Fotos)');
+        setPreviewNombreArchivo(nombreArchivo);
+        setPreviewModalOpen(true);
+      } else {
+        doc.save(nombreArchivo);
+        showToast('Reporte consolidado con fotografías descargado exitosamente.', 'success');
+      }
+    } catch (err: any) {
+      console.error('Error generando PDF consolidado de modelos:', err);
+      showToast('Error al generar PDF: ' + (err?.message || 'Error desconocido'), 'error');
+    } finally {
+      setGenerandoConsolidadoModelosPdf(false);
+    }
+  };
+
+  const obtenerNegocioPayload = () => ({
+    nombre: negocioInfo?.nombre || 'CALZADO COMERCIAL',
+    ruc: negocioInfo?.ruc || '1800000000001',
+    direccion: negocioInfo?.direccion || 'Cevallos, Tungurahua, Ecuador',
+    telefono: negocioInfo?.telefono || '',
+    primaryColor: negocioInfo?.primaryColor || '#0EA5E9',
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // GENERADORES DE PDF PARA TODAS LAS SECCIONES
+  // ══════════════════════════════════════════════════════════════
+
+  // 1. INFORME GENERAL CONSOLIDADO (UNIFICA TODO EL NEGOCIO)
+  const handleReporteGeneralIntegral = async (modo: 'preview' | 'download') => {
+    setGenerandoGeneralPdf(true);
+    try {
+      let cobData = cobranzasData;
+      let campData = campanasData;
+      let mlData = proyeccionMl;
+      let pos = posData;
+      let suc = sucursalesReporteData;
+      let prov = proveedoresData;
+      let modMargen = modelosMargenData;
+      let invFifo = inventarioFifoData;
+      let entData = entregasData;
+
+      const baseParams = new URLSearchParams();
+      baseParams.append('periodo', periodo);
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) baseParams.append('fechaDesde', fechaDesde);
+        if (fechaHasta) baseParams.append('fechaHasta', fechaHasta);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        baseParams.append('sucursalId', sucursalSeleccionada);
+      }
+      const qs = baseParams.toString();
+
+      const promises: Promise<any>[] = [];
+      if (!cobData) promises.push(ApiService.get(`/reportes/cobranzas?${qs}`).then(d => { cobData = d; setCobranzasData(d); }).catch(() => {}));
+      if (!campData) promises.push(ApiService.get(`/reportes/campanas?${qs}`).then(d => { campData = d; setCampanasData(d); }).catch(() => {}));
+      if (!mlData) promises.push(ApiService.get('/reportes/proyeccion-ml?horizonteDias=30').then(d => { mlData = d; setProyeccionMl(d); }).catch(() => {}));
+      if (!pos) promises.push(ApiService.get(`/reportes/pos?${qs}`).then(d => { pos = d; setPosData(d); }).catch(() => {}));
+      if (!suc) promises.push(ApiService.get(`/reportes/rendimiento-sucursales?${qs}`).then(d => { suc = d; setSucursalesReporteData(d); }).catch(() => {}));
+      if (!prov) promises.push(ApiService.get(`/reportes/abastecimiento-proveedores?${qs}`).then(d => { prov = d; setProveedoresData(d); }).catch(() => {}));
+      if (!modMargen) promises.push(ApiService.get(`/reportes/ventas-modelos-margen?${qs}`).then(d => { modMargen = d; setModelosMargenData(d); }).catch(() => {}));
+      if (!invFifo) promises.push(ApiService.get(`/reportes/inventario-fifo?${qs}`).then(d => { invFifo = d; setInventarioFifoData(d); }).catch(() => {}));
+      if (!entData) promises.push(ApiService.get(`/reportes/entregas-pedidos?${qs}`).then(d => { entData = d; setEntregasData(d); }).catch(() => {}));
+
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
+
+      const payload = {
+        negocio: obtenerNegocioPayload(),
+        periodo,
+        fechaGeneracion: new Date().toLocaleString('es-EC'),
+        kpis,
+        serieTemporal: reporteData?.serieTemporal || [],
+        topModelos: reporteData?.topModelos || [],
+        bajaRotacion: reporteData?.bajaRotacion || [],
+        rankingVendedores: reporteData?.rankingVendedores || [],
+        modelosMargen: modMargen || undefined,
+        inventarioFifoData: invFifo || undefined,
+        entregasPedidosData: entData || undefined,
+        cobranzas: cobData ? {
+          totalCartera: cobData.totalCartera || 0,
+          totalClientes: cobData.totalClientes || 0,
+          clientes: cobData.clientes || [],
+        } : undefined,
+        campanas: campData?.campanas || [],
+        distribucionMetodos: reporteData?.distribucionMetodosAbono || {},
+        distribucionCanales: reporteData?.distribucionCanales,
+        distribucionFormasPago: reporteData?.distribucionFormasPago,
+        posData: pos || undefined,
+        sucursalesData: suc || undefined,
+        proveedoresData: prov || undefined,
+        proyeccionMl: mlData || undefined,
+      };
+
+      const doc = generarReporteGeneralIntegralPdf(payload);
+      const nombre = `informe_general_consolidado_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      if (modo === 'preview') {
+        setPdfDocPreview(doc);
+        setPreviewTitulo('Informe General Consolidado — Business Intelligence');
+        setPreviewNombreArchivo(nombre);
+        setPreviewModalOpen(true);
+      } else {
+        doc.save(nombre);
+        showToast('Informe General Consolidado descargado exitosamente.', 'success');
+      }
+    } catch (err: any) {
+      console.error('Error generando informe general:', err);
+      showToast('Error al generar el informe general consolidado.', 'error');
+    } finally {
+      setGenerandoGeneralPdf(false);
+    }
+  };
+
+  // 2. RESUMEN EJECUTIVO
+  const handleReporteResumenPdf = (modo: 'preview' | 'download') => {
+    const payload = {
+      negocio: obtenerNegocioPayload(),
+      periodo,
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      kpis,
+      serieTemporal: reporteData?.serieTemporal || [],
+      topModelos: reporteData?.topModelos || [],
+      rankingVendedores: reporteData?.rankingVendedores || [],
+      distribucionCanales: reporteData?.distribucionCanales,
+      distribucionFormasPago: reporteData?.distribucionFormasPago,
+    };
+
+    const doc = generarReporteResumenEjecutivoPdf(payload);
+    const nombre = `reporte_resumen_ejecutivo_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Resumen Ejecutivo & KPIs');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de Resumen Ejecutivo descargado exitosamente.', 'success');
+    }
+  };
+
+  // 3. ROTACIÓN DE CALZADO & MODELOS
+  const handleReporteModelosPdf = (modo: 'preview' | 'download') => {
+    const modelosGrafica = (modelosMargenData?.topModelosGrafica && modelosMargenData.topModelosGrafica.length > 0)
+      ? modelosMargenData.topModelosGrafica
+      : (reporteData?.topModelos || []).map((m: any, idx: number) => ({
+          nombre: `${m.modelName || 'Calzado'} ${m.color ? `(${m.color})` : ''}`,
+          paresVendidos: m.pares || 0,
+          margenPorcentual: m.margen || 25,
+          gananciaNeta: Math.round((m.ingresos || 0) * 0.25),
+          porcentajeParticipacion: m.participacion || Math.max(3, 20 - idx * 3),
+        }));
+
+    const payload = {
+      negocio: obtenerNegocioPayload(),
+      periodo,
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      topModelos: (reporteData?.topModelos as ModeloReporte[]) || [],
+      topModelosGrafica: modelosGrafica,
+      bajaRotacion: reporteData?.bajaRotacion || [],
+      catalogoCompleto: reporteData?.catalogoProductosCompleto || [],
+      rotacionResumen: reporteData?.rotacionResumen || {},
+      totalParesVendidos: modelosMargenData?.metricas?.totalPares || kpis.totalParesVendidos || 0,
+      totalIngresosModelos: modelosMargenData?.metricas?.totalIngresos || kpis.totalIngresos || 0,
+      filtroSerie: filtroRotacionSerie,
+      filtroEstado: filtroRotacionEstado,
+    };
+
+    const doc = generarReporteModelosRotacionPdf(payload);
+    const nombre = `reporte_rotacion_calzado_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Rotación de Calzado & Modelos');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de Rotación de Calzado descargado exitosamente.', 'success');
+    }
+  };
+
+  // 4. PRODUCTIVIDAD POR TRABAJADOR
+  const handleReporteProductividadPdf = (modo: 'preview' | 'download') => {
+    const payload = {
+      negocio: obtenerNegocioPayload(),
+      periodo,
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      totalIngresosSucursal: kpis.totalIngresos || 0,
+      totalParesSucursal: kpis.totalParesVendidos || 0,
+      vendedores: (reporteData?.rankingVendedores as VendedorReporte[]) || [],
+    };
+
+    const doc = generarReporteProductividadVendedoresPdf(payload);
+    const nombre = `reporte_productividad_personal_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Productividad por Trabajador');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de Productividad descargado exitosamente.', 'success');
+    }
+  };
+
+  // 5. COBRANZAS & CLIENTES DEUDORES
+  const handleReporteCobranzasPdf = (modo: 'preview' | 'download') => {
+    if (!cobranzasData || !cobranzasData.clientes) {
+      showToast('No hay datos de cobranzas disponibles para generar el PDF.', 'warning');
+      return;
+    }
+
+    const payload = {
+      negocio: obtenerNegocioPayload(),
+      periodo,
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      totalCartera: cobranzasData.totalCartera || 0,
+      totalClientes: cobranzasData.totalClientes || 0,
+      totalRecaudado: kpis.totalRecaudadoCobros || 0,
+      clientes: cobranzasData.clientes as ClienteDeudor[],
+    };
+
+    const doc = generarReporteCobranzasPdf(payload);
+    const nombre = `reporte_cobranzas_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Cobranzas — Clientes Deudores');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de cobranzas descargado exitosamente.', 'success');
+    }
+  };
+
+  // 6. CAMPAÑAS Y PROMOCIONES
+  const handleReporteCampanasPdf = (modo: 'preview' | 'download') => {
+    if (!campanasData || !campanasData.campanas) {
+      showToast('No hay datos de campañas disponibles para generar el PDF.', 'warning');
+      return;
+    }
+
+    const payload = {
+      negocio: obtenerNegocioPayload(),
+      periodo,
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      campanas: campanasData.campanas as CampanaReporte[],
+    };
+
+    const doc = generarReporteCampanasPdf(payload);
+    const nombre = `reporte_campanas_promociones_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Rendimiento de Campañas y Promociones');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de campañas descargado exitosamente.', 'success');
+    }
+  };
+
+  // 7. FINANZAS & MÉTODOS DE PAGO
+  const handleReporteFinanzasPdf = (modo: 'preview' | 'download') => {
+    const vObj = vendedores.find((v) => v.id === vendedorSeleccionado);
+    const canalLabels: Record<string, string> = {
+      MANUAL: 'POS Mostrador / Venta Directa',
+      WHATSAPP: 'Pedidos WhatsApp / Comercial',
+      CATALOGO: 'Catálogo Digital Web',
+    };
+    const payload = {
+      negocio: obtenerNegocioPayload(),
+      periodo,
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      totalRecaudadoCobros: kpis.totalRecaudadoCobros || 0,
+      saldoCarteraTotal: kpis.saldoCarteraTotal || 0,
+      totalIngresosVentas: kpis.totalIngresos || 0,
+      distribucionMetodosAbono: reporteData?.distribucionMetodosAbono || {},
+      vendedorNombre: vObj?.nombre || (vendedorSeleccionado !== 'TODOS' ? vendedorSeleccionado : undefined),
+      canalNombre: canalSeleccionado !== 'TODOS' ? (canalLabels[canalSeleccionado] || canalSeleccionado) : undefined,
+      distribucionCanales: reporteData?.distribucionCanales || undefined,
+      distribucionFormasPago: reporteData?.distribucionFormasPago || undefined,
+      recaudacionPorVendedor: reporteData?.recaudacionPorVendedor || undefined,
+    };
+
+    const doc = generarReporteFinanzasMetodosPdf(payload);
+    const nombre = `reporte_finanzas_metodos_pago_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Finanzas & Métodos de Recaudación');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de Finanzas descargado exitosamente.', 'success');
+    }
+  };
+
+  // 8. PROYECCIÓN IA / MACHINE LEARNING
+  const handleReporteProyeccionMlPdf = (modo: 'preview' | 'download') => {
+    if (!proyeccionMl) {
+      showToast('Por favor calcula la inferencia IA antes de previsualizar el reporte.', 'warning');
+      return;
+    }
+
+    const payload = {
+      negocio: obtenerNegocioPayload(),
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      ml: proyeccionMl,
+    };
+
+    const doc = generarReporteProyeccionMlPdf(payload);
+    const nombre = `reporte_proyeccion_ia_ml_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Pronóstico de Demanda Inteligente (Nexora ML)');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de Proyección IA descargado exitosamente.', 'success');
+    }
+  };
+
+  // 9. REPORTE DEL PUNTO DE VENTA (POS)
+  const handleReportePosPdf = (modo: 'preview' | 'download') => {
+    if (!posData) {
+      showToast('No hay datos del Punto de Venta disponibles.', 'warning');
+      return;
+    }
+    setGenerandoPosPdf(true);
+    try {
+      const sucursalNombre = sucursalSeleccionada === 'TODAS'
+        ? 'Todas las Sucursales'
+        : sucursales.find((s) => s.id === sucursalSeleccionada)?.name || 'Sucursal';
+
+      const doc = generarReportePosPdf({
+        negocio: obtenerNegocioPayload(),
+        periodo: periodo === 'PERSONALIZADO' ? `${fechaDesde} al ${fechaHasta}` : periodo,
+        sucursalNombre,
+        fechaGeneracion: new Date().toLocaleString('es-EC'),
+        metricas: posData.metricas,
+        ventas: posData.ventas,
+      });
+
+      const nombre = `reporte_pos_${periodo.toLowerCase()}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      if (modo === 'preview') {
+        setPdfDocPreview(doc);
+        setPreviewTitulo(`Reporte Punto de Venta — ${sucursalNombre}`);
+        setPreviewNombreArchivo(nombre);
+        setPreviewModalOpen(true);
+      } else {
+        doc.save(nombre);
+        showToast('Reporte POS descargado exitosamente.', 'success');
+      }
+    } catch (err: any) {
+      console.error('Error generando PDF POS:', err);
+      showToast('Error al generar PDF del Punto de Venta.', 'error');
+    } finally {
+      setGenerandoPosPdf(false);
+    }
+  };
+
+  // 10. REPORTE DE RENDIMIENTO DE SUCURSALES
+  const handleReporteSucursalPdf = (modo: 'preview' | 'download') => {
+    if (!sucursalesReporteData) {
+      showToast('No hay datos de sucursales disponibles.', 'warning');
+      return;
+    }
+    setGenerandoSucursalPdf(true);
+    try {
+      const doc = generarReporteRendimientoSucursalesPdf({
+        negocio: obtenerNegocioPayload(),
+        periodo: periodo === 'PERSONALIZADO' ? `${fechaDesde} al ${fechaHasta}` : periodo,
+        sucursalSeleccionada: sucursalesReporteData.sucursalSeleccionada,
+        fechaGeneracion: new Date().toLocaleString('es-EC'),
+        totalesEmpresa: sucursalesReporteData.totalesEmpresa,
+        totalesSucursalSeleccionada: sucursalesReporteData.totalesSucursalSeleccionada,
+        sucursales: sucursalesReporteData.sucursales,
+        modelosVendidos: sucursalesReporteData.modelosVendidos,
+      });
+
+      const nombre = `reporte_rendimiento_sucursal_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      if (modo === 'preview') {
+        setPdfDocPreview(doc);
+        setPreviewTitulo(`Rendimiento Comercial — ${sucursalesReporteData.sucursalSeleccionada?.nombre}`);
+        setPreviewNombreArchivo(nombre);
+        setPreviewModalOpen(true);
+      } else {
+        doc.save(nombre);
+        showToast('Reporte de Sucursales descargado exitosamente.', 'success');
+      }
+    } catch (err: any) {
+      console.error('Error generando PDF Sucursal:', err);
+      showToast('Error al generar PDF de Sucursal.', 'error');
+    } finally {
+      setGenerandoSucursalPdf(false);
+    }
+  };
+
+  // 11. REPORTE DE ABASTECIMIENTO DE PROVEEDORES
+  const handleReporteProveedoresPdf = (modo: 'preview' | 'download') => {
+    if (!proveedoresData) {
+      showToast('No hay datos de abastecimiento para generar el PDF.', 'warning');
+      return;
+    }
+    setGenerandoProveedoresPdf(true);
+    try {
+      const doc = generarReporteAbastecimientoPdf({
+        negocio: obtenerNegocioPayload(),
+        periodo: periodo === 'PERSONALIZADO' ? `${fechaDesde} al ${fechaHasta}` : periodo,
+        fechaGeneracion: new Date().toLocaleString('es-EC'),
+        kpis: proveedoresData.kpis || {
+          totalComprado: 0,
+          totalLotes: 0,
+          totalPares: 0,
+          deudaTotal: 0,
+          anticiposTotal: 0,
+          totalDevoluciones: 0,
+          montoDevoluciones: 0,
+        },
+        proveedores: (proveedoresData.porProveedor || []) as ProveedorAbastecimientoReporte[],
+      });
+
+      const nombre = `reporte_abastecimiento_proveedores_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      if (modo === 'preview') {
+        setPdfDocPreview(doc);
+        setPreviewTitulo('Reporte de Abastecimiento & Proveedores');
+        setPreviewNombreArchivo(nombre);
+        setPreviewModalOpen(true);
+      } else {
+        doc.save(nombre);
+        showToast('Reporte de abastecimiento descargado exitosamente.', 'success');
+      }
+    } catch (err: any) {
+      console.error('Error generando PDF de Abastecimiento:', err);
+      showToast('Error al generar PDF de Abastecimiento.', 'error');
+    } finally {
+      setGenerandoProveedoresPdf(false);
+    }
+  };
+
+  const handleImprimirReporte = () => {
+    window.print();
+  };
+
+  const kpis = reporteData?.kpis || {
+    totalIngresos: 0,
+    totalParesVendidos: 0,
+    totalPedidos: 0,
+    ticketPromedio: 0,
+    costoEstimadoTotal: 0,
+    gananciaBruta: 0,
+    margenPorcentaje: 0,
+    totalRecaudadoCobros: 0,
+    saldoCarteraTotal: 0,
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300 pb-16">
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* CABECERA PRINCIPAL & ACCIONES                                    */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--card)] p-6 rounded-3xl border border-[var(--border)] shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 bg-[#0F172A] text-white rounded-2xl shadow-sm">
+            <BarChart3 size={24} />
+          </div>
+          <div>
+            <h1 className="text-xl font-extrabold text-[var(--foreground)] tracking-tight">
+              Reportes & Business Intelligence
+            </h1>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Análisis multi-filtro de ventas, rendimiento por trabajador, rotación de calzado y cobranzas de la sucursal
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={cargarReporte}
+            disabled={loading}
+            className="px-3.5 py-2.5 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span>Actualizar</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleReporteGeneralIntegral('preview')}
+            disabled={generandoGeneralPdf || loading}
+            className="px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+            title="Previsualizar el informe integral consolidado de toda la sucursal"
+          >
+            {generandoGeneralPdf ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+            <span>Previsualizar PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleReporteGeneralIntegral('download')}
+            disabled={generandoGeneralPdf || loading}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+            title="Descargar PDF consolidado con todas las áreas del negocio"
+          >
+            <Download size={14} />
+            <span>Descargar PDF</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* PANEL DE CONTROL: MULTI-FILTRO AVANZADO                          */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
+        <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+          <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
+            <Filter size={14} className="text-[#0F172A]" />
+            <span>Filtros de Análisis</span>
+          </span>
+          <span className="text-[11px] text-[var(--muted-foreground)] font-semibold">
+            {periodo === 'PERSONALIZADO' ? 'Rango personalizado' : `Vista: ${periodo}`}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* 1. Selector de Periodicidad */}
+          <div>
+            <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
+              1. Periodicidad / Fecha
+            </label>
+            <div className="flex flex-wrap gap-1">
+              {(['HOY', 'SEMANAL', 'MENSUAL', 'TRIMESTRAL', 'ANUAL', 'PERSONALIZADO'] as PeriodoTipo[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPeriodo(p)}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                    periodo === p
+                      ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-2xs'
+                      : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[#0F172A]'
+                  }`}
+                >
+                  {p === 'HOY' && 'Hoy'}
+                  {p === 'SEMANAL' && 'Sem.'}
+                  {p === 'MENSUAL' && 'Mes'}
+                  {p === 'TRIMESTRAL' && 'Trim.'}
+                  {p === 'ANUAL' && 'Año'}
+                  {p === 'PERSONALIZADO' && 'Personal.'}
+                </button>
+              ))}
+            </div>
+
+            {/* Fechas personalizadas */}
+            {periodo === 'PERSONALIZADO' && (
+              <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-[var(--border)]">
+                <div>
+                  <label className="text-[10px] font-bold text-[var(--muted-foreground)] block mb-1">Desde:</label>
+                  <input
+                    type="date"
+                    value={fechaDesde}
+                    onChange={(e) => setFechaDesde(e.target.value)}
+                    className="w-full px-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-[var(--muted-foreground)] block mb-1">Hasta:</label>
+                  <input
+                    type="date"
+                    value={fechaHasta}
+                    onChange={(e) => setFechaHasta(e.target.value)}
+                    className="w-full px-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 2. Selector de Sucursal / Sede */}
+          <div>
+            <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
+              2. Sucursal / Sede
+            </label>
+            <div className="relative">
+              {isGlobalAdmin ? (
+                <>
+                  <select
+                    value={sucursalSeleccionada}
+                    onChange={(e) => setSucursalSeleccionada(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
+                  >
+                    <option value="TODAS">Todas las Sucursales (Consolidado)</option>
+                    {sucursales.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name || s.nombre} {s.isMatriz ? '(Matriz)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+                </>
+              ) : (
+                <div className="w-full px-3.5 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] flex items-center justify-between">
+                  <span>{sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.name || sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.nombre || 'Sucursal Asignada'}</span>
+                  <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">Sede Local</span>
+                </div>
+              )}
+            </div>
+            <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+              {isGlobalAdmin
+                ? 'Filtra por sucursal específica o visualiza la red completa.'
+                : 'Reporte delimitado exclusivamente a tu local comercial asignado.'}
+            </p>
+          </div>
+
+          {/* 3. Selector de Vendedor / Trabajador */}
+          <div>
+            <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
+              3. Trabajador o Vendedor
+            </label>
+            <div className="relative">
+              {isVendedor ? (
+                <div className="w-full px-3.5 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] flex items-center justify-between">
+                  <span>{currentUser?.nombre ? capitalizarNombreCompleto(currentUser.nombre) : (currentUser?.email || 'Mis Ventas')}</span>
+                  <span className="text-[10px] font-semibold text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded-full">Vendedor</span>
+                </div>
+              ) : (
+                <>
+                  <select
+                    value={vendedorSeleccionado}
+                    onChange={(e) => setVendedorSeleccionado(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
+                  >
+                    <option value="TODOS">Todos los Trabajadores</option>
+                    {vendedores.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {capitalizarNombreCompleto(v.nombre)} ({v.rol.replace('ROL_', '')})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+                </>
+              )}
+            </div>
+            <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+              {isVendedor ? 'Visualizando exclusivamente tus transacciones comerciales.' : 'Productividad individual o grupal del equipo.'}
+            </p>
+          </div>
+
+          {/* 4. Selector de Canal de Venta */}
+          <div>
+            <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
+              4. Canal de Venta
+            </label>
+            <div className="relative">
+              <select
+                value={canalSeleccionado}
+                onChange={(e) => setCanalSeleccionado(e.target.value)}
+                className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
+              >
+                <option value="TODOS">Todos los Canales (POS + Pedidos)</option>
+                <option value="POS">Solo Punto de Venta Mostrador (POS)</option>
+                <option value="PEDIDOS">Solo Pedidos por Encargo / Mayoristas</option>
+                <option value="WHATSAPP">Solo WhatsApp / Comercial</option>
+                <option value="CATALOGO">Solo Catálogo Digital Web</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+            </div>
+            <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+              Filtra entre mostrador POS y pedidos entregados al por mayor.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* NAVEGACIÓN ESTRUCTURADA POR CATEGORÍAS TEMÁTICAS                  */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      <div className="space-y-3">
+        {/* Nivel 1: Selector de Categoría Principal */}
+        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl">
+          {[
+            {
+              id: 'comercial' as const,
+              label: 'Comercial & Ventas',
+              badge: '4 reportes',
+              icon: <ShoppingBag size={15} />,
+              color: 'text-emerald-500',
+            },
+            {
+              id: 'inventario' as const,
+              label: 'Inventario & Almacén',
+              badge: '3 reportes',
+              icon: <Boxes size={15} />,
+              color: 'text-blue-500',
+            },
+            {
+              id: 'clientes' as const,
+              label: 'Clientes, Cartera & Equipo',
+              badge: '3 reportes',
+              icon: <Receipt size={15} />,
+              color: 'text-purple-500',
+            },
+            {
+              id: 'estrategia' as const,
+              label: 'Finanzas & Rendimiento',
+              badge: '4 reportes',
+              icon: <TrendingUp size={15} />,
+              color: 'text-amber-500',
+            },
+          ].map((cat) => {
+            const isCatActive = categoriaActiva === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => {
+                  setCategoriaActiva(cat.id);
+                  // Si la tab activa actual no pertenece a esta categoría, seleccionar la primera
+                  if (cat.id === 'comercial' && !['ventas_cliente', 'ventas_modelos_foto', 'pos', 'entregas_pedidos'].includes(tabActiva)) {
+                    setTabActiva('ventas_cliente');
+                    if (!ventasDetalladasData) cargarReporteVentasDetalladas();
+                  } else if (cat.id === 'inventario' && !['modelos', 'inventario_fifo', 'proveedores'].includes(tabActiva)) {
+                    setTabActiva('modelos');
+                    if (!modelosMargenData) cargarReporteModelosMargen();
+                  } else if (cat.id === 'clientes' && !['cobranzas', 'campanas', 'vendedores'].includes(tabActiva)) {
+                    setTabActiva('cobranzas');
+                    if (!cobranzasData) cargarCobranzas();
+                  } else if (cat.id === 'estrategia' && !['resumen', 'finanzas', 'sucursales', 'proyeccion_ml'].includes(tabActiva)) {
+                    setTabActiva('resumen');
+                  }
+                }}
+                className={`flex-1 min-w-[200px] px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                  isCatActive
+                    ? 'bg-[#0F172A] text-white shadow-sm'
+                    : 'bg-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={isCatActive ? 'text-white' : cat.color}>{cat.icon}</span>
+                  <span>{cat.label}</span>
+                </div>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                  isCatActive
+                    ? 'bg-white/20 text-white'
+                    : 'bg-[var(--card)] text-[var(--muted-foreground)] border border-[var(--border)]'
+                }`}>
+                  {cat.badge}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Nivel 2: Sub-reportes de la Categoría Seleccionada */}
+        <div className="flex flex-wrap gap-2 pt-1 pb-2 border-b border-[var(--border)]">
+          {(() => {
+            const reportesVisibles: Array<{
+              id: TabReporte;
+              label: string;
+              icon: React.ReactNode;
+              badge?: string;
+              badgeColor?: string;
+            }> = [];
+
+            if (categoriaActiva === 'comercial') {
+              reportesVisibles.push(
+                {
+                  id: 'ventas_cliente',
+                  label: 'Ventas por Cliente & Transacción',
+                  icon: <Users size={14} />,
+                  badge: 'Agrupado',
+                  badgeColor: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25',
+                },
+                {
+                  id: 'ventas_modelos_foto',
+                  label: 'Consolidado de Calzado (con Fotos)',
+                  icon: <Package size={14} />,
+                  badge: 'Con Fotos',
+                  badgeColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25',
+                },
+                {
+                  id: 'pos',
+                  label: 'Punto de Venta Mostrador (POS)',
+                  icon: <Store size={14} />,
+                },
+                {
+                  id: 'entregas_pedidos',
+                  label: 'Entregas & Pedidos Pendientes',
+                  icon: <Truck size={14} />,
+                  badge: 'Pendientes',
+                  badgeColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25',
+                }
+              );
+            } else if (categoriaActiva === 'inventario') {
+              reportesVisibles.push(
+                {
+                  id: 'modelos',
+                  label: 'Rotación de Calzado & Modelos',
+                  icon: <Flame size={14} />,
+                },
+                {
+                  id: 'inventario_fifo',
+                  label: 'Inventario & Valoración FIFO',
+                  icon: <Boxes size={14} />,
+                },
+                {
+                  id: 'proveedores',
+                  label: 'Abastecimiento & Proveedores',
+                  icon: <Building2 size={14} />,
+                }
+              );
+            } else if (categoriaActiva === 'clientes') {
+              reportesVisibles.push(
+                {
+                  id: 'cobranzas',
+                  label: 'Cobranzas & Clientes Deudores',
+                  icon: <Receipt size={14} />,
+                },
+                {
+                  id: 'campanas',
+                  label: 'Rendimiento de Campañas & Promos',
+                  icon: <Megaphone size={14} />,
+                },
+                {
+                  id: 'vendedores',
+                  label: 'Productividad por Trabajador',
+                  icon: <Users size={14} />,
+                }
+              );
+            } else if (categoriaActiva === 'estrategia') {
+              reportesVisibles.push(
+                {
+                  id: 'resumen',
+                  label: 'Resumen Ejecutivo & KPIs',
+                  icon: <BarChart3 size={14} />,
+                },
+                {
+                  id: 'finanzas',
+                  label: 'Finanzas & Métodos de Pago',
+                  icon: <DollarSign size={14} />,
+                },
+                {
+                  id: 'sucursales',
+                  label: 'Rendimiento de Sucursales',
+                  icon: <Building2 size={14} />,
+                },
+                {
+                  id: 'proyeccion_ml',
+                  label: 'Proyección IA / Machine Learning',
+                  icon: <BrainCircuit size={14} />,
+                }
+              );
+            }
+
+            return reportesVisibles.map((tab) => {
+              const isTabActive = tabActiva === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setTabActiva(tab.id);
+                    if (tab.id === 'ventas_cliente' || tab.id === 'ventas_modelos_foto') {
+                      if (!ventasDetalladasData) cargarReporteVentasDetalladas();
+                    } else if (tab.id === 'pos' && !posData) {
+                      cargarReportePos();
+                    } else if (tab.id === 'sucursales' && !sucursalesReporteData) {
+                      cargarReporteSucursales();
+                    } else if (tab.id === 'proveedores' && !proveedoresData) {
+                      cargarReporteProveedores();
+                    } else if (tab.id === 'inventario_fifo' && !inventarioFifoData) {
+                      cargarReporteInventarioFifo();
+                    } else if (tab.id === 'entregas_pedidos' && !entregasData) {
+                      cargarReporteEntregas();
+                    } else if (tab.id === 'proyeccion_ml' && !proyeccionMl) {
+                      cargarProyeccionMl();
+                    } else if (tab.id === 'cobranzas' && !cobranzasData) {
+                      cargarCobranzas();
+                    } else if (tab.id === 'campanas' && !campanasData) {
+                      cargarCampanas();
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    isTabActive
+                      ? 'bg-[#0F172A] text-white shadow-xs'
+                      : 'bg-[var(--card)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] border border-[var(--border)]'
+                  }`}
+                >
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                  {tab.badge && (
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded-md font-extrabold ${tab.badgeColor || 'bg-blue-500/20 text-blue-400'}`}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            });
+          })()}
+        </div>
+      </div>
+
+      {/* Loading state */}
+      {loading ? (
+        <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
+          <Loader2 size={36} className="animate-spin text-[#0F172A]" />
+          <span className="text-xs font-bold">Generando consolidado de inteligencia comercial...</span>
+        </div>
+      ) : (
+        <>
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 1: RESUMEN EJECUTIVO & KPIs                                */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'resumen' && (
+            <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF para Resumen */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
+                    <BarChart3 size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Resumen Ejecutivo & Indicadores Clave (KPIs)
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Facturación total, volumen de calzado, margen bruto y comportamiento de ventas
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleReporteResumenPdf('preview')}
+                    disabled={loading || !reporteData}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteResumenPdf('download')}
+                    disabled={loading || !reporteData}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+              {/* Tarjetas KPIs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Ventas Totales */}
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
+                      {isVendedor
+                        ? 'Mis Ventas Totales'
+                        : isGlobalAdmin && sucursalSeleccionada === 'TODAS'
+                        ? 'Ventas Totales del Negocio'
+                        : 'Ventas de la Sucursal'}
+                    </span>
+                    <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                      <DollarSign size={18} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black text-[var(--foreground)]">
+                      ${kpis.totalIngresos.toFixed(2)}
+                    </div>
+                    <div className="text-[11px] text-[var(--muted-foreground)] font-semibold mt-1">
+                      {isVendedor ? 'Mis transacciones registradas' : `${kpis.totalPedidos} pedidos registrados`}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Pares Vendidos */}
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
+                      {isVendedor ? 'Mis Pares Vendidos' : 'Calzado Vendido'}
+                    </span>
+                    <div className="p-2 bg-indigo-500/10 text-indigo-600 rounded-xl">
+                      <ShoppingBag size={18} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black text-[var(--foreground)]">
+                      {kpis.totalParesVendidos} <span className="text-sm font-bold text-[var(--muted-foreground)]">pares</span>
+                    </div>
+                    <div className="text-[11px] text-[var(--muted-foreground)] font-semibold mt-1">
+                      Ticket Promedio: ${kpis.ticketPromedio.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Margen Bruto Estimado */}
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
+                      Ganancia Bruta Est.
+                    </span>
+                    <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+                      <TrendingUp size={18} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black text-emerald-600">
+                      ${kpis.gananciaBruta.toFixed(2)}
+                    </div>
+                    <div className="text-[11px] text-amber-700 dark:text-amber-400 font-bold mt-1">
+                      Margen: {kpis.margenPorcentaje.toFixed(1)}% sobre costo
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Recaudación de Cobros */}
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
+                      Recaudación Cobros
+                    </span>
+                    <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
+                      <Receipt size={18} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black text-[var(--foreground)]">
+                      ${kpis.totalRecaudadoCobros.toFixed(2)}
+                    </div>
+                    <div className="text-[11px] text-red-500 font-bold mt-1">
+                      Saldo Cartera Activa: ${kpis.saldoCarteraTotal.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gráfico de Evolución Temporal Profesional */}
+              <GraficoCurvaTendencia
+                puntos={
+                  reporteData?.serieTemporal?.map((t: any) => ({
+                    label: t.label,
+                    valor: t.ingresos || 0,
+                    valor2: t.pares || 0,
+                    valorFormateado: `$${(t.ingresos || 0).toFixed(2)}`,
+                    valor2Formateado: `${t.pares || 0} pares`,
+                  })) || []
+                }
+                titulo="Curva de Evolución Temporal de Ingresos & Volumen de Pares"
+                subtitulo="Comportamiento dinámico de la facturación y despacho físico en el periodo seleccionado"
+                primaryColor={negocioInfo?.primaryColor || '#0EA5E9'}
+                secondaryColor="#10B981"
+                serie1Nombre="Facturación ($)"
+                serie2Nombre="Pares Vendidos"
+                emptyMessage="No hay movimientos registrados para el filtro de fechas seleccionado."
+              />
+
+              {/* Distribución por Canales y Formas de Pago */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Canales de Venta */}
+                <GraficoDonutCircular
+                  items={[
+                    {
+                      label: 'POS Mostrador / Directo',
+                      valor: reporteData?.distribucionCanales?.MANUAL?.monto || 0,
+                      color: '#0EA5E9',
+                      subtexto: `${reporteData?.distribucionCanales?.MANUAL?.pares || 0} pares (${reporteData?.distribucionCanales?.MANUAL?.count || 0} pedidos)`,
+                    },
+                    {
+                      label: 'Pedidos WhatsApp / Asesor',
+                      valor: reporteData?.distribucionCanales?.WHATSAPP?.monto || 0,
+                      color: '#10B981',
+                      subtexto: `${reporteData?.distribucionCanales?.WHATSAPP?.pares || 0} pares (${reporteData?.distribucionCanales?.WHATSAPP?.count || 0} pedidos)`,
+                    },
+                    {
+                      label: 'Catálogo Digital Web',
+                      valor: reporteData?.distribucionCanales?.CATALOGO?.monto || 0,
+                      color: '#6366F1',
+                      subtexto: `${reporteData?.distribucionCanales?.CATALOGO?.pares || 0} pares (${reporteData?.distribucionCanales?.CATALOGO?.count || 0} pedidos)`,
+                    },
+                  ]}
+                  titulo="Ventas por Canal de Entrada"
+                  subtitulo="Desglose de ingresos según el origen del pedido"
+                  valorCentro={kpis.totalIngresos > 0 ? `$${kpis.totalIngresos.toFixed(0)}` : '$0'}
+                  etiquetaCentro="Total Facturado"
+                />
+
+                {/* Formas de Pago */}
+                <GraficoDonutCircular
+                  items={[
+                    {
+                      label: 'Ventas de Contado',
+                      valor: reporteData?.distribucionFormasPago?.CONTADO?.monto || 0,
+                      color: '#10B981',
+                      subtexto: `${reporteData?.distribucionFormasPago?.CONTADO?.count || 0} transacciones cobradas`,
+                    },
+                    {
+                      label: 'Ventas a Crédito',
+                      valor: reporteData?.distribucionFormasPago?.CREDITO?.monto || 0,
+                      color: '#3B82F6',
+                      subtexto: `${reporteData?.distribucionFormasPago?.CREDITO?.count || 0} notas con saldo diferido`,
+                    },
+                  ]}
+                  titulo="Distribución Contado vs Crédito"
+                  subtitulo="Estructura de cobro de las transacciones comerciales"
+                  valorCentro={
+                    kpis.totalIngresos > 0 && reporteData?.distribucionFormasPago?.CONTADO?.monto
+                      ? `${((reporteData.distribucionFormasPago.CONTADO.monto / kpis.totalIngresos) * 100).toFixed(0)}%`
+                      : '100%'
+                  }
+                  etiquetaCentro="Al Contado"
+                />
+              </div>
+
+              {/* Métricas de Eficiencia Comercial */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                  <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
+                    Ticket Promedio por Pedido
+                  </span>
+                  <div className="text-xl font-black text-[var(--foreground)]">
+                    ${kpis.totalPedidos > 0 ? (kpis.totalIngresos / kpis.totalPedidos).toFixed(2) : '0.00'}
+                  </div>
+                  <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5 block">
+                    Facturación media por cada transacción
+                  </span>
+                </div>
+
+                <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                  <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
+                    Volumen Promedio por Venta
+                  </span>
+                  <div className="text-xl font-black text-blue-600">
+                    {kpis.totalPedidos > 0 && (kpis.totalParesVendidos || 0) > 0
+                      ? ((kpis.totalParesVendidos || 0) / kpis.totalPedidos).toFixed(1)
+                      : '0.0'} pares
+                  </div>
+                  <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5 block">
+                    Pares promedio comercializados por pedido
+                  </span>
+                </div>
+
+                <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                  <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
+                    Tasa de Cobro Inmediato
+                  </span>
+                  <div className="text-xl font-black text-emerald-600">
+                    {kpis.totalIngresos > 0 && reporteData?.distribucionFormasPago?.CONTADO?.monto
+                      ? `${((reporteData.distribucionFormasPago.CONTADO.monto / kpis.totalIngresos) * 100).toFixed(0)}%`
+                      : '100%'}
+                  </div>
+                  <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5 block">
+                    Ventas liquidadas al contado sin diferir
+                  </span>
+                </div>
+              </div>
+
+              {/* Tablas Ejecutivas: Top Modelos y Rendimiento de Vendedores */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Top 5 Modelos */}
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3.5 shadow-xs">
+                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
+                        <ShoppingBag size={16} className="text-blue-500" />
+                        Top Modelos Más Vendidos
+                      </h4>
+                      <p className="text-[11px] text-[var(--muted-foreground)]">
+                        Calzado con mayor rotación en el periodo
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600">
+                      Catálogo
+                    </span>
+                  </div>
+
+                  {Array.isArray(reporteData?.topModelos) && reporteData.topModelos.length > 0 ? (
+                    <div className="space-y-2.5">
+                      {reporteData.topModelos.slice(0, 5).map((m: any, idx: number) => {
+                        const maxP = Math.max(...reporteData.topModelos.map((x: any) => x.pares || 0), 1);
+                        const pct = Math.min(100, Math.max(8, ((m.pares || 0) / maxP) * 100));
+                        const colors = ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'];
+                        const col = colors[idx % colors.length];
+
+                        return (
+                          <div key={idx} className="p-2.5 bg-[var(--muted)]/20 border border-[var(--border)]/60 rounded-xl space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className="w-5 h-5 rounded-lg flex items-center justify-center font-black text-[10px] text-white shrink-0"
+                                  style={{ backgroundColor: col }}
+                                >
+                                  {idx + 1}
+                                </span>
+                                <span className="font-bold text-[var(--foreground)] truncate max-w-[180px]">
+                                  {m.modelName} {m.color ? `(${m.color})` : ''}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="font-mono font-bold text-xs text-[var(--foreground)]">
+                                  {m.pares} pares
+                                </span>
+                                <span className="font-mono font-black text-xs text-emerald-600">
+                                  ${Number(m.ingresos || 0).toFixed(0)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="w-full bg-[var(--muted)]/40 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                style={{ width: `${pct}%`, backgroundColor: col }}
+                                className="h-full rounded-full transition-all duration-500"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center text-xs text-[var(--muted-foreground)] italic">
+                      No hay datos de modelos para este periodo.
+                    </div>
+                  )}
+                </div>
+
+                {/* Ranking de Vendedores */}
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3.5 shadow-xs">
+                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
+                        <Users size={16} className="text-emerald-500" />
+                        Productividad del Equipo de Ventas
+                      </h4>
+                      <p className="text-[11px] text-[var(--muted-foreground)]">
+                        Pares comercializados e ingresos por asesor
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600">
+                      Personal
+                    </span>
+                  </div>
+
+                  {Array.isArray(reporteData?.rankingVendedores) && reporteData.rankingVendedores.length > 0 ? (
+                    <div className="space-y-2.5">
+                      {reporteData.rankingVendedores.slice(0, 5).map((v: any, idx: number) => {
+                        const totalVtas = kpis.totalIngresos || 1;
+                        const pctV = Math.min(100, Math.max(0, ((v.totalIngresos || 0) / totalVtas) * 100));
+
+                        return (
+                          <div key={idx} className="p-2.5 bg-[var(--muted)]/20 border border-[var(--border)]/60 rounded-xl space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="w-5 h-5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-black text-[10px] shrink-0">
+                                  {idx + 1}
+                                </span>
+                                <span className="font-bold text-[var(--foreground)] truncate max-w-[180px]">
+                                  {capitalizarNombreCompleto(v.nombre || 'Vendedor')}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="font-mono text-xs text-[var(--muted-foreground)]">
+                                  {v.paresVendidos || 0} pares
+                                </span>
+                                <span className="font-mono font-black text-xs text-[var(--foreground)]">
+                                  ${Number(v.totalIngresos || 0).toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="w-full bg-[var(--muted)]/40 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                style={{ width: `${pctV}%` }}
+                                className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center text-xs text-[var(--muted-foreground)] italic">
+                      No hay registros de vendedores para este periodo.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB: VENTAS POR CLIENTE & TRANSACCIÓN                          */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'ventas_cliente' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Cabecera del Módulo */}
+              <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                      VENTAS AGRUPADAS POR COMPRADOR
+                    </span>
+                    <span className="text-xs text-[var(--muted-foreground)] font-mono">
+                      {canalSeleccionado === 'POS' ? 'Canal: Solo POS Mostrador' : canalSeleccionado === 'PEDIDOS' ? 'Canal: Solo Pedidos / Mayoristas' : 'Canal: Todos los Canales'}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
+                    <Users size={18} className="text-emerald-600" />
+                    <span>Ventas Detalladas por Cliente & Transacción</span>
+                  </h3>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Revisa exactamente qué compró cada cliente en el periodo: fecha, comprobante, modelos, serie y curvas de tallas físicas entregadas.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={cargarReporteVentasDetalladas}
+                    disabled={loadingVentasDetalladas}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <RefreshCw size={13} className={loadingVentasDetalladas ? 'animate-spin' : ''} />
+                    <span>Actualizar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteVentasPorClientePdf('preview')}
+                    disabled={loadingVentasDetalladas || !ventasDetalladasData}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    {generandoVentasClientePdf ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteVentasPorClientePdf('download')}
+                    disabled={loadingVentasDetalladas || !ventasDetalladasData}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={13} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Tarjetas KPI Superiores */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
+                      Clientes con Compras
+                    </span>
+                    <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                      <Users size={16} />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-[var(--foreground)] tracking-tight">
+                    {ventasDetalladasData?.resumenKpis?.totalClientesUnicos || 0}
+                  </div>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Compradores registrados en el periodo
+                  </p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
+                      Total Transacciones
+                    </span>
+                    <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
+                      <Receipt size={16} />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-[var(--foreground)] tracking-tight">
+                    {ventasDetalladasData?.resumenKpis?.totalTransacciones || 0}
+                  </div>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Ventas POS y entregas de pedidos
+                  </p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
+                      Pares Vendidos
+                    </span>
+                    <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+                      <Package size={16} />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-[var(--foreground)] tracking-tight">
+                    {ventasDetalladasData?.resumenKpis?.totalPares || 0} <span className="text-sm font-normal text-[var(--muted-foreground)]">pares</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-600 font-bold">
+                    {ventasDetalladasData?.resumenKpis?.totalDocenasEquivalentes || '0 docenas'}
+                  </p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
+                      Total Facturado
+                    </span>
+                    <div className="p-2 bg-purple-500/10 text-purple-600 rounded-xl">
+                      <DollarSign size={16} />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-emerald-600 tracking-tight">
+                    ${(ventasDetalladasData?.resumenKpis?.totalMontoVendido || 0).toFixed(2)}
+                  </div>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Ticket promedio: ${(ventasDetalladasData?.resumenKpis?.ticketPromedio || 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Barra de Búsqueda y Filtros de Cliente */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="relative flex-1">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                  <input
+                    type="text"
+                    placeholder="Buscar cliente por nombre, cédula o teléfono..."
+                    value={filtroVentasClienteBusqueda}
+                    onChange={(e) => setFiltroVentasClienteBusqueda(e.target.value)}
+                    className="w-full pl-9 pr-3.5 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+                  {filtroVentasClienteBusqueda && (
+                    <button
+                      type="button"
+                      onClick={() => setFiltroVentasClienteBusqueda('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-[var(--muted-foreground)] font-semibold">
+                  <span>Mostrando {
+                    (ventasDetalladasData?.ventasPorCliente || []).filter((c: any) => {
+                      if (!filtroVentasClienteBusqueda.trim()) return true;
+                      const term = normalizarParaBusqueda(filtroVentasClienteBusqueda);
+                      return normalizarParaBusqueda(c.nombre).includes(term) ||
+                             (c.identificacion && normalizarParaBusqueda(c.identificacion).includes(term)) ||
+                             (c.telefono && c.telefono.includes(filtroVentasClienteBusqueda));
+                    }).length
+                  } cliente(s)</span>
+                </div>
+              </div>
+
+              {/* Listado de Clientes con Transacciones y Curvas de Tallas */}
+              {loadingVentasDetalladas ? (
+                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
+                  <Loader2 size={32} className="animate-spin text-emerald-600" />
+                  <span className="text-xs font-bold">Cargando ventas y curvas de calzado por cliente...</span>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {(() => {
+                    const clientesFiltrados = (ventasDetalladasData?.ventasPorCliente || []).filter((c: any) => {
+                      if (!filtroVentasClienteBusqueda.trim()) return true;
+                      const term = normalizarParaBusqueda(filtroVentasClienteBusqueda);
+                      return normalizarParaBusqueda(c.nombre).includes(term) ||
+                             (c.identificacion && normalizarParaBusqueda(c.identificacion).includes(term)) ||
+                             (c.telefono && c.telefono.includes(filtroVentasClienteBusqueda));
+                    });
+
+                    if (clientesFiltrados.length === 0) {
+                      return (
+                        <div className="p-12 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2">
+                          <Users size={32} className="mx-auto text-[var(--muted-foreground)]/40" />
+                          <p className="font-bold text-sm text-[var(--foreground)]">No se encontraron clientes con ventas</p>
+                          <p>Verifica el rango de fechas seleccionado o los filtros de canal de venta.</p>
+                        </div>
+                      );
+                    }
+
+                    return clientesFiltrados.map((cli: any, idx: number) => {
+                      const expandido = clienteDetalleExpandidoId === cli.clienteId || clienteDetalleExpandidoId === 'TODOS';
+                      return (
+                        <div
+                          key={cli.clienteId || idx}
+                          className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs transition-all"
+                        >
+                          {/* Cabecera del Cliente */}
+                          <div
+                            onClick={() => setClienteDetalleExpandidoId(expandido ? null : cli.clienteId)}
+                            className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-[var(--muted)]/30 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold text-sm">
+                                {cli.nombre ? cli.nombre.substring(0, 2).toUpperCase() : 'CL'}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-extrabold text-sm text-[var(--foreground)]">
+                                    {capitalizarNombreCompleto(cli.nombre) || 'CLIENTE GENERAL'}
+                                  </span>
+                                  {cli.identificacion && (
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[var(--muted)] text-[var(--muted-foreground)]">
+                                      {cli.identificacion}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-[var(--muted-foreground)] flex items-center gap-2 mt-0.5">
+                                  {cli.telefono && (
+                                    <span className="flex items-center gap-1">
+                                      <Phone size={11} /> {cli.telefono}
+                                    </span>
+                                  )}
+                                  <span>•</span>
+                                  <span>{cli.totalTransacciones} compra(s)</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Resumen numérico a la derecha */}
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <div className="text-xs font-extrabold text-[var(--foreground)]">
+                                  {cli.totalPares} pares <span className="text-emerald-600 font-bold">({cli.totalDocenasLabel})</span>
+                                </div>
+                                <div className="text-sm font-black text-emerald-600">
+                                  ${cli.totalMonto.toFixed(2)}
+                                </div>
+                              </div>
+                              <ChevronDown
+                                size={18}
+                                className={`text-[var(--muted-foreground)] transition-transform duration-200 ${expandido ? 'rotate-180' : ''}`}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Detalle Desplegable de Transacciones */}
+                          {expandido && (
+                            <div className="border-t border-[var(--border)] p-5 bg-[var(--background)]/50 space-y-4">
+                              {(cli.transacciones || []).map((tx: any, tIdx: number) => (
+                                <div
+                                  key={tx.orderId || tIdx}
+                                  className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-3"
+                                >
+                                  {/* Cabecera de la Transacción */}
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)] pb-2.5 text-xs">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-bold text-[var(--foreground)]">
+                                        Comprobante: {tx.comprobanteNumero}
+                                      </span>
+                                      <span className="text-[var(--muted-foreground)]">•</span>
+                                      <span className="text-[var(--muted-foreground)]">{tx.fechaFormateada}</span>
+                                      <span className="text-[var(--muted-foreground)]">•</span>
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                        tx.canal === 'POS'
+                                          ? 'bg-blue-500/10 text-blue-600'
+                                          : 'bg-amber-500/10 text-amber-600'
+                                      }`}>
+                                        {tx.canalLabel}
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded-md bg-[var(--muted)] text-[var(--muted-foreground)] text-[10px] font-semibold">
+                                        {tx.tipoPago}
+                                      </span>
+                                      {tx.vendedorNombre && (
+                                        <span className="text-[var(--muted-foreground)] text-[11px]">
+                                          Vend: {tx.vendedorNombre}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-right font-extrabold text-xs text-[var(--foreground)]">
+                                      Subtotal: <span className="text-emerald-600 font-bold">${tx.montoTotal.toFixed(2)}</span> ({tx.totalPares} p)
+                                    </div>
+                                  </div>
+
+                                  {/* Listado de Modelos con Curva de Tallas */}
+                                  <div className="space-y-2">
+                                    {(tx.items || []).map((it: any, iIdx: number) => (
+                                      <div
+                                        key={it.lineId || iIdx}
+                                        className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          {it.imageUrl ? (
+                                            <img
+                                              src={it.imageUrl}
+                                              alt={it.modelName}
+                                              className="w-11 h-11 rounded-lg object-cover border border-[var(--border)]"
+                                            />
+                                          ) : (
+                                            <div className="w-11 h-11 rounded-lg bg-[var(--muted)] flex items-center justify-center font-bold text-xs text-[var(--muted-foreground)]">
+                                              CAL
+                                            </div>
+                                          )}
+                                          <div>
+                                            <div className="font-extrabold uppercase text-[var(--foreground)]">
+                                              {it.modelName} {it.color ? `· ${it.color}` : ''}
+                                            </div>
+                                            <div className="text-[11px] font-bold text-emerald-600">
+                                              Serie: {formatearNombreSerie(it.serieNombre)}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Curva de Tallas */}
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">Curva:</span>
+                                          <span className="px-2.5 py-1 rounded-lg bg-[var(--card)] border border-[var(--border)] font-mono font-bold text-[11px] text-[var(--foreground)]">
+                                            {it.curvaTallas || `${it.totalPares} pares`}
+                                          </span>
+                                        </div>
+
+                                        {/* Cantidad y Subtotal */}
+                                        <div className="text-right">
+                                          <div className="font-bold text-[var(--foreground)]">
+                                            {it.totalPares} pares <span className="text-emerald-600 font-bold">({it.docenasLabel})</span>
+                                          </div>
+                                          <div className="text-xs text-[var(--muted-foreground)]">
+                                            ${it.precioUnitario.toFixed(2)} / par • <span className="font-extrabold text-emerald-600">${it.subtotal.toFixed(2)}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB: CONSOLIDADO DE CALZADO VENDIDO CON FOTOGRAFÍA             */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'ventas_modelos_foto' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Cabecera del Módulo */}
+              <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25">
+                      TOTALIZACIÓN GENERAL CON FOTOGRAFÍA
+                    </span>
+                    <span className="text-xs text-[var(--muted-foreground)] font-mono">
+                      {canalSeleccionado === 'POS' ? 'Canal: Solo POS Mostrador' : canalSeleccionado === 'PEDIDOS' ? 'Canal: Solo Pedidos / Mayoristas' : 'Canal: Todos los Canales'}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
+                    <Package size={18} className="text-blue-600" />
+                    <span>Consolidado de Calzado Vendido con Fotografía</span>
+                  </h3>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Todos los modelos vendidos agrupados en un solo consolidado con su fotografía real, serie, desglose exacto de tallas físicas y total de docenas.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={cargarReporteVentasDetalladas}
+                    disabled={loadingVentasDetalladas}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <RefreshCw size={13} className={loadingVentasDetalladas ? 'animate-spin' : ''} />
+                    <span>Actualizar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteConsolidadoModelosPdf('preview')}
+                    disabled={loadingVentasDetalladas || !ventasDetalladasData}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    {generandoConsolidadoModelosPdf ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteConsolidadoModelosPdf('download')}
+                    disabled={loadingVentasDetalladas || !ventasDetalladasData}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={13} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Tarjetas KPI Superiores */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
+                      Modelos Vendidos
+                    </span>
+                    <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
+                      <Package size={16} />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-[var(--foreground)] tracking-tight">
+                    {ventasDetalladasData?.resumenKpis?.totalModelosDistintos || 0}
+                  </div>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Modelos con demanda activa
+                  </p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
+                      Total Pares Vendidos
+                    </span>
+                    <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+                      <Boxes size={16} />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-[var(--foreground)] tracking-tight">
+                    {ventasDetalladasData?.resumenKpis?.totalPares || 0} <span className="text-sm font-normal text-[var(--muted-foreground)]">pares</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-600 font-bold">
+                    {ventasDetalladasData?.resumenKpis?.totalDocenasEquivalentes || '0 docenas'}
+                  </p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
+                      Clientes Compradores
+                    </span>
+                    <div className="p-2 bg-purple-500/10 text-purple-600 rounded-xl">
+                      <Users size={16} />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-[var(--foreground)] tracking-tight">
+                    {ventasDetalladasData?.resumenKpis?.totalClientesUnicos || 0}
+                  </div>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Total de clientes compradores
+                  </p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
+                      Recaudación Total
+                    </span>
+                    <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                      <DollarSign size={16} />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-emerald-600 tracking-tight">
+                    ${(ventasDetalladasData?.resumenKpis?.totalMontoVendido || 0).toFixed(2)}
+                  </div>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    {ventasDetalladasData?.resumenKpis?.totalTransacciones || 0} transacciones acumuladas
+                  </p>
+                </div>
+              </div>
+
+              {/* Barra de Filtros y Selector de Vista */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="relative flex-1">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                  <input
+                    type="text"
+                    placeholder="Buscar calzado por modelo, color o serie..."
+                    value={filtroVentasModeloBusqueda}
+                    onChange={(e) => setFiltroVentasModeloBusqueda(e.target.value)}
+                    className="w-full pl-9 pr-3.5 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+                  {filtroVentasModeloBusqueda && (
+                    <button
+                      type="button"
+                      onClick={() => setFiltroVentasModeloBusqueda('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex bg-[var(--background)] border border-[var(--border)] p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setVistaModelosConsolidados('tabla')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        vistaModelosConsolidados === 'tabla'
+                          ? 'bg-[#0F172A] text-white shadow-2xs'
+                          : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                      }`}
+                    >
+                      <List size={13} />
+                      <span>Tabla</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVistaModelosConsolidados('tarjetas')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        vistaModelosConsolidados === 'tarjetas'
+                          ? 'bg-[#0F172A] text-white shadow-2xs'
+                          : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                      }`}
+                    >
+                      <Grid size={13} />
+                      <span>Tarjetas con Curva</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contenido: Tabla o Tarjetas */}
+              {loadingVentasDetalladas ? (
+                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
+                  <Loader2 size={32} className="animate-spin text-blue-600" />
+                  <span className="text-xs font-bold">Cargando consolidado de calzado vendido con fotografía...</span>
+                </div>
+              ) : (
+                (() => {
+                  const modelosFiltrados = (ventasDetalladasData?.modelosConsolidados || []).filter((m: any) => {
+                    if (!filtroVentasModeloBusqueda.trim()) return true;
+                    const term = normalizarParaBusqueda(filtroVentasModeloBusqueda);
+                    return normalizarParaBusqueda(m.modelName).includes(term) ||
+                           (m.color && normalizarParaBusqueda(m.color).includes(term)) ||
+                           (m.serieNombre && normalizarParaBusqueda(m.serieNombre).includes(term));
+                  });
+
+                  if (modelosFiltrados.length === 0) {
+                    return (
+                      <div className="p-12 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2">
+                        <Package size={32} className="mx-auto text-[var(--muted-foreground)]/40" />
+                        <p className="font-bold text-sm text-[var(--foreground)]">No hay modelos de calzado vendidos</p>
+                        <p>No se registraron ventas para el periodo o filtros indicados.</p>
+                      </div>
+                    );
+                  }
+
+                  if (vistaModelosConsolidados === 'tarjetas') {
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {modelosFiltrados.map((mod: any, mIdx: number) => (
+                          <div
+                            key={mod.productId || mIdx}
+                            className="bg-[var(--card)] border border-[var(--border)] rounded-3xl p-5 space-y-3.5 shadow-xs hover:border-[#0F172A] transition-all flex flex-col justify-between"
+                          >
+                            {/* Encabezado con Miniatura y Serie */}
+                            <div className="flex items-start gap-3">
+                              {mod.imageUrl ? (
+                                <img
+                                  src={mod.imageUrl}
+                                  alt={mod.modelName}
+                                  className="w-14 h-14 rounded-2xl object-cover border border-[var(--border)] shrink-0 shadow-2xs"
+                                />
+                              ) : (
+                                <div className="w-14 h-14 rounded-2xl bg-[var(--muted)] flex items-center justify-center font-bold text-xs text-[var(--muted-foreground)] shrink-0">
+                                  CAL
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="font-black text-sm uppercase text-[var(--foreground)] truncate">
+                                  {mod.modelName}
+                                </div>
+                                <div className="text-xs text-[var(--muted-foreground)]">
+                                  {mod.color || 'Color estándar'}
+                                </div>
+                                <div className="text-[11px] font-bold text-emerald-600 mt-0.5">
+                                  Serie: {formatearNombreSerie(mod.serieNombre)}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Curva de Tallas Vendidas */}
+                            <div className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-2xl space-y-1.5">
+                              <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
+                                Curva de Tallas Entregadas:
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {(mod.tallasDesglose || []).map((t: any, tIdx: number) => (
+                                  <span
+                                    key={tIdx}
+                                    className="px-2 py-0.5 rounded-lg bg-[var(--card)] border border-[var(--border)] text-[11px] font-mono font-bold text-[var(--foreground)]"
+                                  >
+                                    T{t.talla}: <span className="text-emerald-600">{t.cantidad}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Resumen Comercial Inferior */}
+                            <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between text-xs">
+                              <div>
+                                <div className="font-extrabold text-[var(--foreground)]">
+                                  {mod.totalPares} pares
+                                </div>
+                                <div className="text-[11px] text-emerald-600 font-bold">
+                                  {mod.docenasLabel}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-[11px] text-[var(--muted-foreground)]">
+                                  ${mod.precioPromedioPar.toFixed(2)} / par
+                                </div>
+                                <div className="font-black text-sm text-emerald-600">
+                                  ${mod.totalMonto.toFixed(2)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+
+                  // Vista de Tabla Detallada
+                  return (
+                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-[var(--muted)]/50 border-b border-[var(--border)] text-[var(--muted-foreground)] font-bold text-[11px] uppercase tracking-wider">
+                              <th className="py-3 px-3.5 text-center w-14">Foto</th>
+                              <th className="py-3 px-3.5">Modelo & Color</th>
+                              <th className="py-3 px-3.5">Serie Comercial</th>
+                              <th className="py-3 px-3.5">Curva de Tallas Vendidas</th>
+                              <th className="py-3 px-3.5 text-right">Volumen Total</th>
+                              <th className="py-3 px-3.5 text-right">P. Promedio</th>
+                              <th className="py-3 px-3.5 text-right">Recaudación</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[var(--border)]">
+                            {modelosFiltrados.map((mod: any, mIdx: number) => (
+                              <tr key={mod.productId || mIdx} className="hover:bg-[var(--muted)]/20 transition-colors">
+                                <td className="py-2.5 px-3.5 text-center">
+                                  {mod.imageUrl ? (
+                                    <img
+                                      src={mod.imageUrl}
+                                      alt={mod.modelName}
+                                      className="w-11 h-11 rounded-xl object-cover border border-[var(--border)] mx-auto shadow-2xs"
+                                    />
+                                  ) : (
+                                    <div className="w-11 h-11 rounded-xl bg-[var(--muted)] flex items-center justify-center font-bold text-[10px] text-[var(--muted-foreground)] mx-auto">
+                                      CAL
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3.5">
+                                  <div className="font-extrabold uppercase text-[var(--foreground)]">
+                                    {mod.modelName}
+                                  </div>
+                                  <div className="text-[11px] text-[var(--muted-foreground)]">
+                                    {mod.color || 'Color estándar'}
+                                  </div>
+                                  <div className="text-[10px] text-[var(--muted-foreground)]/70">
+                                    {mod.clientesCount || 1} cliente(s) • {mod.transaccionesCount || 1} pedido(s)
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-3.5">
+                                  <span className="font-bold text-emerald-600">
+                                    {formatearNombreSerie(mod.serieNombre)}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3.5">
+                                  <div className="font-mono text-[11px] font-bold text-[var(--foreground)] bg-[var(--background)] px-2.5 py-1 rounded-lg border border-[var(--border)] inline-block max-w-md">
+                                    {mod.curvaTallas || `${mod.totalPares} pares`}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-3.5 text-right">
+                                  <div className="font-extrabold text-[var(--foreground)]">
+                                    {mod.totalPares} pares
+                                  </div>
+                                  <div className="text-[11px] text-emerald-600 font-bold">
+                                    {mod.docenasLabel}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-3.5 text-right text-[var(--muted-foreground)] font-semibold">
+                                  ${mod.precioPromedioPar.toFixed(2)}
+                                </td>
+                                <td className="py-2.5 px-3.5 text-right font-black text-sm text-emerald-600">
+                                  ${mod.totalMonto.toFixed(2)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-[var(--muted)]/60 font-bold border-t-2 border-[var(--border)] text-xs">
+                              <td colSpan={4} className="py-3 px-3.5 text-right font-black uppercase text-[var(--foreground)]">
+                                Total Consolidado ({modelosFiltrados.length} Modelos):
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-black text-[var(--foreground)]">
+                                {ventasDetalladasData?.resumenKpis?.totalPares || 0} pares
+                                <div className="text-[10px] text-emerald-600 font-bold font-normal">
+                                  {ventasDetalladasData?.resumenKpis?.totalDocenasEquivalentes || ''}
+                                </div>
+                              </td>
+                              <td className="py-3 px-3.5 text-right text-[var(--muted-foreground)]">
+                                -
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-black text-emerald-600 text-sm">
+                                ${(ventasDetalladasData?.resumenKpis?.totalMontoVendido || 0).toFixed(2)}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB POS: REPORTE DEL PUNTO DE VENTA (MOSTRADOR / CAJA)          */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'pos' && (
+            <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF para POS */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl shadow-sm">
+                    <Store size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Reporte de Punto de Venta & Caja Mostrador
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Registro y control de ventas directas por par, recaudación en efectivo, tarjetas y transferencias por sucursal
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={cargarReportePos}
+                    disabled={loadingPos}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <RefreshCw size={14} className={loadingPos ? 'animate-spin' : ''} />
+                    <span>Recargar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReportePosPdf('preview')}
+                    disabled={loadingPos || !posData}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReportePosPdf('download')}
+                    disabled={loadingPos || !posData}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {loadingPos ? (
+                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
+                  <Loader2 size={36} className="animate-spin text-blue-600" />
+                  <span className="text-xs font-bold">Consolidando transacciones del Punto de Venta...</span>
+                </div>
+              ) : posData ? (
+                <div className="space-y-6">
+                  {/* KPIs del Punto de Venta */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Total Recaudado POS</span>
+                        <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                          <DollarSign size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                        ${posData.metricas?.totalRecaudado?.toFixed(2) || '0.00'}
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Cobros en mostrador del período
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Ventas Realizadas</span>
+                        <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
+                          <Receipt size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-[var(--foreground)]">
+                        {posData.metricas?.cantidadVentas || 0}
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Tickets emitidos en caja
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Pares Despachados</span>
+                        <div className="p-2 bg-indigo-500/10 text-indigo-600 rounded-xl">
+                          <ShoppingBag size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                        {posData.metricas?.cantidadPares || 0} pares
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Calzado entregado en tienda
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Ticket Promedio POS</span>
+                        <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+                          <Tag size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-[var(--foreground)] font-mono">
+                        ${posData.metricas?.ticketPromedio?.toFixed(2) || '0.00'}
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Gasto promedio por cliente
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gráficas Estadísticas del Punto de Venta */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Donut de Métodos de Recaudación en Caja */}
+                    <GraficoDonutCircular
+                      items={[
+                        {
+                          label: 'Efectivo en Caja',
+                          valor: posData.metricas?.desgloseMetodosPago?.efectivo?.total || 0,
+                          color: '#10B981',
+                          subtexto: `${posData.metricas?.desgloseMetodosPago?.efectivo?.cantidad || 0} cobros realizados`,
+                        },
+                        {
+                          label: 'Tarjeta (Datafast / Voucher)',
+                          valor: posData.metricas?.desgloseMetodosPago?.tarjeta?.total || 0,
+                          color: '#0EA5E9',
+                          subtexto: `${posData.metricas?.desgloseMetodosPago?.tarjeta?.cantidad || 0} transacciones`,
+                        },
+                        {
+                          label: 'Transferencia Bancaria',
+                          valor: posData.metricas?.desgloseMetodosPago?.transferencia?.total || 0,
+                          color: '#8B5CF6',
+                          subtexto: `${posData.metricas?.desgloseMetodosPago?.transferencia?.cantidad || 0} comprobantes`,
+                        },
+                      ]}
+                      titulo="Distribución de Cobros en Caja"
+                      subtitulo="Participación de ingresos por método de recaudación directa"
+                      valorCentro={`$${(posData.metricas?.totalRecaudado || 0).toFixed(0)}`}
+                      etiquetaCentro="Total Caja"
+                    />
+
+                    {/* Barras de Modelos Más Vendidos en Mostrador */}
+                    <GraficoBarrasModerno
+                      items={
+                        (posData.metricas?.topModelos || []).slice(0, 5).map((m: any, idx: number) => ({
+                          label: `${m.nombre} ${m.color ? `(${m.color})` : ''}`,
+                          valor: m.pares,
+                          valorFormateado: `${m.pares} pares`,
+                          subtexto: `$${(m.total || 0).toFixed(2)} recaudados`,
+                          color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'][idx % 5],
+                        }))
+                      }
+                      titulo="Top Calzado Vendido en Mostrador"
+                      subtitulo="Variantes con mayor rotación directa en tienda"
+                      unidad="pares"
+                      emptyMessage="No se registran modelos vendidos en este rango de fechas."
+                    />
+                  </div>
+
+                  {/* Tabla y Buscador de Ventas Realizadas en POS */}
+                  <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+                      <div>
+                        <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
+                          Historial de Ventas y Comprobantes POS
+                        </h4>
+                        <p className="text-[11px] text-[var(--muted-foreground)]">
+                          Registro detallado de transacciones, clientes, productos despachados y comprobantes
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Buscador */}
+                        <div className="relative w-64">
+                          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                          <input
+                            type="text"
+                            placeholder="Buscar nota, cliente o modelo..."
+                            value={filtroPosBusqueda}
+                            onChange={(e) => setFiltroPosBusqueda(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                          />
+                        </div>
+
+                        {/* Filtro Método */}
+                        <select
+                          value={filtroPosMetodo}
+                          onChange={(e) => setFiltroPosMetodo(e.target.value)}
+                          className="px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        >
+                          <option value="TODOS">Todos los Métodos</option>
+                          <option value="EFECTIVO">Efectivo</option>
+                          <option value="TARJETA">Tarjeta</option>
+                          <option value="TRANSFERENCIA">Transferencia</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Tabla de ventas POS */}
+                    {posData.ventas?.length === 0 ? (
+                      <div className="p-12 text-center text-xs text-[var(--muted-foreground)] italic">
+                        No se encontraron ventas de mostrador con los filtros aplicados.
+                      </div>
+                    ) : (
+                      <div className="border border-[var(--border)] rounded-2xl overflow-hidden overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-[#0F172A] text-white uppercase text-[10px] tracking-wider">
+                            <tr>
+                              <th className="py-3 px-4 font-bold">Nota / Comprobante</th>
+                              <th className="py-3 px-4 font-bold">Fecha / Hora</th>
+                              <th className="py-3 px-4 font-bold">Sucursal</th>
+                              <th className="py-3 px-4 font-bold">Cliente</th>
+                              <th className="py-3 px-4 font-bold">Vendedor</th>
+                              <th className="py-3 px-4 font-bold">Artículos Vendidos</th>
+                              <th className="py-3 px-4 font-bold">Método de Pago</th>
+                              <th className="py-3 px-4 font-bold text-right">Total</th>
+                              <th className="py-3 px-4 font-bold text-center">Acción</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[var(--border)] bg-[var(--card)] text-[var(--foreground)]">
+                            {posData.ventas?.map((v: any) => (
+                              <tr key={v.id} className="hover:bg-[var(--muted)]/30 transition-colors">
+                                <td className="py-3 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                  {v.numeroNota}
+                                </td>
+                                <td className="py-3 px-4 text-[11px] text-[var(--muted-foreground)]">
+                                  {new Date(v.fecha).toLocaleString('es-EC', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </td>
+                                <td className="py-3 px-4 font-semibold text-[11px]">
+                                  {v.sucursalNombre || 'Sucursal'}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="font-bold">{v.cliente?.nombre || 'Consumidor Final'}</div>
+                                  <div className="text-[10px] text-[var(--muted-foreground)]">
+                                    {v.cliente?.cedula && v.cliente.cedula !== '9999999999' ? `CI: ${v.cliente.cedula}` : 'Consumidor Final'}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-[11px]">
+                                  {v.vendedor?.nombre || 'Vendedor'}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="space-y-1 max-w-xs">
+                                    {v.lineas?.map((l: any, idx: number) => (
+                                      <div key={idx} className="flex items-center gap-1.5 text-[11px]">
+                                        <span className="font-bold text-emerald-600">{l.cantidad}x</span>
+                                        <span className="font-medium truncate">{l.modelName || l.nombre}</span>
+                                        {l.talla && (
+                                          <span className="px-1.5 py-0.2 bg-[var(--muted)] text-[10px] rounded font-mono font-bold">
+                                            T{l.talla}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                                      v.metodoPago === 'EFECTIVO'
+                                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                        : v.metodoPago === 'TARJETA'
+                                        ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                                        : 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
+                                    }`}
+                                  >
+                                    {v.metodoPago}
+                                  </span>
+                                  {v.detallePago && (
+                                    <div className="text-[9px] text-[var(--muted-foreground)] mt-0.5 truncate max-w-[140px]" title={v.detallePago}>
+                                      {v.detallePago}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-right font-mono font-black text-sm text-[var(--foreground)]">
+                                  ${Number(v.total).toFixed(2)}
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setVentaPosDetalle(v)}
+                                    className="p-1.5 hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg transition-colors cursor-pointer"
+                                    title="Ver comprobante de venta"
+                                  >
+                                    <Eye size={14} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB SUCURSALES: RENDIMIENTO DE SUCURSALES & VENTAS POR MODELO   */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'sucursales' && (
+            <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF para Rendimiento de Sucursales */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl shadow-sm">
+                    <Building2 size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Rendimiento de Sucursales & Ventas por Modelo
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Desglose detallado del total de ventas de cada modelo de calzado en la sucursal seleccionada por el Admin General
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={cargarReporteSucursales}
+                    disabled={loadingSucursales}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <RefreshCw size={14} className={loadingSucursales ? 'animate-spin' : ''} />
+                    <span>Actualizar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteSucursalPdf('preview')}
+                    disabled={loadingSucursales || !sucursalesReporteData}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteSucursalPdf('download')}
+                    disabled={loadingSucursales || !sucursalesReporteData}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {loadingSucursales ? (
+                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
+                  <Loader2 size={36} className="animate-spin text-blue-600" />
+                  <span className="text-xs font-bold">Analizando rendimiento y ventas por modelo de cada sucursal...</span>
+                </div>
+              ) : sucursalesReporteData ? (
+                <div className="space-y-6">
+                  {/* KPIs de la Sucursal Seleccionada */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Ventas Sucursal</span>
+                        <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                          <DollarSign size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                        ${sucursalesReporteData.totalesSucursalSeleccionada?.ingresos?.toFixed(2) || '0.00'}
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        {sucursalesReporteData.sucursalSeleccionada?.nombre}
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Pares Comercializados</span>
+                        <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
+                          <ShoppingBag size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-[var(--foreground)]">
+                        {sucursalesReporteData.totalesSucursalSeleccionada?.pares || 0} pares
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Volumen físico despachado
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Pedidos / Transacciones</span>
+                        <div className="p-2 bg-indigo-500/10 text-indigo-600 rounded-xl">
+                          <Receipt size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                        {sucursalesReporteData.totalesSucursalSeleccionada?.pedidos || 0}
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Operaciones comerciales cerradas
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Modelos en Rotación</span>
+                        <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+                          <Award size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-[var(--foreground)]">
+                        {sucursalesReporteData.totalesSucursalSeleccionada?.totalModelosVendidos || 0} modelos
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Catálogo activo con ventas
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gráficas Estadísticas de Sucursales */}
+                  {sucursalesReporteData.sucursales && sucursalesReporteData.sucursales.length > 0 && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* Donut de Participación de Sucursales */}
+                      <GraficoDonutCircular
+                        items={sucursalesReporteData.sucursales.map((s: any, idx: number) => {
+                          const paleta = ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'];
+                          return {
+                            label: s.nombre,
+                            valor: s.totalVentas || 0,
+                            color: paleta[idx % paleta.length],
+                            subtexto: `${s.totalPares} pares (${s.porcentajeEmpresa}%)`,
+                          };
+                        })}
+                        titulo="Aportación a Ventas de la Empresa"
+                        subtitulo="Participación porcentual de ingresos por punto de venta"
+                        valorCentro={`$${(sucursalesReporteData.totalesEmpresa?.ingresos || 0).toFixed(0)}`}
+                        etiquetaCentro="Total Red"
+                      />
+
+                      {/* Barras de Despacho de Pares por Sucursal */}
+                      <GraficoBarrasModerno
+                        items={sucursalesReporteData.sucursales.map((s: any, idx: number) => ({
+                          label: s.nombre,
+                          valor: s.totalPares || 0,
+                          valorFormateado: `${s.totalPares} pares`,
+                          subtexto: `Ticket prom: $${s.ticketPromedio?.toFixed(2) || '0.00'}`,
+                          color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'][idx % 5],
+                        }))}
+                        titulo="Volumen Físico de Pares por Local"
+                        subtitulo="Calzado comercializado en cada establecimiento"
+                        unidad="pares"
+                      />
+                    </div>
+                  )}
+
+                  {/* Comparativa Comercial de Todas las Sucursales de la Empresa */}
+                  {sucursalesReporteData.sucursales?.length > 1 && (
+                    <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
+                      <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+                        <div>
+                          <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
+                            Comparativa Comercial entre Sucursales de la Empresa
+                          </h4>
+                          <p className="text-[11px] text-[var(--muted-foreground)]">
+                            Participación de cada punto de venta en la facturación consolidada
+                          </p>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 dark:bg-slate-800 dark:text-slate-200 px-3 py-1 rounded-xl">
+                          Total Empresa: ${sucursalesReporteData.totalesEmpresa?.ingresos?.toFixed(2) || '0.00'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {sucursalesReporteData.sucursales?.map((suc: any) => {
+                          const esSeleccionada = sucursalSeleccionada === suc.sucursalId;
+                          return (
+                            <div
+                              key={suc.sucursalId}
+                              onClick={() => setSucursalSeleccionada(suc.sucursalId)}
+                              className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-2 ${
+                                esSeleccionada
+                                  ? 'bg-blue-500/10 border-blue-500 shadow-xs'
+                                  : 'bg-[var(--background)] border-[var(--border)] hover:border-blue-400'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-black text-xs text-[var(--foreground)] flex items-center gap-1.5">
+                                  <Building2 size={13} className="text-blue-600" />
+                                  {suc.nombre}
+                                </span>
+                                <span className="px-2 py-0.5 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded-md text-[10px] font-black">
+                                  {suc.porcentajeEmpresa}% del total
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-baseline pt-1">
+                                <span className="text-lg font-black font-mono text-emerald-600 dark:text-emerald-400">
+                                  ${suc.totalVentas?.toFixed(2)}
+                                </span>
+                                <span className="text-xs text-[var(--muted-foreground)] font-bold">
+                                  {suc.totalPares} pares · {suc.totalPedidos} pedidos
+                                </span>
+                              </div>
+                              <div className="w-full bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
+                                <div style={{ width: `${suc.porcentajeEmpresa}%` }} className="bg-blue-600 h-full rounded-full" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SECCIÓN PRINCIPAL: Ventas de Cada Modelo en la Sucursal */}
+                  <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-5 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+                      <div>
+                        <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center gap-1.5">
+                          <Award size={15} className="text-amber-500" />
+                          <span>Total de Ventas por Modelo en {sucursalesReporteData.sucursalSeleccionada?.nombre}</span>
+                        </h4>
+                        <p className="text-[11px] text-[var(--muted-foreground)]">
+                          Desglose de cada modelo de calzado comercializado en la sucursal con volumen de pares, ingresos y porcentaje
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Buscador de modelos */}
+                        <div className="relative w-56">
+                          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                          <input
+                            type="text"
+                            placeholder="Buscar modelo o color..."
+                            value={filtroSucursalModeloTexto}
+                            onChange={(e) => setFiltroSucursalModeloTexto(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                          />
+                        </div>
+
+                        {/* Orden */}
+                        <select
+                          value={filtroSucursalOrden}
+                          onChange={(e: any) => setFiltroSucursalOrden(e.target.value)}
+                          className="px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        >
+                          <option value="VENTAS_DESC">Mayor Facturación ($)</option>
+                          <option value="PARES_DESC">Más Pares Vendidos</option>
+                          <option value="PRECIO_DESC">Mayor Precio Promedio</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Top 5 Modelos Destacados en Cards */}
+                    {sucursalesReporteData.top5Modelos?.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase">
+                           Top 5 Modelos Estrella de la Sucursal
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                          {sucursalesReporteData.top5Modelos.map((m: any, idx: number) => {
+                            const medalColors = [
+                              'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
+                              'bg-slate-300/30 text-slate-700 dark:text-slate-200 border-slate-400/30',
+                              'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30',
+                              'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
+                              'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
+                            ];
+                            return (
+                              <div
+                                key={`${m.modelId}_${m.color}`}
+                                className="p-3.5 bg-[var(--background)] border border-[var(--border)] rounded-2xl space-y-2 relative overflow-hidden"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black border ${medalColors[idx] || medalColors[4]}`}>
+                                    #{idx + 1}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                    {m.porcentajeSucursal}%
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 pt-1">
+                                  {m.imageUrl ? (
+                                    <img
+                                      src={m.imageUrl}
+                                      alt={m.modelName}
+                                      className="w-10 h-10 rounded-xl object-cover border border-[var(--border)] shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[var(--muted-foreground)] shrink-0">
+                                      <ShoppingBag size={18} />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="font-extrabold text-xs text-[var(--foreground)] truncate uppercase">
+                                      {m.modelName}
+                                    </div>
+                                    <div className="text-[10px] text-[var(--muted-foreground)] truncate">
+                                      {m.color} · {formatearNombreSerie(m.serieNombre)}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex justify-between items-baseline pt-1 border-t border-[var(--border)] text-xs">
+                                  <span className="font-bold text-blue-600">{m.paresVendidos} pares</span>
+                                  <span className="font-mono font-black text-emerald-600">${m.montoTotal.toFixed(2)}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tabla de Todos los Modelos Vendidos */}
+                    {(() => {
+                      let lista = sucursalesReporteData.modelosVendidos || [];
+                      if (filtroSucursalModeloTexto.trim()) {
+                        const q = filtroSucursalModeloTexto.toLowerCase().trim();
+                        lista = lista.filter(
+                          (m: any) =>
+                            m.modelName?.toLowerCase().includes(q) ||
+                            m.color?.toLowerCase().includes(q) ||
+                            m.serieNombre?.toLowerCase().includes(q) ||
+                            m.baseCode?.toLowerCase().includes(q)
+                        );
+                      }
+                      if (filtroSucursalOrden === 'PARES_DESC') {
+                        lista = [...lista].sort((a, b) => b.paresVendidos - a.paresVendidos);
+                      } else if (filtroSucursalOrden === 'PRECIO_DESC') {
+                        lista = [...lista].sort((a, b) => b.precioPromedio - a.precioPromedio);
+                      } else {
+                        lista = [...lista].sort((a, b) => b.montoTotal - a.montoTotal);
+                      }
+
+                      if (lista.length === 0) {
+                        return (
+                          <div className="p-12 text-center text-xs text-[var(--muted-foreground)] italic">
+                            No se encontraron modelos con los criterios de búsqueda.
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="border border-[var(--border)] rounded-2xl overflow-hidden overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-[#0F172A] text-white uppercase text-[10px] tracking-wider">
+                              <tr>
+                                <th className="py-3 px-4 font-bold text-center w-12">#</th>
+                                <th className="py-3 px-4 font-bold">Modelo de Calzado</th>
+                                <th className="py-3 px-4 font-bold">Variante / Serie</th>
+                                <th className="py-3 px-4 font-bold text-center">Pares Vendidos</th>
+                                <th className="py-3 px-4 font-bold text-right">Facturación ($)</th>
+                                <th className="py-3 px-4 font-bold text-right">Precio Prom.</th>
+                                <th className="py-3 px-4 font-bold text-center">Pedidos</th>
+                                <th className="py-3 px-4 font-bold">Contribución (%)</th>
+                                <th className="py-3 px-4 font-bold text-center">Stock Actual</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[var(--border)] bg-[var(--card)] text-[var(--foreground)]">
+                              {lista.map((m: any, idx: number) => (
+                                <tr key={`${m.modelId}_${m.color}`} className="hover:bg-[var(--muted)]/30 transition-colors">
+                                  <td className="py-3 px-4 text-center font-bold text-[var(--muted-foreground)]">
+                                    {m.ranking || idx + 1}
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2.5">
+                                      {m.imageUrl ? (
+                                        <img
+                                          src={m.imageUrl}
+                                          alt={m.modelName}
+                                          className="w-10 h-10 rounded-xl object-cover border border-[var(--border)] shrink-0"
+                                        />
+                                      ) : (
+                                        <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[var(--muted-foreground)] shrink-0">
+                                          <ShoppingBag size={18} />
+                                        </div>
+                                      )}
+                                      <div>
+                                        <div className="font-extrabold uppercase text-[var(--foreground)]">
+                                          {m.modelName}
+                                        </div>
+                                        {m.baseCode && (
+                                          <div className="text-[10px] text-[var(--muted-foreground)] font-mono">
+                                            Cód: {m.baseCode}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <div className="font-semibold text-[11px]">{m.color}</div>
+                                    <div className="text-[10px] text-[var(--muted-foreground)]">
+                                      Serie: {formatearNombreSerie(m.serieNombre)}
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    <span className="px-2.5 py-1 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded-lg font-black text-xs">
+                                      {m.paresVendidos} pares
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
+                                    ${m.montoTotal.toFixed(2)}
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-mono text-[11px] text-[var(--muted-foreground)]">
+                                    ${m.precioPromedio.toFixed(2)} / par
+                                  </td>
+                                  <td className="py-3 px-4 text-center font-bold text-[11px]">
+                                    {m.pedidosCount}
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <div className="space-y-1 w-32">
+                                      <div className="flex justify-between text-[10px] font-bold">
+                                        <span>{m.porcentajeSucursal}%</span>
+                                      </div>
+                                      <div className="w-full bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
+                                        <div
+                                          style={{ width: `${Math.min(100, m.porcentajeSucursal)}%` }}
+                                          className="bg-emerald-600 h-full rounded-full"
+                                        />
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                        m.stockActual > 10
+                                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                          : m.stockActual > 0
+                                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                          : 'bg-red-500/15 text-red-700 dark:text-red-300'
+                                      }`}
+                                    >
+                                      {m.stockActual} pares
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 2: ROTACIÓN DE CALZADO & MODELOS                           */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 2: ROTACIÓN DE CALZADO & MODELOS                           */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'modelos' && (() => {
+            const catalogoOriginal = (reporteData?.catalogoProductosCompleto as any[]) || [];
+            const rotResumen = reporteData?.rotacionResumen || {
+              totalProductos: catalogoOriginal.length,
+              totalConVentas: catalogoOriginal.filter((p: any) => p.paresVendidos > 0).length,
+              totalSinVentas: catalogoOriginal.filter((p: any) => p.paresVendidos === 0).length,
+              totalConStock: catalogoOriginal.filter((p: any) => p.stockTotal > 0).length,
+              totalSinStock: catalogoOriginal.filter((p: any) => p.stockTotal <= 0).length,
+              totalRotacionAlta: catalogoOriginal.filter((p: any) => p.rotacion === 'ALTA').length,
+              totalRotacionMedia: catalogoOriginal.filter((p: any) => p.rotacion === 'MEDIA').length,
+              totalRotacionBaja: catalogoOriginal.filter((p: any) => p.rotacion === 'BAJA').length,
+              totalSinMovimiento: catalogoOriginal.filter((p: any) => p.rotacion === 'SIN_MOVIMIENTO').length,
+              capitalEnRiesgo: catalogoOriginal
+                .filter((p: any) => p.rotacion === 'SIN_MOVIMIENTO' && p.stockTotal > 0)
+                .reduce((acc: number, p: any) => acc + (p.capitalRetenido || 0), 0),
+            };
+
+            const seriesDisponibles = (reporteData?.seriesDisponibles as { id: string; nombre: string }[]) || [];
+
+            // Filtrado dinámico
+            const catalogoFiltrado = catalogoOriginal.filter((p: any) => {
+              if (filtroRotacionTexto.trim()) {
+                const query = normalizarParaBusqueda(filtroRotacionTexto);
+                const mName = normalizarParaBusqueda(p.modelName || '');
+                const mColor = normalizarParaBusqueda(p.color || '');
+                const mSerie = normalizarParaBusqueda(p.serieNombre || '');
+                if (!mName.includes(query) && !mColor.includes(query) && !mSerie.includes(query)) {
+                  return false;
+                }
+              }
+
+              if (filtroRotacionSerie !== 'TODAS') {
+                if (p.serieId !== filtroRotacionSerie) return false;
+              }
+
+              if (filtroCategoriaModelo !== 'TODAS') {
+                const cat = p.categoria || p.material || '';
+                if (cat !== filtroCategoriaModelo) return false;
+              }
+
+              if (filtroRotacionEstado !== 'TODOS') {
+                if (filtroRotacionEstado === 'CON_STOCK') {
+                  if (p.stockTotal <= 0) return false;
+                } else if (filtroRotacionEstado === 'SIN_STOCK') {
+                  if (p.stockTotal > 0) return false;
+                } else {
+                  if (p.rotacion !== filtroRotacionEstado) return false;
+                }
+              }
+
+              return true;
+            }).sort((a: any, b: any) => {
+              if (filtroRotacionOrden === 'VENTAS_DESC') return b.paresVendidos - a.paresVendidos;
+              if (filtroRotacionOrden === 'VENTAS_ASC') return a.paresVendidos - b.paresVendidos;
+              if (filtroRotacionOrden === 'STOCK_DESC') return b.stockTotal - a.stockTotal;
+              if (filtroRotacionOrden === 'STOCK_ASC') return a.stockTotal - b.stockTotal;
+              if (filtroRotacionOrden === 'INGRESOS_DESC') return b.ingresos - a.ingresos;
+              if (filtroRotacionOrden === 'MARGEN_DESC') return b.margen - a.margen;
+              return 0;
+            });
+
+            const hayFiltrosActivos =
+              filtroRotacionTexto.trim() !== '' ||
+              filtroRotacionSerie !== 'TODAS' ||
+              filtroCategoriaModelo !== 'TODAS' ||
+              filtroRotacionEstado !== 'TODOS' ||
+              filtroRotacionOrden !== 'VENTAS_DESC';
+
+            return (
+              <div className="space-y-6">
+                {/* 1. Encabezado Ejecutivo y Botones de Descarga / Vista */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
+                      <ShoppingBag size={24} />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base text-[var(--foreground)]">
+                        Reporte Profesional de Rotación de Calzado & Modelos
+                      </h3>
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        Auditoría completa de catálogo: artículos estrella, rotación regular y calzado inmóvil con capital estancado
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Switch de modo vista */}
+                    <div className="flex items-center bg-[var(--muted)]/50 p-1 rounded-2xl border border-[var(--border)]">
+                      <button
+                        type="button"
+                        onClick={() => setFiltroRotacionVista('tabla')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                          filtroRotacionVista === 'tabla'
+                            ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs'
+                            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                        }`}
+                        title="Vista en tabla analítica"
+                      >
+                        <List size={14} />
+                        <span>Tabla</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFiltroRotacionVista('tarjetas')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                          filtroRotacionVista === 'tarjetas'
+                            ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs'
+                            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                        }`}
+                        title="Vista en tarjetas con curva de tallas"
+                      >
+                        <Grid size={14} />
+                        <span>Tarjetas</span>
+                      </button>
+                    </div>
+
+                    {/* Botón Preview PDF */}
+                    <button
+                      type="button"
+                      onClick={() => handleReporteModelosPdf('preview')}
+                      disabled={loading || !reporteData}
+                      className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    >
+                      <Eye size={14} />
+                      <span>Previsualizar PDF</span>
+                    </button>
+
+                    {/* Botón Descargar PDF */}
+                    <button
+                      type="button"
+                      onClick={() => handleReporteModelosPdf('download')}
+                      disabled={loading || !reporteData}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    >
+                      <Download size={14} />
+                      <span>Descargar PDF</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 1.1 FASE 8: Resumen Financiero y Margen FIFO Real */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                    <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
+                      Pares Vendidos
+                    </span>
+                    <div className="text-xl font-black text-blue-600">
+                      {modelosMargenData?.metricas?.totalPares ?? rotResumen.totalConVentas} pares
+                    </div>
+                    <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
+                      En {modelosMargenData?.metricas?.totalModelosVendidos ?? rotResumen.totalConVentas} variantes
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                    <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
+                      Facturación Total
+                    </span>
+                    <div className="text-xl font-black text-[var(--foreground)]">
+                      ${(modelosMargenData?.metricas?.totalIngresos ?? 0).toFixed(2)}
+                    </div>
+                    <span className="text-[10px] text-emerald-600 font-bold mt-1 block">
+                      Ingreso bruto cobrado
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                    <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
+                      Costo Real FIFO
+                    </span>
+                    <div className="text-xl font-black text-amber-600">
+                      ${(modelosMargenData?.metricas?.totalCostoFifo ?? 0).toFixed(2)}
+                    </div>
+                    <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
+                      Costo por lote consumido
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-[var(--card)] border border-emerald-500/30 rounded-2xl shadow-xs bg-emerald-500/5">
+                    <span className="text-[10px] font-black uppercase text-emerald-600 tracking-wider block mb-1">
+                      Ganancia Neta Real
+                    </span>
+                    <div className="text-xl font-black text-emerald-600">
+                      ${(modelosMargenData?.metricas?.gananciaTotal ?? 0).toFixed(2)}
+                    </div>
+                    <span className="text-[10px] text-emerald-700/80 font-bold mt-1 block">
+                      Utilidad neta generada
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                    <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
+                      Margen Promedio
+                    </span>
+                    <div className="text-xl font-black text-indigo-600">
+                      {modelosMargenData?.metricas?.margenPromedio ?? 0}%
+                    </div>
+                    <span className="text-[10px] text-indigo-600/80 font-bold mt-1 block">
+                      Rentabilidad sobre venta
+                    </span>
+                  </div>
+                </div>
+
+                {/* 1.2 FASE 8: Gráficas Comparativas (Barras Modernas + Donut de Participación %) */}
+                {(() => {
+                  const modelosGrafica = (modelosMargenData?.topModelosGrafica && modelosMargenData.topModelosGrafica.length > 0)
+                    ? modelosMargenData.topModelosGrafica
+                    : (reporteData?.topModelos || []).map((m: any, idx: number) => ({
+                        nombre: `${m.modelName || 'Calzado'} ${m.color ? `(${m.color})` : ''}`,
+                        paresVendidos: m.pares || 0,
+                        margenPorcentual: m.margen || 25,
+                        gananciaNeta: Math.round((m.ingresos || 0) * 0.25),
+                        porcentajeParticipacion: m.participacion || Math.max(3, 20 - idx * 3),
+                      }));
+
+                  if (modelosGrafica.length === 0) return null;
+
+                  return (
+                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+                      {/* Gráfica de Barras Combinada: Volumen vs Margen % */}
+                      <div className="xl:col-span-7">
+                        <GraficoBarrasModerno
+                          items={modelosGrafica.map((m: any, idx: number) => ({
+                            label: m.nombre,
+                            valor: m.paresVendidos,
+                            valorFormateado: `${m.paresVendidos} pares`,
+                            subtexto: `Margen: ${m.margenPorcentual}% • Utilidad: +$${Math.round(m.gananciaNeta || 0)}`,
+                            color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899', '#8B5CF6', '#14B8A6', '#F97316'][idx % 8],
+                          }))}
+                          titulo="Modelos con Mayor Demanda y Margen Real"
+                          subtitulo="Comparativa de pares despachados y porcentaje de utilidad FIFO"
+                          unidad="pares"
+                        />
+                      </div>
+
+                      {/* Gráfica Circular / Participación Porcentual SVG */}
+                      <div className="xl:col-span-5">
+                        <GraficoDonutCircular
+                          items={modelosGrafica.slice(0, 5).map((m: any, idx: number) => {
+                            const paleta = ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'];
+                            return {
+                              label: m.nombre,
+                              valor: m.paresVendidos,
+                              color: paleta[idx % paleta.length],
+                            };
+                          })}
+                          titulo="Participación por Modelo"
+                          subtitulo="Distribución porcentual del volumen de calzado comercializado"
+                          valorCentro={`${modelosMargenData?.metricas?.totalPares || reporteData?.totalParesVendidos || rotResumen.totalConVentas || 0}`}
+                          etiquetaCentro="Pares Totales"
+                          size={160}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 2. Cuadrícula de Métricas y KPIs de Rotación */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Tarjeta 1: Total Artículos Analizados */}
+                  <div
+                    onClick={() => setFiltroRotacionEstado('TODOS')}
+                    className={`p-4 bg-[var(--card)] border rounded-2xl transition-all cursor-pointer shadow-xs hover:border-blue-500/50 ${
+                      filtroRotacionEstado === 'TODOS' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-[var(--border)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider">Catálogo Total</span>
+                      <Package size={16} className="text-blue-500" />
+                    </div>
+                    <div className="text-2xl font-black text-[var(--foreground)]">
+                      {rotResumen.totalProductos}
+                      <span className="text-xs font-medium text-[var(--muted-foreground)] ml-1.5">modelos</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 text-[11px] text-[var(--muted-foreground)]">
+                      <span className="text-emerald-600 font-bold">{rotResumen.totalConStock} con stock</span>
+                      <span>•</span>
+                      <span className="text-slate-400">{rotResumen.totalSinStock} agotados</span>
+                    </div>
+                  </div>
+
+                  {/* Tarjeta 2: Con Ventas Activas */}
+                  <div
+                    onClick={() => setFiltroRotacionEstado('ALTA')}
+                    className={`p-4 bg-[var(--card)] border rounded-2xl transition-all cursor-pointer shadow-xs hover:border-emerald-500/50 ${
+                      filtroRotacionEstado === 'ALTA' ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-[var(--border)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">Con Salida Comercial</span>
+                      <Flame size={16} className="text-emerald-500" />
+                    </div>
+                    <div className="text-2xl font-black text-emerald-600">
+                      {rotResumen.totalConVentas}
+                      <span className="text-xs font-medium text-[var(--muted-foreground)] ml-1.5">
+                        ({rotResumen.totalProductos > 0 ? Math.round((rotResumen.totalConVentas / rotResumen.totalProductos) * 100) : 0}%)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 text-[11px] text-[var(--muted-foreground)]">
+                      <span className="text-emerald-600 font-bold">{rotResumen.totalRotacionAlta} Alta</span>
+                      <span>•</span>
+                      <span className="text-blue-600 font-bold">{rotResumen.totalRotacionMedia} Media</span>
+                      <span>•</span>
+                      <span className="text-amber-600 font-bold">{rotResumen.totalRotacionBaja} Baja</span>
+                    </div>
+                  </div>
+
+                  {/* Tarjeta 3: Sin Movimiento (0 ventas) */}
+                  <div
+                    onClick={() => setFiltroRotacionEstado('SIN_MOVIMIENTO')}
+                    className={`p-4 bg-[var(--card)] border rounded-2xl transition-all cursor-pointer shadow-xs hover:border-rose-500/50 ${
+                      filtroRotacionEstado === 'SIN_MOVIMIENTO' ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-500/5' : 'border-[var(--border)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-rose-600">Sin Salida (0 Ventas)</span>
+                      <TrendingDown size={16} className="text-rose-500" />
+                    </div>
+                    <div className="text-2xl font-black text-rose-600">
+                      {rotResumen.totalSinMovimiento}
+                      <span className="text-xs font-medium text-[var(--muted-foreground)] ml-1.5">modelos</span>
+                    </div>
+                    <div className="text-[11px] text-rose-500/80 mt-2 font-medium">
+                      Calzado sin salida comercial en el periodo
+                    </div>
+                  </div>
+
+                  {/* Tarjeta 4: Capital Estancado en Bodega */}
+                  <div
+                    onClick={() => {
+                      setFiltroRotacionEstado('SIN_MOVIMIENTO');
+                      setFiltroRotacionOrden('STOCK_DESC');
+                    }}
+                    className="p-4 bg-[var(--card)] border border-rose-500/30 rounded-2xl transition-all cursor-pointer shadow-xs hover:border-rose-500"
+                    title="Click para ver artículos estancados ordenados por stock"
+                  >
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-rose-600">Capital en Riesgo</span>
+                      <AlertTriangle size={16} className="text-rose-500" />
+                    </div>
+                    <div className="text-2xl font-black text-rose-600">
+                      ${rotResumen.capitalEnRiesgo.toFixed(2)}
+                    </div>
+                    <div className="text-[11px] text-[var(--muted-foreground)] mt-2">
+                      Costo retenido en {rotResumen.totalSinMovimiento} modelos sin rotación
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Barra de Filtros, Series y Búsqueda */}
+                <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-3 shadow-xs">
+                  {/* Fila 1: Búsqueda */}
+                  <div className="relative w-full">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                    <input
+                      type="text"
+                      value={filtroRotacionTexto}
+                      onChange={(e) => setFiltroRotacionTexto(e.target.value)}
+                      placeholder="Buscar por modelo, color o serie..."
+                      className="w-full pl-10 pr-4 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-hidden focus:border-blue-500 transition-colors"
+                    />
+                    {filtroRotacionTexto && (
+                      <button
+                        type="button"
+                        onClick={() => setFiltroRotacionTexto('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Fila 2: Filtros en línea con wrap */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Filtro por Serie */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
+                        <Layers size={14} />
+                        Serie:
+                      </span>
+                      <select
+                        value={filtroRotacionSerie}
+                        onChange={(e) => setFiltroRotacionSerie(e.target.value)}
+                        className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                      >
+                        <option value="TODAS">Todas las Series ({seriesDisponibles.length})</option>
+                        {seriesDisponibles.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {formatearNombreSerie(s.nombre)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Filtro por Categoría / Material */}
+                    {(() => {
+                      const categoriasDelCatalogo = Array.from(new Set(
+                        catalogoOriginal.map((p: any) => p.categoria || p.material || '').filter((c: string) => c && c !== 'General' && c.trim())
+                      )).sort() as string[];
+                      return categoriasDelCatalogo.length > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
+                            <Tag size={14} />
+                            Categoría:
+                          </span>
+                          <select
+                            value={filtroCategoriaModelo}
+                            onChange={(e) => setFiltroCategoriaModelo(e.target.value)}
+                            className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                          >
+                            <option value="TODAS">Todas las Categorías</option>
+                            {categoriasDelCatalogo.map((cat: string) => (
+                              <option key={cat} value={cat}>
+                                {cat}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : null;
+                    })()}
+
+                    {/* Filtro por Estado / Nivel de Rotación */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
+                        <Filter size={14} />
+                        Rotación:
+                      </span>
+                      <select
+                        value={filtroRotacionEstado}
+                        onChange={(e) => setFiltroRotacionEstado(e.target.value as any)}
+                        className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                      >
+                        <option value="TODOS">Todos los Estados</option>
+                        <option value="ALTA">Alta Rotación (Estrella)</option>
+                        <option value="MEDIA">Rotación Media</option>
+                        <option value="BAJA">Baja Rotación</option>
+                        <option value="SIN_MOVIMIENTO">Sin Movimiento (0 Ventas)</option>
+                        <option value="CON_STOCK">Solo con Stock Físico</option>
+                        <option value="SIN_STOCK">Solo Agotados</option>
+                      </select>
+                    </div>
+
+                    {/* Ordenación */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap">
+                        Ordenar:
+                      </span>
+                      <select
+                        value={filtroRotacionOrden}
+                        onChange={(e) => setFiltroRotacionOrden(e.target.value as any)}
+                        className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer max-w-[220px]"
+                      >
+                        <option value="VENTAS_DESC">Mayor Demanda (Más vendidos)</option>
+                        <option value="VENTAS_ASC">Menor Demanda (Menos vendidos)</option>
+                        <option value="STOCK_DESC">Mayor Stock en Bodega</option>
+                        <option value="STOCK_ASC">Menor Stock en Bodega</option>
+                        <option value="INGRESOS_DESC">Mayor Facturación</option>
+                        <option value="MARGEN_DESC">Mayor Margen Estimado</option>
+                      </select>
+                    </div>
+
+                    {/* Botón Reset */}
+                    {hayFiltrosActivos && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFiltroRotacionTexto('');
+                          setFiltroRotacionSerie('TODAS');
+                          setFiltroRotacionEstado('TODOS');
+                          setFiltroRotacionOrden('VENTAS_DESC');
+                          setFiltroCategoriaModelo('TODAS');
+                        }}
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 rounded-xl transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                        title="Restaurar todos los filtros"
+                      >
+                        <RotateCcw size={13} />
+                        <span>Limpiar</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Contador de resultados */}
+                  <div className="flex items-center justify-between text-xs text-[var(--muted-foreground)] pt-2 border-t border-[var(--border)]">
+                    <span>
+                      Mostrando <strong className="text-[var(--foreground)]">{catalogoFiltrado.length}</strong> de{' '}
+                      <strong>{catalogoOriginal.length}</strong> artículos del catálogo
+                    </span>
+                    {filtroRotacionSerie !== 'TODAS' && (
+                      <span className="text-blue-600 font-bold bg-blue-500/10 px-2 py-0.5 rounded-md">
+                        Serie:{' '}
+                        {formatearNombreSerie(
+                          seriesDisponibles.find((s) => s.id === filtroRotacionSerie)?.nombre || filtroRotacionSerie
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 4. Lista de Productos: VISTA TABLA */}
+                {filtroRotacionVista === 'tabla' && (
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="bg-[var(--muted)]/40 border-b border-[var(--border)] text-[var(--muted-foreground)] font-black uppercase text-[10px] tracking-wider">
+                            <th className="py-3 px-4">Calzado / Modelo</th>
+                            <th className="py-3 px-3">Serie</th>
+                            <th className="py-3 px-3 text-center">Pares Vendidos</th>
+                            <th className="py-3 px-3 text-right">Precio Prom.</th>
+                            <th className="py-3 px-3 text-right">Costo FIFO</th>
+                            <th className="py-3 px-3 text-right">Ganancia Neta</th>
+                            <th className="py-3 px-3 text-center">Margen %</th>
+                            <th className="py-3 px-3 text-center">Stock Bodega</th>
+                            <th className="py-3 px-3">Curva de Tallas</th>
+                            <th className="py-3 px-3 text-center">Detalle</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border)]">
+                          {catalogoFiltrado.length === 0 ? (
+                            <tr>
+                              <td colSpan={10} className="py-12 text-center text-slate-400">
+                                <Package size={36} className="mx-auto mb-2 opacity-40" />
+                                <p className="font-bold text-sm">No se encontraron modelos con los filtros seleccionados</p>
+                                <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                                  Prueba cambiando los criterios de serie, rotación o el texto de búsqueda.
+                                </p>
+                              </td>
+                            </tr>
+                          ) : (
+                            catalogoFiltrado.map((p: any) => {
+                              const expandido = productoExpandidoId === p.productId;
+                              return (
+                                <React.Fragment key={p.productId}>
+                                  <tr className="hover:bg-[var(--muted)]/20 transition-colors">
+                                    {/* Calzado / Modelo con miniatura */}
+                                    <td className="py-3 px-4">
+                                      <div className="flex items-center gap-3">
+                                        {p.imageUrl ? (
+                                          <img
+                                            src={p.imageUrl}
+                                            alt={p.modelName}
+                                            className="w-11 h-11 rounded-xl object-cover border border-[var(--border)] shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="w-11 h-11 rounded-xl bg-[var(--muted)] flex items-center justify-center text-lg shrink-0 border border-[var(--border)]">
+                                            
+                                          </div>
+                                        )}
+                                        <div className="min-w-0">
+                                          <span className="font-black text-xs text-[var(--foreground)] block truncate uppercase">
+                                            {p.modelName}
+                                          </span>
+                                          <span className="text-[11px] text-[var(--muted-foreground)] block truncate">
+                                            Color: <strong className="text-[var(--foreground)]">{p.color}</strong>
+                                          </span>
+                                          <span className="text-[10px] text-slate-400">
+                                            PVP: ${p.precioVenta.toFixed(2)} / par
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    {/* Serie */}
+                                    <td className="py-3 px-3">
+                                      <span className="text-xs font-bold text-emerald-600 block">
+                                        {formatearNombreSerie(p.serieNombre)}
+                                      </span>
+                                    </td>
+
+                                    {/* Pares Vendidos */}
+                                    <td className="py-3 px-3 text-center">
+                                      {p.paresVendidos > 0 ? (
+                                        <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                                          {p.paresVendidos} pares
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold text-rose-500 bg-rose-500/5 border border-rose-500/10">
+                                          0 ventas
+                                        </span>
+                                      )}
+                                    </td>
+
+                                    {/* Precio Promedio */}
+                                    <td className="py-3 px-3 text-right font-bold text-xs text-[var(--foreground)]">
+                                      ${(p.paresVendidos > 0 ? (p.ingresos / p.paresVendidos) : p.precioVenta).toFixed(2)}
+                                    </td>
+
+                                    {/* Costo FIFO */}
+                                    <td className="py-3 px-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400">
+                                      ${(p.paresVendidos > 0 ? (p.costo / p.paresVendidos) : p.precioCosto).toFixed(2)}
+                                    </td>
+
+                                    {/* Ganancia Neta */}
+                                    <td className="py-3 px-3 text-right font-black text-xs text-emerald-600">
+                                      ${((p.ingresos || 0) - (p.costo || 0)).toFixed(2)}
+                                    </td>
+
+                                    {/* Margen % */}
+                                    <td className="py-3 px-3 text-center">
+                                      {(() => {
+                                        const net = (p.ingresos || 0) - (p.costo || 0);
+                                        const mPct = p.ingresos > 0 ? Math.round((net / p.ingresos) * 100) : p.margen;
+                                        return (
+                                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                                            mPct >= 40
+                                              ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                              : mPct >= 25
+                                              ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                                              : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                          }`}>
+                                            {mPct}%
+                                          </span>
+                                        );
+                                      })()}
+                                    </td>
+
+                                    {/* Stock Físico */}
+                                    <td className="py-3 px-3 text-center">
+                                      {p.stockTotal <= 0 ? (
+                                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                          Agotado (0)
+                                        </span>
+                                      ) : (
+                                        <div>
+                                          <span className="font-black text-xs text-[var(--foreground)]">
+                                            {p.stockTotal} pares
+                                          </span>
+                                          {p.stockDisponible < p.stockTotal && (
+                                            <span className="block text-[10px] text-amber-600 font-medium">
+                                              ({p.stockDisponible} disp.)
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </td>
+
+                                    {/* Curva de Tallas Resumida */}
+                                    <td className="py-3 px-3 max-w-[260px]">
+                                      <div className="flex flex-wrap gap-1">
+                                        {p.tallasDetalle && p.tallasDetalle.length > 0 ? (
+                                          p.tallasDetalle.map((t: any) => (
+                                            <span
+                                              key={t.talla}
+                                              className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold border ${
+                                                t.disponible > 0
+                                                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
+                                                  : 'bg-rose-500/10 text-rose-500 border-rose-500/20 opacity-60'
+                                              }`}
+                                              title={`Talla ${t.talla}: ${t.disponible} disponibles`}
+                                            >
+                                              T{t.talla}:{t.disponible}
+                                            </span>
+                                          ))
+                                        ) : (
+                                          <span className="text-[10px] text-slate-400">Sin desglose</span>
+                                        )}
+                                      </div>
+                                    </td>
+
+                                    {/* Detalle Toggle */}
+                                    <td className="py-3 px-3 text-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => setProductoExpandidoId(expandido ? null : p.productId)}
+                                        className="p-1.5 hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg transition-colors cursor-pointer"
+                                        title={expandido ? 'Ocultar desglose' : 'Ver curva detallada'}
+                                      >
+                                        <ChevronDown
+                                          size={16}
+                                          className={`transition-transform duration-200 ${expandido ? 'rotate-180' : ''}`}
+                                        />
+                                      </button>
+                                    </td>
+                                  </tr>
+
+                                  {/* Fila expandida con desglose de tallas y diagnóstico */}
+                                  {expandido && (
+                                    <tr className="bg-[var(--muted)]/30 border-b border-[var(--border)]">
+                                      <td colSpan={10} className="p-4">
+                                        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
+                                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)] pb-2">
+                                            <div>
+                                              <span className="font-black text-xs uppercase text-[var(--foreground)]">
+                                                Desglose de Curva de Tallas & Stock en Bodega: {p.modelName} ({p.color})
+                                              </span>
+                                              <span className="text-[11px] text-[var(--muted-foreground)] block">
+                                                Serie: <strong className="text-emerald-600">{formatearNombreSerie(p.serieNombre)}</strong> • Margen estimado: <strong className="text-emerald-600">{p.margen}%</strong>
+                                              </span>
+                                            </div>
+
+                                            {/* Diagnóstico Operativo */}
+                                            {p.rotacion === 'SIN_MOVIMIENTO' && p.stockTotal > 0 && (
+                                              <div className="px-3 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-600 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                                <AlertTriangle size={14} />
+                                                <span>Candidato a promoción de liquidación / combo</span>
+                                              </div>
+                                            )}
+                                            {p.rotacion === 'ALTA' && p.tallasAgotadas?.length > 0 && (
+                                              <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                                <AlertCircle size={14} />
+                                                <span>Reabastecer tallas agotadas: {p.tallasAgotadas.join(', ')}</span>
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          {/* Curva de Tallas Detallada */}
+                                          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 pt-1">
+                                            {p.tallasDetalle?.map((t: any) => (
+                                              <div
+                                                key={t.talla}
+                                                className={`p-2.5 rounded-xl border text-center ${
+                                                  t.disponible > 0
+                                                    ? 'bg-[var(--muted)]/40 border-[var(--border)]'
+                                                    : 'bg-rose-500/5 border-rose-500/20 opacity-70'
+                                                }`}
+                                              >
+                                                <span className="font-black text-xs block text-[var(--foreground)]">
+                                                  Talla {t.talla}
+                                                </span>
+                                                <span
+                                                  className={`font-black text-sm block ${
+                                                    t.disponible > 0 ? 'text-emerald-600' : 'text-rose-500'
+                                                  }`}
+                                                >
+                                                  {t.disponible} pares
+                                                </span>
+                                                {t.reservado > 0 && (
+                                                  <span className="text-[9px] text-amber-600 block">
+                                                    ({t.reservado} reservado)
+                                                  </span>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. Lista de Productos: VISTA TARJETAS (Cumple Estrictamente Regla 7 ModelTallaCurvaCard) */}
+                {filtroRotacionVista === 'tarjetas' && (
+                  <div className="space-y-4">
+                    {catalogoFiltrado.length === 0 ? (
+                      <div className="p-12 text-center bg-[var(--card)] border border-[var(--border)] rounded-3xl text-slate-400">
+                        <Package size={40} className="mx-auto mb-2 opacity-40" />
+                        <p className="font-bold text-sm">No se encontraron modelos con los filtros seleccionados</p>
+                        <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                          Prueba cambiando los criterios de serie, rotación o el texto de búsqueda.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {catalogoFiltrado.map((p: any) => {
+                          const docenasTotal = (p.stockTotal / 12).toFixed(1);
+                          return (
+                            <div
+                              key={p.productId}
+                              className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between gap-3 relative overflow-hidden"
+                            >
+                              {/* Header: Miniatura, Modelo en negrita mayúscula, Color y Serie (Regla 7) */}
+                              <div className="flex items-start gap-3">
+                                {p.imageUrl ? (
+                                  <img
+                                    src={p.imageUrl}
+                                    alt={p.modelName}
+                                    className="w-12 h-12 rounded-xl object-cover border border-[var(--border)] shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-xl bg-[var(--muted)] flex items-center justify-center text-xl shrink-0 border border-[var(--border)]">
+                                    
+                                  </div>
+                                )}
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <h4 className="font-black uppercase text-xs text-[var(--foreground)] truncate">
+                                      {p.modelName}
+                                    </h4>
+                                    {/* Badge Rotación */}
+                                    {p.rotacion === 'ALTA' && (
+                                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shrink-0">
+                                        ALTA
+                                      </span>
+                                    )}
+                                    {p.rotacion === 'MEDIA' && (
+                                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-blue-500/10 text-blue-600 border border-blue-500/20 shrink-0">
+                                        MEDIA
+                                      </span>
+                                    )}
+                                    {p.rotacion === 'BAJA' && (
+                                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-amber-500/10 text-amber-600 border border-amber-500/20 shrink-0">
+                                        BAJA
+                                      </span>
+                                    )}
+                                    {p.rotacion === 'SIN_MOVIMIENTO' && (
+                                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-rose-500/10 text-rose-600 border border-rose-500/20 shrink-0">
+                                        SIN SALIDA
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="text-[11px] text-[var(--muted-foreground)] truncate mt-0.5">
+                                    Color: <strong className="text-[var(--foreground)]">{p.color}</strong> •{' '}
+                                    <span className="text-emerald-600 font-bold">
+                                      Serie: {formatearNombreSerie(p.serieNombre)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Curva de Tallas (Regla 7): Píldoras para cada talla con cantidades */}
+                              <div className="bg-[var(--muted)]/30 p-2.5 rounded-xl border border-[var(--border)]">
+                                <div className="text-[10px] font-bold text-[var(--muted-foreground)] mb-1.5 flex items-center justify-between">
+                                  <span>Curva de Tallas & Stock Bodega:</span>
+                                  <span className="text-slate-500">
+                                    {p.tallasConStock} de {p.tallasDetalle?.length || 0} tallas activas
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {p.tallasDetalle && p.tallasDetalle.length > 0 ? (
+                                    p.tallasDetalle.map((t: any) => (
+                                      <div
+                                        key={t.talla}
+                                        className={`px-2 py-1 rounded-lg text-center border text-[10px] font-bold ${
+                                          t.disponible > 0
+                                            ? 'bg-[var(--card)] text-[var(--foreground)] border-[var(--border)]'
+                                            : 'bg-rose-500/5 text-rose-500 border-rose-500/20 opacity-50'
+                                        }`}
+                                      >
+                                        <span className="block text-[9px] text-[var(--muted-foreground)]">T{t.talla}</span>
+                                        <span>{t.disponible}</span>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400">Sin tallas registradas</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Resumen Comercial (Regla 7): Total pares, precio y subtotal */}
+                              <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between text-xs">
+                                <div>
+                                  <div className="font-bold text-[var(--foreground)]">
+                                    {p.stockTotal} pares en bodega
+                                    <span className="text-[10px] font-normal text-[var(--muted-foreground)] ml-1">
+                                      ({docenasTotal} Docenas)
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-[var(--muted-foreground)]">
+                                    Salidas en periodo:{' '}
+                                    <strong className={p.paresVendidos > 0 ? 'text-blue-600' : 'text-rose-500'}>
+                                      {p.paresVendidos} pares
+                                    </strong>
+                                  </div>
+                                </div>
+
+                                <div className="text-right">
+                                  <div className="text-[10px] text-[var(--muted-foreground)]">
+                                    ${p.precioVenta.toFixed(2)} / par
+                                  </div>
+                                  <div className="font-black text-sm text-emerald-600">
+                                    ${p.ingresos.toFixed(2)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Alerta de mercadería sin rotación pero con stock */}
+                              {p.rotacion === 'SIN_MOVIMIENTO' && p.stockTotal > 0 && (
+                                <div className="px-2.5 py-1.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-[10px] text-rose-600 font-bold flex items-center justify-between">
+                                  <span>Mercadería Inmóvil</span>
+                                  <span>${p.capitalRetenido.toFixed(2)} en costo</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 3: PRODUCTIVIDAD POR TRABAJADOR                            */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'vendedores' && (
+            <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF para Productividad */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
+                    <Users size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Reporte de Productividad por Trabajador
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Rendimiento individual, pedidos atendidos, pares comercializados y contribución al local
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleReporteProductividadPdf('preview')}
+                    disabled={loading || !reporteData?.rankingVendedores?.length}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteProductividadPdf('download')}
+                    disabled={loading || !reporteData?.rankingVendedores?.length}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Componente de Filtro Avanzado para Trabajadores */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col md:flex-row items-center gap-3 shadow-xs">
+                <div className="relative flex-1 w-full">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+                  <input
+                    type="text"
+                    value={filtroTrabajadorTexto}
+                    onChange={(e) => setFiltroTrabajadorTexto(e.target.value)}
+                    placeholder="Buscar trabajador por nombre o correo electrónico..."
+                    className="w-full pl-9 pr-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+
+                <div className="w-full md:w-48">
+                  <select
+                    value={filtroTrabajadorRol}
+                    onChange={(e) => setFiltroTrabajadorRol(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  >
+                    <option value="TODOS">Todos los Roles</option>
+                    <option value="ADMIN">Administrador</option>
+                    <option value="VENDEDOR">Vendedor</option>
+                    <option value="BODEGUERO">Bodeguero</option>
+                    <option value="PRODUCCION">Producción</option>
+                  </select>
+                </div>
+
+                <div className="w-full md:w-56">
+                  <select
+                    value={filtroTrabajadorOrden}
+                    onChange={(e) => setFiltroTrabajadorOrden(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  >
+                    <option value="VENTAS_DESC">Mayor Facturación ($)</option>
+                    <option value="PARES_DESC">Más Pares Vendidos</option>
+                    <option value="PEDIDOS_DESC">Más Pedidos Atendidos</option>
+                    <option value="VENTAS_ASC">Menor Facturación ($)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Gráficas Estadísticas de Productividad de Vendedores */}
+              {reporteData?.rankingVendedores && reporteData.rankingVendedores.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Barras de Facturación por Trabajador */}
+                  <GraficoBarrasModerno
+                    items={reporteData.rankingVendedores.slice(0, 6).map((v: any, idx: number) => ({
+                      label: capitalizarNombreCompleto(v.nombre),
+                      valor: v.ingresosFacturados || 0,
+                      valorFormateado: `$${(v.ingresosFacturados || 0).toFixed(2)}`,
+                      subtexto: `${v.paresVendidos} pares (${v.pedidosCount} pedidos)`,
+                      color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899', '#8B5CF6'][idx % 6],
+                    }))}
+                    titulo="Facturación Individual por Trabajador"
+                    subtitulo="Monto total facturado por cada colaborador en el periodo"
+                    unidad="$"
+                  />
+
+                  {/* Donut de Cuota de Ventas en Pares */}
+                  <GraficoDonutCircular
+                    items={reporteData.rankingVendedores.slice(0, 5).map((v: any, idx: number) => {
+                      const paleta = ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'];
+                      return {
+                        label: capitalizarNombreCompleto(v.nombre),
+                        valor: v.paresVendidos || 0,
+                        color: paleta[idx % paleta.length],
+                        subtexto: `${v.paresVendidos} pares despachados`,
+                      };
+                    })}
+                    titulo="Participación en Volumen de Pares"
+                    subtitulo="Distribución porcentual de calzado comercializado por vendedor"
+                    valorCentro={`${kpis.totalParesVendidos || 0}`}
+                    etiquetaCentro="Pares Totales"
+                  />
+                </div>
+              )}
+
+              {/* Tabla de Ranking y Productividad */}
+              <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
+                      <Users className="text-[#0F172A]" size={18} />
+                      <span>Ranking y Rendimiento del Personal de Ventas</span>
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Desglose de pedidos, pares comercializados y volumen facturado por cada colaborador
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-[var(--muted-foreground)] px-3 py-1 bg-[var(--muted)]/40 rounded-xl">
+                    {reporteData?.rankingVendedores?.length || 0} trabajadores
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                      <tr>
+                        <th className="px-4 py-3">Posición / Trabajador</th>
+                        <th className="px-4 py-3 text-center">Rol</th>
+                        <th className="px-4 py-3 text-center">Pedidos Realizados</th>
+                        <th className="px-4 py-3 text-center">Pares Vendidos</th>
+                        <th className="px-4 py-3 text-right">Monto Total Facturado</th>
+                        <th className="px-4 py-3 text-right">% Contribución Sucursal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border)]">
+                      {(() => {
+                        const listaTrabajadores: any[] = (reporteData?.rankingVendedores || []).filter((v: any) => {
+                          const matchTexto =
+                            !filtroTrabajadorTexto ||
+                            v.nombre?.toLowerCase().includes(filtroTrabajadorTexto.toLowerCase()) ||
+                            v.email?.toLowerCase().includes(filtroTrabajadorTexto.toLowerCase());
+                          const matchRol =
+                            filtroTrabajadorRol === 'TODOS' ||
+                            v.rol === filtroTrabajadorRol ||
+                            v.rol === `ROL_${filtroTrabajadorRol}`;
+                          return matchTexto && matchRol;
+                        }).sort((a: any, b: any) => {
+                          if (filtroTrabajadorOrden === 'VENTAS_DESC') return (b.ingresosFacturados || 0) - (a.ingresosFacturados || 0);
+                          if (filtroTrabajadorOrden === 'PARES_DESC') return (b.paresVendidos || 0) - (a.paresVendidos || 0);
+                          if (filtroTrabajadorOrden === 'PEDIDOS_DESC') return (b.pedidosCount || 0) - (a.pedidosCount || 0);
+                          if (filtroTrabajadorOrden === 'VENTAS_ASC') return (a.ingresosFacturados || 0) - (b.ingresosFacturados || 0);
+                          return 0;
+                        });
+
+                        if (listaTrabajadores.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={6} className="p-8 text-center text-xs text-[var(--muted-foreground)]">
+                                No se encontraron colaboradores que coincidan con los filtros de búsqueda.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return listaTrabajadores.map((v: any, index: number) => {
+                          const contribucionPct = kpis.totalIngresos > 0 ? (v.ingresosFacturados / kpis.totalIngresos) * 100 : 0;
+                          return (
+                            <tr key={v.userId ? `vend-${v.userId}` : `vend-${index}`} className="hover:bg-[var(--muted)]/20">
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2.5">
+                                  <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] ${
+                                    index === 0 ? 'bg-amber-500 text-white' : index === 1 ? 'bg-slate-400 text-white' : 'bg-slate-200 text-slate-700'
+                                  }`}>
+                                    #{index + 1}
+                                  </span>
+                                  <div>
+                                    <span className="font-extrabold text-xs text-[var(--foreground)] block">{capitalizarNombreCompleto(v.nombre)}</span>
+                                    <span className="text-[10px] text-[var(--muted-foreground)]">{v.email || 'Sin correo'}</span>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="px-4 py-3 text-center">
+                                <span className="px-2 py-0.5 bg-[#0F172A]/10 text-[#0F172A] rounded-md font-bold text-[10px]">
+                                  {v.rol.replace('ROL_', '')}
+                                </span>
+                              </td>
+
+                              <td className="px-4 py-3 text-center font-bold">{v.pedidosCount} pedidos</td>
+
+                              <td className="px-4 py-3 text-center font-black text-indigo-600 dark:text-indigo-400">
+                                {v.paresVendidos} pares
+                              </td>
+
+                              <td className="px-4 py-3 text-right font-black text-emerald-600 text-sm">
+                                ${v.ingresosFacturados.toFixed(2)}
+                              </td>
+
+                              <td className="px-4 py-3 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <div className="w-16 bg-[var(--muted)] h-2 rounded-full overflow-hidden">
+                                    <div style={{ width: `${contribucionPct}%` }} className="bg-[#0F172A] h-full rounded-full" />
+                                  </div>
+                                  <span className="font-bold text-[11px] text-[var(--foreground)]">{contribucionPct.toFixed(1)}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB: REPORTE DE COBRANZAS — CLIENTES QUE DEBEN                */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'cobranzas' && (
+            <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
+                    <Receipt size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Reporte de Cobranzas — Clientes Deudores
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Detalle nominal de clientes con saldo pendiente, notas de entrega a crédito y antigüedad de deuda
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={cargarCobranzas}
+                    disabled={loadingCobranzas}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <RefreshCw size={13} className={loadingCobranzas ? 'animate-spin' : ''} />
+                    <span>Actualizar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteCobranzasPdf('preview')}
+                    disabled={loadingCobranzas || !cobranzasData?.clientes?.length}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteCobranzasPdf('download')}
+                    disabled={loadingCobranzas || !cobranzasData?.clientes?.length}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* KPIs de Cobranzas */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Cartera Pendiente Total</span>
+                  <div className="text-2xl font-black text-red-600">
+                    ${(cobranzasData?.totalCartera || 0).toFixed(2)}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Monto total por recaudar en el negocio</p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Clientes con Deuda</span>
+                  <div className="text-2xl font-black text-[var(--foreground)]">
+                    {cobranzasData?.totalClientes || 0}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Clientes con notas o créditos pendientes</p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Deuda Promedio / Cliente</span>
+                  <div className="text-2xl font-black text-amber-600">
+                    ${cobranzasData?.totalClientes > 0 ? ((cobranzasData.totalCartera || 0) / cobranzasData.totalClientes).toFixed(2) : '0.00'}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Promedio adeudado por comprador activo</p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Recaudado en Periodo</span>
+                  <div className="text-2xl font-black text-emerald-600">
+                    ${kpis.totalRecaudadoCobros.toFixed(2)}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Abonos y pagos ingresados efectivamente</p>
+                </div>
+              </div>
+
+              {/* Gráficos Estadísticos de Cartera y Recuperación */}
+              {cobranzasData && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Donut de Recuperación vs Cartera */}
+                  <GraficoDonutCircular
+                    items={[
+                      {
+                        label: 'Recaudado Efectivo',
+                        valor: kpis.totalRecaudadoCobros || 0,
+                        color: '#10B981',
+                        subtexto: 'Abonos y cobros ingresados en el periodo',
+                      },
+                      {
+                        label: 'Cartera por Cobrar',
+                        valor: cobranzasData.totalCartera || 0,
+                        color: '#EF4444',
+                        subtexto: `${cobranzasData.totalClientes || 0} compradores con saldo pendiente`,
+                      },
+                    ]}
+                    titulo="Ratio de Recuperación de Liquidez"
+                    subtitulo="Comparativa entre abonos recaudados y saldo deudor activo"
+                    valorCentro={
+                      (kpis.totalRecaudadoCobros + (cobranzasData.totalCartera || 0)) > 0
+                        ? `${(
+                            (kpis.totalRecaudadoCobros /
+                              (kpis.totalRecaudadoCobros + (cobranzasData.totalCartera || 0))) *
+                            100
+                          ).toFixed(0)}%`
+                        : '100%'
+                    }
+                    etiquetaCentro="Recuperado"
+                  />
+
+                  {/* Barras de Exposición por Nivel de Riesgo Crediticio */}
+                  {(() => {
+                    const niveles: Record<string, { cant: number; deuda: number }> = {
+                      EXCELENTE: { cant: 0, deuda: 0 },
+                      BUENO: { cant: 0, deuda: 0 },
+                      REGULAR: { cant: 0, deuda: 0 },
+                      CRITICO: { cant: 0, deuda: 0 },
+                    };
+
+                    (cobranzasData.clientes || []).forEach((c: any) => {
+                      const niv = (c.nivelCredito || '').toUpperCase();
+                      if (niv.includes('EXCELENTE') || (c.scoreCrediticio && c.scoreCrediticio >= 80)) {
+                        niveles.EXCELENTE.cant += 1;
+                        niveles.EXCELENTE.deuda += c.totalDeuda || 0;
+                      } else if (niv.includes('BUENO') || (c.scoreCrediticio && c.scoreCrediticio >= 60)) {
+                        niveles.BUENO.cant += 1;
+                        niveles.BUENO.deuda += c.totalDeuda || 0;
+                      } else if (niv.includes('REGULAR') || (c.scoreCrediticio && c.scoreCrediticio >= 40)) {
+                        niveles.REGULAR.cant += 1;
+                        niveles.REGULAR.deuda += c.totalDeuda || 0;
+                      } else {
+                        niveles.CRITICO.cant += 1;
+                        niveles.CRITICO.deuda += c.totalDeuda || 0;
+                      }
+                    });
+
+                    const barItems = [
+                      {
+                        label: 'Excelente (Bajo Riesgo)',
+                        valor: niveles.EXCELENTE.deuda,
+                        valorFormateado: `$${niveles.EXCELENTE.deuda.toFixed(2)}`,
+                        subtexto: `${niveles.EXCELENTE.cant} clientes`,
+                        color: '#10B981',
+                      },
+                      {
+                        label: 'Bueno (Riesgo Normal)',
+                        valor: niveles.BUENO.deuda,
+                        valorFormateado: `$${niveles.BUENO.deuda.toFixed(2)}`,
+                        subtexto: `${niveles.BUENO.cant} clientes`,
+                        color: '#0EA5E9',
+                      },
+                      {
+                        label: 'Regular (En Observación)',
+                        valor: niveles.REGULAR.deuda,
+                        valorFormateado: `$${niveles.REGULAR.deuda.toFixed(2)}`,
+                        subtexto: `${niveles.REGULAR.cant} clientes`,
+                        color: '#F59E0B',
+                      },
+                      {
+                        label: 'Crítico (Mora / Alto Riesgo)',
+                        valor: niveles.CRITICO.deuda,
+                        valorFormateado: `$${niveles.CRITICO.deuda.toFixed(2)}`,
+                        subtexto: `${niveles.CRITICO.cant} clientes`,
+                        color: '#EF4444',
+                      },
+                    ].filter((b) => b.valor > 0 || (cobranzasData.clientes || []).length === 0);
+
+                    return (
+                      <GraficoBarrasModerno
+                        items={barItems}
+                        titulo="Exposición de Cartera por Nivel de Riesgo"
+                        subtitulo="Monto total adeudado según el scoring y comportamiento de pago"
+                        unidad="$"
+                        emptyMessage="Sin deudas pendientes registradas."
+                      />
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Filtros de búsqueda de deudores */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row items-center gap-3 shadow-xs">
+                <div className="relative flex-1 w-full">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+                  <input
+                    type="text"
+                    value={filtroDeudor}
+                    onChange={(e) => setFiltroDeudor(e.target.value)}
+                    placeholder="Buscar por nombre, cédula o teléfono..."
+                    className="w-full pl-9 pr-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+
+                <div className="w-full sm:w-56">
+                  <select
+                    value={filtroScoreDeudor}
+                    onChange={(e) => setFiltroScoreDeudor(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  >
+                    <option value="TODOS">Todos los Niveles Crediticios</option>
+                    <option value="EXCELENTE">Nivel Excelente</option>
+                    <option value="BUENO">Nivel Bueno</option>
+                    <option value="REGULAR">Nivel Regular</option>
+                    <option value="RIESGO">Nivel Riesgo</option>
+                    <option value="CRITICO">Nivel Crítico</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Tabla de Clientes Deudores */}
+              <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
+                {loadingCobranzas ? (
+                  <div className="p-14 text-center text-xs text-[var(--muted-foreground)] flex flex-col items-center justify-center gap-2">
+                    <Loader2 size={30} className="animate-spin text-blue-600" />
+                    <span>Cargando estado de cartera y notas pendientes...</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                        <tr>
+                          <th className="px-4 py-3">Cliente / Identificación</th>
+                          <th className="px-4 py-3 text-center">Nivel / Score</th>
+                          <th className="px-4 py-3 text-center">Notas Pendientes</th>
+                          <th className="px-4 py-3 text-right">Saldo Deudor Total</th>
+                          <th className="px-4 py-3 text-center">Último Abono</th>
+                          <th className="px-4 py-3 text-center">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {(() => {
+                          const clientesFiltrados = (cobranzasData?.clientes || []).filter((c: ClienteDeudor) => {
+                            const matchTexto =
+                              !filtroDeudor ||
+                              normalizarParaBusqueda(c.nombre).includes(normalizarParaBusqueda(filtroDeudor)) ||
+                              c.cedula?.includes(filtroDeudor) ||
+                              c.telefono?.includes(filtroDeudor);
+                            const matchNivel =
+                              filtroScoreDeudor === 'TODOS' ||
+                              c.nivelCredito?.toUpperCase() === filtroScoreDeudor;
+                            return matchTexto && matchNivel;
+                          });
+
+                          if (clientesFiltrados.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={6} className="p-10 text-center text-xs text-[var(--muted-foreground)]">
+                                  No se encontraron clientes deudores con los criterios seleccionados.
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return clientesFiltrados.map((c: ClienteDeudor) => {
+                            const expandido = clienteExpandidoId === c.clienteId;
+                            return (
+                              <React.Fragment key={c.clienteId}>
+                                <tr className="hover:bg-[var(--muted)]/20 transition-colors">
+                                  <td className="px-4 py-3.5">
+                                    <div className="font-extrabold text-[var(--foreground)] text-xs">
+                                      {c.nombre}
+                                    </div>
+                                    <div className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-2 mt-0.5">
+                                      <span>C.I./RUC: {c.cedula}</span>
+                                      {c.telefono && <span>• Tel: {c.telefono}</span>}
+                                    </div>
+                                  </td>
+
+                                  <td className="px-4 py-3.5 text-center">
+                                    <div className="inline-flex flex-col items-center">
+                                      <span className="px-2 py-0.5 bg-[#0F172A]/10 text-[#0F172A] rounded-md font-extrabold text-[10px] uppercase">
+                                        {c.nivelCredito || 'REGULAR'}
+                                      </span>
+                                      <span className="text-[10px] text-[var(--muted-foreground)] font-semibold mt-0.5">
+                                        Score: {c.scoreCrediticio ?? 50}/100
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  <td className="px-4 py-3.5 text-center">
+                                    <span className="px-2.5 py-1 bg-amber-500/10 text-amber-700 dark:text-amber-300 font-extrabold text-xs rounded-lg">
+                                      {c.notasPendientes} {c.notasPendientes === 1 ? 'nota' : 'notas'}
+                                    </span>
+                                  </td>
+
+                                  <td className="px-4 py-3.5 text-right font-black text-sm text-red-600">
+                                    ${c.totalDeuda.toFixed(2)}
+                                  </td>
+
+                                  <td className="px-4 py-3.5 text-center">
+                                    {c.ultimoAbono ? (
+                                      <div>
+                                        <span className="font-bold text-[var(--foreground)] text-[11px]">
+                                          ${(c.ultimoAbonoMonto || 0).toFixed(2)}
+                                        </span>
+                                        <div className="text-[10px] text-[var(--muted-foreground)]">
+                                          {c.ultimoAbono}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin abonos</span>
+                                    )}
+                                  </td>
+
+                                  <td className="px-4 py-3.5 text-center">
+                                    {c.detalleNotas && c.detalleNotas.length > 0 ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setClienteExpandidoId(expandido ? null : c.clienteId)}
+                                        className="px-2.5 py-1 bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-[var(--foreground)] text-[11px] font-bold rounded-lg border border-[var(--border)] transition-all cursor-pointer inline-flex items-center gap-1"
+                                      >
+                                        <span>{expandido ? 'Ocultar' : 'Ver Notas'}</span>
+                                        <ChevronDown size={12} className={`transition-transform ${expandido ? 'rotate-180' : ''}`} />
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] text-[var(--muted-foreground)]">—</span>
+                                    )}
+                                  </td>
+                                </tr>
+
+                                {/* Desglose expandido de notas */}
+                                {expandido && c.detalleNotas && (
+                                  <tr className="bg-[var(--muted)]/10">
+                                    <td colSpan={6} className="px-6 py-3 border-y border-[var(--border)]">
+                                      <div className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] mb-2">
+                                        Desglose de Comprobantes Pendientes:
+                                      </div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                        {c.detalleNotas.map((n, i) => (
+                                          <div key={i} className="p-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl flex items-center justify-between text-xs shadow-2xs">
+                                            <div>
+                                              <span className="font-extrabold text-[var(--foreground)] block">
+                                                {n.numero}
+                                              </span>
+                                              <span className="text-[10px] text-[var(--muted-foreground)]">
+                                                Fecha: {n.fecha}
+                                              </span>
+                                            </div>
+                                            <div className="text-right">
+                                              <span className="text-[10px] text-[var(--muted-foreground)] block">
+                                                Total: ${n.montoTotal.toFixed(2)}
+                                              </span>
+                                              <span className="font-extrabold text-red-600">
+                                                Saldo: ${n.saldoPendiente.toFixed(2)}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            );
+                          });
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB: REPORTE DE CAMPAÑAS Y PROMOCIONES                        */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'campanas' && (
+            <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
+                    <Megaphone size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Reporte de Campañas & Promociones
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Métricas de efectividad, cupones canjeados, volumen de calzado comercializado y ROI
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={cargarCampanas}
+                    disabled={loadingCampanas}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <RefreshCw size={13} className={loadingCampanas ? 'animate-spin' : ''} />
+                    <span>Actualizar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteCampanasPdf('preview')}
+                    disabled={loadingCampanas || !campanasData?.campanas?.length}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteCampanasPdf('download')}
+                    disabled={loadingCampanas || !campanasData?.campanas?.length}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* KPIs de Campañas */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Total Campañas Registradas</span>
+                  <div className="text-2xl font-black text-[var(--foreground)]">
+                    {campanasData?.totalCampanas || 0}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Estrategias promocionales creadas</p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Campañas Activas</span>
+                  <div className="text-2xl font-black text-purple-600">
+                    {campanasData?.campanasActivas || 0}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Vigentes para canje en venta y POS</p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Total Canjes Usados</span>
+                  <div className="text-2xl font-black text-indigo-600">
+                    {campanasData?.totalCanjes || 0}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Cupones y promociones redimidos</p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Ingresos Brutos Asociados</span>
+                  <div className="text-2xl font-black text-emerald-600">
+                    ${(campanasData?.montoGeneradoTotal || 0).toFixed(2)}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Facturación generada con campañas</p>
+                </div>
+              </div>
+
+              {/* Gráficas Estadísticas de Campañas */}
+              {campanasData?.campanas && campanasData.campanas.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Barras de Facturación por Campaña */}
+                  <GraficoBarrasModerno
+                    items={campanasData.campanas.slice(0, 5).map((c: any, idx: number) => ({
+                      label: c.titulo,
+                      valor: c.montoTotalGenerado || 0,
+                      valorFormateado: `$${(c.montoTotalGenerado || 0).toFixed(2)}`,
+                      subtexto: `${c.canjesUsados} canjes (${c.paresVendidos} pares)`,
+                      color: ['#8B5CF6', '#10B981', '#0EA5E9', '#F59E0B', '#EC4899'][idx % 5],
+                    }))}
+                    titulo="Facturación Generada por Campaña"
+                    subtitulo="Ingresos brutos atribuibles a cada cupón o descuento aplicado"
+                    unidad="$"
+                  />
+
+                  {/* Donut de Consumo de Cupos */}
+                  {(() => {
+                    const totalCanjes = campanasData.campanas.reduce((s: number, c: any) => s + (c.canjesUsados || 0), 0);
+                    const totalCupos = campanasData.campanas.reduce((s: number, c: any) => s + (c.maximoCanjes || 0), 0);
+                    const disponibles = Math.max(0, totalCupos - totalCanjes);
+
+                    return (
+                      <GraficoDonutCircular
+                        items={[
+                          {
+                            label: 'Canjes Redimidos',
+                            valor: totalCanjes,
+                            color: '#10B981',
+                            subtexto: `${totalCanjes} clientes beneficiados`,
+                          },
+                          {
+                            label: 'Cupos Disponibles',
+                            valor: disponibles,
+                            color: '#8B5CF6',
+                            subtexto: `${disponibles} canjes aún por redimir`,
+                          },
+                        ]}
+                        titulo="Eficiencia y Consumo de Cupos"
+                        subtitulo="Proporción de beneficios comerciales consumidos vs capacidad"
+                        valorCentro={totalCupos > 0 ? `${((totalCanjes / totalCupos) * 100).toFixed(0)}%` : '100%'}
+                        etiquetaCentro="Tasa de Uso"
+                      />
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Filtros de campañas */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row items-center gap-3 shadow-xs">
+                <div className="relative flex-1 w-full">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+                  <input
+                    type="text"
+                    value={busquedaCampana}
+                    onChange={(e) => setBusquedaCampana(e.target.value)}
+                    placeholder="Buscar por código promocional o título..."
+                    className="w-full pl-9 pr-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+
+                <div className="w-full sm:w-48">
+                  <select
+                    value={filtroCampanaEstado}
+                    onChange={(e) => setFiltroCampanaEstado(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  >
+                    <option value="TODAS">Todos los Estados</option>
+                    <option value="ACTIVAS">Solo Activas</option>
+                    <option value="INACTIVAS">Solo Finalizadas / Inactivas</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Tabla de Rendimiento de Campañas */}
+              <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
+                {loadingCampanas ? (
+                  <div className="p-14 text-center text-xs text-[var(--muted-foreground)] flex flex-col items-center justify-center gap-2">
+                    <Loader2 size={30} className="animate-spin text-purple-600" />
+                    <span>Analizando métricas de campañas y canjes...</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                        <tr>
+                          <th className="px-4 py-3">Campaña / Código</th>
+                          <th className="px-4 py-3 text-center">Tipo de Descuento</th>
+                          <th className="px-4 py-3 text-center">Canjes / Límite</th>
+                          <th className="px-4 py-3 text-center">Efectividad</th>
+                          <th className="px-4 py-3 text-right">Venta Generada</th>
+                          <th className="px-4 py-3 text-center">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {(() => {
+                          const campanasFiltradas = (campanasData?.campanas || []).filter((c: CampanaReporte) => {
+                            const matchTexto =
+                              !busquedaCampana ||
+                              c.titulo?.toLowerCase().includes(busquedaCampana.toLowerCase()) ||
+                              c.codigo?.toLowerCase().includes(busquedaCampana.toLowerCase());
+                            const matchEstado =
+                              filtroCampanaEstado === 'TODAS' ||
+                              (filtroCampanaEstado === 'ACTIVAS' && c.activo) ||
+                              (filtroCampanaEstado === 'INACTIVAS' && !c.activo);
+                            return matchTexto && matchEstado;
+                          });
+
+                          if (campanasFiltradas.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={6} className="p-10 text-center text-xs text-[var(--muted-foreground)]">
+                                  No se encontraron campañas promocionales con los filtros seleccionados.
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return campanasFiltradas.map((c: CampanaReporte) => {
+                            const usoPct = c.maximoCanjes > 0 ? (c.canjesUsados / c.maximoCanjes) * 100 : 0;
+                            const funciono = c.canjesUsados > 0;
+                            return (
+                              <tr key={c.id} className="hover:bg-[var(--muted)]/20 transition-colors">
+                                <td className="px-4 py-3.5">
+                                  <div className="font-extrabold text-[var(--foreground)] text-xs">
+                                    {c.titulo}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-700 dark:text-purple-300 rounded font-mono font-bold text-[10px]">
+                                      {c.codigo}
+                                    </span>
+                                    <span className="text-[10px] text-[var(--muted-foreground)]">
+                                      Desde {new Date(c.fechaInicio).toLocaleDateString('es-EC')}
+                                    </span>
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3.5 text-center">
+                                  <span className="font-bold text-[var(--foreground)] text-[11px]">
+                                    {c.tipoDescuento === 'PORCENTAJE' && `${c.valorDescuento}% de descuento`}
+                                    {c.tipoDescuento === 'MONTO_FIJO' && `$${c.valorDescuento.toFixed(2)} fijos`}
+                                    {c.tipoDescuento === 'DESCUENTO_POR_PAR' && `$${c.valorDescuento.toFixed(2)} por par`}
+                                  </span>
+                                </td>
+
+                                <td className="px-4 py-3.5 text-center">
+                                  <div className="space-y-1">
+                                    <div className="font-bold text-xs">
+                                      {c.canjesUsados} / {c.maximoCanjes > 0 ? c.maximoCanjes : '∞'}
+                                    </div>
+                                    {c.maximoCanjes > 0 && (
+                                      <div className="w-20 mx-auto bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
+                                        <div
+                                          style={{ width: `${Math.min(usoPct, 100)}%` }}
+                                          className={`h-full rounded-full ${usoPct >= 80 ? 'bg-emerald-500' : 'bg-purple-600'}`}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3.5 text-center">
+                                  {funciono ? (
+                                    <span className={`px-2 py-0.5 rounded-md font-extrabold text-[10px] ${
+                                      usoPct >= 50
+                                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                        : 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300'
+                                    }`}>
+                                      {usoPct >= 50 ? 'Alta Efectividad' : 'Desempeño Positivo'}
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 bg-slate-500/15 text-slate-600 dark:text-slate-400 rounded-md font-bold text-[10px]">
+                                      Sin Canjes
+                                    </span>
+                                  )}
+                                </td>
+
+                                <td className="px-4 py-3.5 text-right">
+                                  <div className="font-black text-sm text-emerald-600">
+                                    ${(c.montoTotalGenerado || 0).toFixed(2)}
+                                  </div>
+                                  <div className="text-[10px] text-[var(--muted-foreground)]">
+                                    {c.paresVendidos || 0} pares comercializados
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3.5 text-center">
+                                  <span className={`px-2 py-0.5 rounded-full font-extrabold text-[10px] ${
+                                    c.activo
+                                      ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                                      : 'bg-slate-500/10 text-slate-600 border border-slate-500/20'
+                                  }`}>
+                                    {c.activo ? 'ACTIVA' : 'FINALIZADA'}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 4: FINANZAS & MÉTODOS DE PAGO                              */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'finanzas' && (
+            <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF para Finanzas */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
+                    <DollarSign size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Reporte Financiero & Canales de Recaudación
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Desglose de liquidez por método de abono, efectivo, transferencias bancarias y cartera pendiente
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleReporteFinanzasPdf('preview')}
+                    disabled={loading || !reporteData}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteFinanzasPdf('download')}
+                    disabled={loading || !reporteData}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Barra de Filtros Activos para Finanzas */}
+              <div className="flex flex-wrap items-center gap-2 p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl text-xs shadow-2xs">
+                <span className="font-bold text-[var(--muted-foreground)] flex items-center gap-1.5 mr-1">
+                  <Filter size={13} className="text-blue-600" />
+                  <span>Filtros Activos:</span>
+                </span>
+                <span className="px-2.5 py-1 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg font-bold">
+                   {periodo} {periodo === 'PERSONALIZADO' && `(${fechaDesde || 'Inicio'} a ${fechaHasta || 'Fin'})`}
+                </span>
+                <span className="px-2.5 py-1 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg font-bold">
+                  {sucursalSeleccionada === 'TODAS' ? 'Todas las Sucursales' : (sucursales.find(s => s.id === sucursalSeleccionada)?.name || 'Sucursal Seleccionada')}
+                </span>
+                <span className={`px-2.5 py-1 rounded-lg font-bold border ${
+                  vendedorSeleccionado !== 'TODOS' ? 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-300' : 'bg-[var(--muted)]/50 border-[var(--border)]'
+                }`}>
+                  {vendedorSeleccionado === 'TODOS' ? 'Todos los Trabajadores' : capitalizarNombreCompleto(vendedores.find(v => v.id === vendedorSeleccionado)?.nombre || 'Trabajador')}
+                </span>
+                <span className={`px-2.5 py-1 rounded-lg font-bold border ${
+                  canalSeleccionado !== 'TODOS' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300' : 'bg-[var(--muted)]/50 border-[var(--border)]'
+                }`}>
+                  {canalSeleccionado === 'TODOS'
+                    ? 'Todos los Canales'
+                    : canalSeleccionado === 'POS' || canalSeleccionado === 'MANUAL'
+                    ? 'POS Mostrador'
+                    : canalSeleccionado === 'PEDIDOS'
+                    ? 'Pedidos / Mayoristas'
+                    : canalSeleccionado === 'WHATSAPP'
+                    ? 'Pedidos WhatsApp'
+                    : 'Catálogo Digital'}
+                </span>
+                {(vendedorSeleccionado !== 'TODOS' || canalSeleccionado !== 'TODOS' || sucursalSeleccionada !== 'TODAS') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVendedorSeleccionado('TODOS');
+                      setCanalSeleccionado('TODOS');
+                      if (isGlobalAdmin) setSucursalSeleccionada('TODAS');
+                    }}
+                    className="ml-auto text-[11px] font-bold text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <RotateCcw size={12} />
+                    <span>Restablecer Filtros</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Donut de Métodos de Abono y Cobro */}
+                <GraficoDonutCircular
+                  items={Object.entries(reporteData?.distribucionMetodosAbono || {}).map(([met, d]: [string, any], idx: number) => {
+                    const paleta = ['#10B981', '#0EA5E9', '#6366F1', '#F59E0B', '#EC4899'];
+                    const labelTexto =
+                      met === 'EFECTIVO' ? 'Efectivo en Caja'
+                      : met === 'TRANSFERENCIA' ? 'Transferencia Bancaria'
+                      : met === 'DEPOSITO' ? 'Depósito Bancario'
+                      : met === 'CHEQUE' ? 'Cheque / Documento'
+                      : met.replace('_', ' ');
+
+                    return {
+                      label: labelTexto,
+                      valor: d.monto || 0,
+                      color: paleta[idx % paleta.length],
+                      subtexto: `${d.count} abonos recibidos`,
+                    };
+                  })}
+                  titulo="Recaudación por Método de Abono"
+                  subtitulo="Flujo de liquidez cobrado en el periodo según la forma de pago"
+                  valorCentro={`$${kpis.totalRecaudadoCobros.toFixed(0)}`}
+                  etiquetaCentro="Total Cobrado"
+                />
+
+                {/* Resumen de Cartera e Índices Financieros */}
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs flex flex-col justify-between">
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
+                    Índices Financieros & Cartera de Clientes
+                  </h3>
+
+                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl space-y-1">
+                    <span className="text-[11px] font-bold text-red-600 uppercase">Saldo Deudor Pendiente en Cartera:</span>
+                    <div className="text-2xl font-black text-red-600">
+                      ${kpis.saldoCarteraTotal.toFixed(2)}
+                    </div>
+                    <p className="text-[10px] text-red-700/80">
+                      Total adeudado por clientes en notas y compras a crédito activas ({kpis.clientesConDeudaCount || 0} clientes deudores).
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-1">
+                    <span className="text-[11px] font-bold text-emerald-600 uppercase">Efectividad de Recaudación en el Periodo:</span>
+                    <div className="text-2xl font-black text-emerald-600">
+                      ${kpis.totalRecaudadoCobros.toFixed(2)}
+                    </div>
+                    <p className="text-[10px] text-emerald-700/80">
+                      Monto líquido ingresado a caja por concepto de cobros y abonos en estas fechas.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ventas y Recaudación por Canal de Venta & Contado vs Crédito */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Ventas por Canal de Entrada */}
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
+                    <span>Ventas por Canal de Entrada</span>
+                    <span className="text-[10px] text-[var(--muted-foreground)] font-normal">Facturación total</span>
+                  </h3>
+                  <div className="space-y-2 text-xs">
+                    {[
+                      { key: 'MANUAL', label: 'POS Mostrador / Venta Directa', data: reporteData?.distribucionCanales?.MANUAL, color: 'bg-emerald-600' },
+                      { key: 'WHATSAPP', label: 'Pedidos WhatsApp / Comercial', data: reporteData?.distribucionCanales?.WHATSAPP, color: 'bg-blue-600' },
+                      { key: 'CATALOGO', label: 'Catálogo Digital Web', data: reporteData?.distribucionCanales?.CATALOGO, color: 'bg-purple-600' },
+                    ].map((c) => {
+                      const monto = c.data?.monto || 0;
+                      const pares = c.data?.pares || 0;
+                      const pct = kpis.totalIngresos > 0 ? (monto / kpis.totalIngresos) * 100 : 0;
+                      return (
+                        <div key={c.key} className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-1">
+                          <div className="flex justify-between items-center font-bold">
+                            <span>{c.label}</span>
+                            <span>${monto.toFixed(2)} ({pct.toFixed(0)}%)</span>
+                          </div>
+                          <div className="w-full bg-[var(--muted)] h-2 rounded-full overflow-hidden">
+                            <div style={{ width: `${pct}%` }} className={`${c.color} h-full rounded-full`} />
+                          </div>
+                          <div className="text-[10px] text-[var(--muted-foreground)] flex justify-between">
+                            <span>{c.data?.count || 0} pedidos registrados</span>
+                            <span>{pares} pares vendidos</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Formas de Pago: Contado vs Crédito */}
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
+                    <span>Distribución Contado vs Crédito</span>
+                    <span className="text-[10px] text-[var(--muted-foreground)] font-normal">Forma comercial</span>
+                  </h3>
+                  <div className="space-y-2 text-xs">
+                    {[
+                      { key: 'CONTADO', label: 'Ventas de Contado', data: reporteData?.distribucionFormasPago?.CONTADO, color: 'bg-emerald-600' },
+                      { key: 'CREDITO', label: 'Ventas a Crédito', data: reporteData?.distribucionFormasPago?.CREDITO, color: 'bg-blue-600' },
+                    ].map((f) => {
+                      const monto = f.data?.monto || 0;
+                      const pct = kpis.totalIngresos > 0 ? (monto / kpis.totalIngresos) * 100 : 0;
+                      return (
+                        <div key={f.key} className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-1">
+                          <div className="flex justify-between items-center font-bold">
+                            <span>{f.label}</span>
+                            <span>${monto.toFixed(2)} ({pct.toFixed(0)}%)</span>
+                          </div>
+                          <div className="w-full bg-[var(--muted)] h-2 rounded-full overflow-hidden">
+                            <div style={{ width: `${pct}%` }} className={`${f.color} h-full rounded-full`} />
+                          </div>
+                          <div className="text-[10px] text-[var(--muted-foreground)]">
+                            {f.data?.count || 0} transacciones realizadas
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Cobros y Recaudación por Trabajador / Vendedor */}
+              {reporteData?.recaudacionPorVendedor && reporteData.recaudacionPorVendedor.length > 0 && (
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
+                    <span>Cobros y Recaudación por Trabajador</span>
+                    <span className="text-[10px] text-[var(--muted-foreground)] font-normal">Abonos recaudados</span>
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {reporteData.recaudacionPorVendedor.map((v: any) => {
+                      const pct = kpis.totalRecaudadoCobros > 0 ? (v.totalAbonos / kpis.totalRecaudadoCobros) * 100 : 0;
+                      return (
+                        <div key={v.userId} className="p-3.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-black text-xs text-[var(--foreground)] truncate">{capitalizarNombreCompleto(v.nombre)}</span>
+                            <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-blue-500/10 text-blue-600">
+                              {v.rol?.replace('ROL_', '') || 'VENDEDOR'}
+                            </span>
+                          </div>
+                          <div className="flex items-baseline justify-between">
+                            <span className="text-lg font-black text-emerald-600 font-mono">
+                              ${v.totalAbonos.toFixed(2)}
+                            </span>
+                            <span className="text-xs font-bold text-[var(--muted-foreground)]">
+                              {pct.toFixed(0)}% del total
+                            </span>
+                          </div>
+                          <div className="w-full bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
+                            <div style={{ width: `${pct}%` }} className="bg-emerald-500 h-full rounded-full" />
+                          </div>
+                          <p className="text-[10px] text-[var(--muted-foreground)]">
+                            {v.count} abonos recibidos
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Historial Detallado de Transacciones de Cobro y Abonos */}
+              {reporteData?.abonosRecientes && reporteData.abonosRecientes.length > 0 && (
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
+                        Historial de Transacciones de Cobro y Abonos
+                      </h3>
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        Últimos movimientos financieros registrados en el periodo según los filtros activos
+                      </p>
+                    </div>
+
+                    <div className="relative w-full sm:w-64">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+                      <input
+                        type="text"
+                        value={filtroAbonosFinanzasTexto}
+                        onChange={(e) => setFiltroAbonosFinanzasTexto(e.target.value)}
+                        placeholder="Buscar por cliente, cobrador..."
+                        className="w-full pl-8 pr-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[var(--muted)]/60 text-[var(--muted-foreground)] text-[10px] uppercase font-bold tracking-wider border-b border-[var(--border)]">
+                        <tr>
+                          <th className="py-2.5 px-3.5">Fecha</th>
+                          <th className="py-2.5 px-3.5">Cliente</th>
+                          <th className="py-2.5 px-3.5">Recaudador / Vendedor</th>
+                          <th className="py-2.5 px-3.5">Canal</th>
+                          <th className="py-2.5 px-3.5">Método</th>
+                          <th className="py-2.5 px-3.5 text-right">Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)] font-medium">
+                        {reporteData.abonosRecientes
+                          .filter((ab: any) => {
+                            if (!filtroAbonosFinanzasTexto.trim()) return true;
+                            const t = filtroAbonosFinanzasTexto.toLowerCase();
+                            return (
+                              ab.clienteNombre?.toLowerCase().includes(t) ||
+                              ab.usuarioNombre?.toLowerCase().includes(t) ||
+                              ab.metodo?.toLowerCase().includes(t) ||
+                              ab.notas?.toLowerCase().includes(t)
+                            );
+                          })
+                          .map((ab: any) => (
+                            <tr key={ab.id} className="hover:bg-[var(--muted)]/20 transition-colors">
+                              <td className="py-2.5 px-3.5 text-[var(--muted-foreground)] font-mono text-[11px]">
+                                {new Date(ab.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                              <td className="py-2.5 px-3.5 font-bold text-[var(--foreground)]">
+                                {ab.clienteNombre}
+                                {ab.notaNumero && (
+                                  <span className="block text-[10px] font-mono text-[var(--muted-foreground)]">
+                                    Nota #{ab.notaNumero}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3.5 text-[var(--foreground)]">
+                                {ab.usuarioNombre}
+                              </td>
+                              <td className="py-2.5 px-3.5">
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                  ab.canal === 'MANUAL' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' :
+                                  ab.canal === 'WHATSAPP' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' :
+                                  'bg-purple-500/10 text-purple-700 dark:text-purple-300'
+                                }`}>
+                                  {ab.canal === 'MANUAL' ? 'POS Mostrador' : ab.canal === 'WHATSAPP' ? 'WhatsApp' : 'Catálogo Web'}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3.5">
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-[var(--muted)] text-[var(--foreground)]">
+                                  {ab.metodo}
+                                </span>
+                                {ab.notas && (
+                                  <span className="block text-[9px] text-[var(--muted-foreground)] truncate max-w-[120px]" title={ab.notas}>
+                                    {ab.notas}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3.5 text-right font-mono font-black text-emerald-600 text-sm">
+                                +${ab.monto.toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 5: PROYECCIÓN IA / MACHINE LEARNING                        */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'proyeccion_ml' && (
+            <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl shadow-sm">
+                    <BrainCircuit size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Motor Predictivo de Demanda de Calzado (Nexora ML)
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Proyección estadística e inferencia basada en patrones de consumo del cantón Cevallos
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={cargarProyeccionMl}
+                    disabled={loadingMl}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <Sparkles size={14} className={loadingMl ? 'animate-spin text-blue-600' : 'text-blue-600'} />
+                    <span>{loadingMl ? 'Calculando...' : 'Recalcular Proyección'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteProyeccionMlPdf('preview')}
+                    disabled={loadingMl || !proyeccionMl}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteProyeccionMlPdf('download')}
+                    disabled={loadingMl || !proyeccionMl}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {loadingMl ? (
+                <div className="p-12 text-center text-xs text-[var(--muted-foreground)] flex flex-col items-center justify-center gap-2">
+                  <Loader2 size={32} className="animate-spin text-blue-600" />
+                  <span>Procesando serie temporal y curvas estacionales...</span>
+                </div>
+              ) : proyeccionMl ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl">
+                      <span className="text-[10px] font-bold uppercase text-purple-700 dark:text-purple-300 block mb-1">
+                        Pares Proyectados (Próx. 30 Días):
+                      </span>
+                      <span className="text-2xl font-black text-purple-900 dark:text-purple-200">
+                        {proyeccionMl.totalParesProyectados || 0} pares
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl">
+                      <span className="text-[10px] font-bold uppercase text-indigo-700 dark:text-indigo-300 block mb-1">
+                        Nivel de Confianza del Modelo:
+                      </span>
+                      <span className="text-2xl font-black text-indigo-900 dark:text-indigo-200">
+                        {proyeccionMl.confianza || '89.4%'}
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
+                      <span className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300 block mb-1">
+                        Recomendación Operativa:
+                      </span>
+                      <span className="text-xs font-extrabold text-emerald-900 dark:text-emerald-200 block">
+                        Abastecer series juveniles y adulto para pico de fin de semana
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Gráfico de Curva Predictiva */}
+                  {Array.isArray(proyeccionMl.proyecciones) && proyeccionMl.proyecciones.length > 1 && (
+                    <GraficoCurvaTendencia
+                      puntos={proyeccionMl.proyecciones.map((p: any) => ({
+                        label: p.diaLabel || p.fecha?.slice(5) || '',
+                        valor: Number(p.demandaEsperadaPares) || 0,
+                      }))}
+                      titulo="Curva de Demanda Proyectada (Próx. 30 Días)"
+                      subtitulo="Pares de calzado estimados por día según el modelo predictivo"
+                      primaryColor="#9333EA"
+                      secondaryColor="#7C3AED"
+                      serie1Nombre="Pares proyectados"
+                      altura={220}
+                    />
+                  )}
+
+                  {/* Tabla de proyección diaria */}
+                  <div className="border border-[var(--border)] rounded-2xl overflow-hidden">
+                    <div className="p-3 bg-[var(--muted)]/40 text-xs font-extrabold text-[var(--foreground)] border-b border-[var(--border)]">
+                      Demanda Proyectada Día por Día
+                    </div>
+                    <div className="max-h-60 overflow-y-auto divide-y divide-[var(--border)] text-xs">
+                      {proyeccionMl.proyecciones?.map((p: any, i: number) => (
+                        <div key={i} className="p-2.5 flex items-center justify-between hover:bg-[var(--muted)]/20">
+                          <span className="font-bold text-[var(--foreground)]">{p.diaLabel || p.fecha}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] text-[var(--muted-foreground)]">
+                              Rango: {p.limiteInferior} - {p.limiteSuperior} pares
+                            </span>
+                            <span className="px-2 py-0.5 bg-purple-500/15 text-purple-700 dark:text-purple-300 rounded-md font-black">
+                              {p.demandaEsperadaPares} pares
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
+                  Presiona «Recalcular Proyección IA» para consultar la predicción de ventas.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* TAB 10: ABASTECIMIENTO DE PROVEEDORES                           */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'proveedores' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Cabecera del Módulo */}
+              <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                      CICLO COMPLETO DE COMERCIALIZACIÓN
+                    </span>
+                    <span className="text-xs text-[var(--muted-foreground)] font-mono">
+                      Proveedores → Stock → Ventas → Cobranzas
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
+                    <Package size={18} className="text-emerald-600" />
+                    <span>Reporte de Abastecimiento & Proveedores</span>
+                  </h3>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Control de compras a proveedores de calzado, lotes recibidos, anticipos entregados y cuentas pendientes del local.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleReporteProveedoresPdf('preview')}
+                    disabled={generandoProveedoresPdf || loadingProveedores}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    {generandoProveedoresPdf ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
+                    <span>Previsualizar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteProveedoresPdf('download')}
+                    disabled={generandoProveedoresPdf || loadingProveedores}
+                    className="px-3.5 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    <Download size={13} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {loadingProveedores ? (
+                <div className="p-12 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-2">
+                  <Loader2 size={24} className="animate-spin text-emerald-600" />
+                  <span>Cargando datos de abastecimiento de proveedores...</span>
+                </div>
+              ) : proveedoresData ? (
+                <>
+                  {/* Tarjetas KPI de Abastecimiento */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
+                        Total Comprado a Proveedores
+                      </span>
+                      <div className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                        ${Number(proveedoresData.kpis?.totalComprado || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
+                      </div>
+                      <span className="text-[10px] text-[var(--muted-foreground)] block">
+                        {proveedoresData.kpis?.totalLotes || 0} lotes / {proveedoresData.kpis?.totalPares || 0} pares de calzado
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
+                        Deuda Pendiente a Proveedores
+                      </span>
+                      <div className="text-2xl font-black font-mono text-orange-500">
+                        ${Number(proveedoresData.kpis?.deudaTotal || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
+                      </div>
+                      <span className="text-[10px] text-[var(--muted-foreground)] block">
+                        Cuentas por pagar del local a proveedores
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
+                        Anticipos Entregados (A Favor)
+                      </span>
+                      <div className="text-2xl font-black font-mono text-indigo-600 dark:text-indigo-400">
+                        +${Number(proveedoresData.kpis?.anticiposTotal || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
+                      </div>
+                      <span className="text-[10px] text-[var(--muted-foreground)] block">
+                        Dinero adelantado a proveedores
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
+                        Devoluciones / Garantías
+                      </span>
+                      <div className="text-2xl font-black font-mono text-red-500">
+                        ${Number(proveedoresData.kpis?.montoDevoluciones || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
+                      </div>
+                      <span className="text-[10px] text-[var(--muted-foreground)] block">
+                        {proveedoresData.kpis?.totalDevoluciones || 0} pares con observación de proveedor
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Gráficos Estadísticos de Abastecimiento */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Barras: Compras por Proveedor */}
+                    {Array.isArray(proveedoresData.porProveedor) && proveedoresData.porProveedor.length > 0 && (
+                      <GraficoBarrasModerno
+                        items={proveedoresData.porProveedor
+                          .sort((a: any, b: any) => (Number(b.totalComprado) || 0) - (Number(a.totalComprado) || 0))
+                          .slice(0, 8)
+                          .map((p: any) => ({
+                            label: p.nombre || 'Sin nombre',
+                            valor: Number(p.totalComprado) || 0,
+                          }))}
+                        titulo="Volumen de Compras por Proveedor"
+                        subtitulo="Monto total comprado a cada proveedor en el período"
+                        primaryColor={negocioInfo?.primaryColor || '#0EA5E9'}
+                        orientacion="horizontal"
+                        unidad="$"
+                      />
+                    )}
+
+                    {/* Donut: Pagado vs Pendiente */}
+                    <GraficoDonutCircular
+                      items={[
+                        {
+                          label: 'Pagado',
+                          valor: Math.max(0, (Number(proveedoresData.kpis?.totalComprado) || 0) - (Number(proveedoresData.kpis?.deudaTotal) || 0)),
+                          color: negocioInfo?.primaryColor || '#0EA5E9',
+                        },
+                        {
+                          label: 'Deuda Pendiente',
+                          valor: Number(proveedoresData.kpis?.deudaTotal) || 0,
+                          color: '#F97316',
+                        },
+                        {
+                          label: 'Anticipos a Favor',
+                          valor: Number(proveedoresData.kpis?.anticiposTotal) || 0,
+                          color: '#6366F1',
+                        },
+                      ].filter(d => d.valor > 0)}
+                      titulo="Estado de Cuentas a Proveedores"
+                      subtitulo="Distribución del capital pagado, deuda y anticipos"
+                    />
+                  </div>
+
+                  {/* Tabla de Proveedores */}
+                  <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+                      <div>
+                        <h4 className="text-sm font-bold text-[var(--foreground)]">
+                          Relación de Proveedores & Estado de Cuenta
+                        </h4>
+                        <p className="text-[11px] text-[var(--muted-foreground)]">
+                          {(proveedoresData.porProveedor || []).length} proveedores registrados del local
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Buscador */}
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Buscar proveedor o RUC..."
+                            value={filtroProveedorBusqueda}
+                            onChange={(e) => setFiltroProveedorBusqueda(e.target.value)}
+                            className="text-xs px-3 py-1.5 pl-8 bg-[var(--background)] border border-[var(--border)] rounded-xl w-48 focus:outline-none focus:border-emerald-500"
+                          />
+                          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                        </div>
+
+                        {/* Filtro Solvencia */}
+                        <select
+                          value={filtroProveedorSolvencia}
+                          onChange={(e) => setFiltroProveedorSolvencia(e.target.value)}
+                          className="text-xs px-2.5 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl font-bold cursor-pointer focus:outline-none"
+                        >
+                          <option value="TODOS">Todos los Estados</option>
+                          <option value="AL_DIA">Al Día</option>
+                          <option value="CON_ANTICIPO">Con Saldo a Favor</option>
+                          <option value="CON_DEUDA">Con Deuda Pendiente</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead>
+                          <tr className="border-b border-[var(--border)] text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
+                            <th className="py-2.5 px-3">Proveedor</th>
+                            <th className="py-2.5 px-3">RUC / Cédula</th>
+                            <th className="py-2.5 px-3">Ubicación</th>
+                            <th className="py-2.5 px-3 text-center">Lotes Recibidos</th>
+                            <th className="py-2.5 px-3 text-right">Total Comprado</th>
+                            <th className="py-2.5 px-3 text-right">Saldo a Favor</th>
+                            <th className="py-2.5 px-3 text-right">Deuda Pendiente</th>
+                            <th className="py-2.5 px-3 text-center">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border)]">
+                          {(proveedoresData.porProveedor || [])
+                            .filter((p: any) => {
+                              if (filtroProveedorSolvencia !== 'TODOS' && p.estadoSolvencia !== filtroProveedorSolvencia) return false;
+                              if (filtroProveedorBusqueda.trim()) {
+                                const q = filtroProveedorBusqueda.toLowerCase().trim();
+                                const nom = (p.nombre || '').toLowerCase();
+                                const ruc = (p.rucCedula || '').toLowerCase();
+                                const ciu = (p.ciudad || '').toLowerCase();
+                                if (!nom.includes(q) && !ruc.includes(q) && !ciu.includes(q)) return false;
+                              }
+                              return true;
+                            })
+                            .map((p: any) => (
+                              <tr key={p.id} className="hover:bg-[var(--muted)]/30 transition-colors">
+                                <td className="py-3 px-3 font-bold text-[var(--foreground)]">
+                                  {p.nombre}
+                                </td>
+                                <td className="py-3 px-3 font-mono text-[var(--muted-foreground)]">
+                                  {p.rucCedula || 'S/RUC'}
+                                </td>
+                                <td className="py-3 px-3 text-[var(--muted-foreground)]">
+                                  {p.ciudad || 'Cevallos'}
+                                </td>
+                                <td className="py-3 px-3 text-center">
+                                  <span className="font-bold">{p.totalLotes}</span>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] block">({p.totalPares} pares)</span>
+                                </td>
+                                <td className="py-3 px-3 text-right font-black font-mono text-emerald-600 dark:text-emerald-400">
+                                  ${Number(p.totalComprado || 0).toFixed(2)}
+                                </td>
+                                <td className="py-3 px-3 text-right font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                                  {Number(p.saldoAFavor || 0) > 0 ? `+$${Number(p.saldoAFavor).toFixed(2)}` : '—'}
+                                </td>
+                                <td className="py-3 px-3 text-right font-mono font-bold text-orange-500">
+                                  {Number(p.saldoPendiente || 0) > 0 ? `$${Number(p.saldoPendiente).toFixed(2)}` : '$0.00'}
+                                </td>
+                                <td className="py-3 px-3 text-center">
+                                  {p.estadoSolvencia === 'CON_ANTICIPO' ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">
+                                      Saldo a Favor
+                                    </span>
+                                  ) : p.estadoSolvencia === 'AL_DIA' ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                      Al Día
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/10 text-orange-600 border border-orange-500/20">
+                                      Con Deuda
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Lotes Recientes de Calzado Recibidos */}
+                  {Array.isArray(proveedoresData.lotesRecientes) && proveedoresData.lotesRecientes.length > 0 && (
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs space-y-3">
+                      <h4 className="text-sm font-bold text-[var(--foreground)]">
+                        Lotes y Comprobantes de Calzado Recibidos Recientemente
+                      </h4>
+                      <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-2xl overflow-hidden">
+                        {proveedoresData.lotesRecientes.slice(0, 8).map((lote: any) => (
+                          <div key={lote.id} className="p-3 flex items-center justify-between text-xs bg-[var(--card)]">
+                            <div>
+                              <div className="font-bold text-[var(--foreground)]">
+                                Comprobante #{lote.numeroFactura || 'S/N'} — {lote.proveedorNombre}
+                              </div>
+                              <div className="text-[10px] text-[var(--muted-foreground)]">
+                                Fecha: {new Date(lote.fechaCompra).toLocaleDateString('es-EC')} · {lote.itemsCount || 0} modelos/curvas
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs font-black font-mono text-emerald-600 dark:text-emerald-400">
+                                ${Number(lote.total || 0).toFixed(2)}
+                              </span>
+                              <span className="text-[10px] text-[var(--muted-foreground)] block">
+                                Estado: {lote.estado || 'RECIBIDO'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="p-8 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl">
+                  Selecciona la pestaña para consultar el abastecimiento de proveedores.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 11: REPORTE DE INVENTARIO CON VALORACIÓN FIFO            */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'inventario_fifo' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Cabecera del Módulo */}
+              <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                      MÉTODO DE COSTEO FIFO (FIRST-IN, FIRST-OUT)
+                    </span>
+                    <span className="text-xs text-[var(--muted-foreground)] font-mono">
+                      Lotes de Compra → PVP → Margen Real
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
+                    <Boxes size={18} className="text-emerald-600" />
+                    <span>Reporte de Inventario con Valoración FIFO</span>
+                  </h3>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Control físico de existencias valoradas según el costo de cada lote de compra, cálculo de ganancia estimada y alertas de reposición.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleReporteInventarioFifoPdf('preview')}
+                    disabled={generandoFifoPdf || loadingInventarioFifo || !inventarioFifoData}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    {generandoFifoPdf ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
+                    <span>Previsualizar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleReporteInventarioFifoPdf('download')}
+                    disabled={generandoFifoPdf || loadingInventarioFifo || !inventarioFifoData}
+                    className="px-3.5 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    {generandoFifoPdf ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {loadingInventarioFifo ? (
+                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
+                  <Loader2 size={32} className="animate-spin text-emerald-600" />
+                  <span className="text-xs font-bold">Calculando valoración FIFO de inventario...</span>
+                </div>
+              ) : inventarioFifoData ? (
+                <>
+                  {/* Tarjetas de Resumen (KPIs en Cabecera) */}
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                    {/* KPI 1: Total Pares */}
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
+                        <span>Pares en Bodega</span>
+                        <Package size={14} className="text-sky-500" />
+                      </div>
+                      <div className="text-xl font-black font-mono text-[var(--foreground)]">
+                        {inventarioFifoData.kpis.totalParesBodega} <span className="text-xs font-normal text-[var(--muted-foreground)]">pares</span>
+                      </div>
+                      <p className="text-[10px] text-[var(--muted-foreground)]">
+                        En {inventarioFifoData.kpis.totalModelos} variantes de calzado
+                      </p>
+                    </div>
+
+                    {/* KPI 2: Valor Total FIFO */}
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
+                        <span>Inversión FIFO</span>
+                        <DollarSign size={14} className="text-emerald-500" />
+                      </div>
+                      <div className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                        ${inventarioFifoData.kpis.valorTotalFifo.toFixed(2)}
+                      </div>
+                      <p className="text-[10px] text-[var(--muted-foreground)]">
+                        Al costo de compra de cada lote
+                      </p>
+                    </div>
+
+                    {/* KPI 3: Valor en Venta PVP */}
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
+                        <span>Valor PVP</span>
+                        <ShoppingBag size={14} className="text-indigo-500" />
+                      </div>
+                      <div className="text-xl font-black font-mono text-indigo-600 dark:text-indigo-400">
+                        ${inventarioFifoData.kpis.valorTotalPvp.toFixed(2)}
+                      </div>
+                      <p className="text-[10px] text-[var(--muted-foreground)]">
+                        Estimado a precio de venta
+                      </p>
+                    </div>
+
+                    {/* KPI 4: Ganancia Estimada */}
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
+                        <span>Ganancia Proyectada</span>
+                        <TrendingUp size={14} className="text-emerald-600" />
+                      </div>
+                      <div className="text-xl font-black font-mono text-emerald-700 dark:text-emerald-300">
+                        ${inventarioFifoData.kpis.gananciaEstimada.toFixed(2)}
+                      </div>
+                      <p className="text-[10px] font-bold text-emerald-600">
+                        Margen rentabilidad: {inventarioFifoData.kpis.margenEstimadoPct}%
+                      </p>
+                    </div>
+
+                    {/* KPI 5: Alertas de Stock */}
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1 col-span-2 lg:col-span-1">
+                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
+                        <span>Alertas de Stock</span>
+                        <AlertTriangle size={14} className="text-amber-500" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-black text-red-600">
+                          {inventarioFifoData.kpis.modelosAgotadosCount} agotados
+                        </span>
+                        <span className="text-xs text-[var(--muted-foreground)]">·</span>
+                        <span className="text-sm font-black text-amber-600">
+                          {inventarioFifoData.kpis.modelosStockBajoCount} en mínimo
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-[var(--muted-foreground)]">
+                        Pares críticos (&le; 2 pares)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Gráficos Estadísticos */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Gráfico 1: Top 5 Inversión FIFO vs PVP */}
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-3 flex items-center justify-between">
+                        <span>Top 5 Inversión en Bodega</span>
+                        <BarChart3 size={13} className="text-emerald-500" />
+                      </h4>
+                      <div className="space-y-2.5">
+                        {inventarioFifoData.graficos?.topInversion?.map((item: any, idx: number) => {
+                          const maxVal = inventarioFifoData.graficos.topInversion[0]?.costoTotalFifo || 1;
+                          const pct = Math.min(Math.round((item.costoTotalFifo / maxVal) * 100), 100);
+                          return (
+                            <div key={idx} className="space-y-1">
+                              <div className="flex justify-between text-[11px]">
+                                <span className="font-bold truncate max-w-[170px] text-[var(--foreground)]">{item.nombre}</span>
+                                <span className="font-mono text-emerald-600 font-bold">${item.costoTotalFifo.toFixed(0)}</span>
+                              </div>
+                              <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden">
+                                <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                              </div>
+                              <div className="flex justify-between text-[9px] text-[var(--muted-foreground)]">
+                                <span>{item.stockTotal} pares</span>
+                                <span>PVP: ${item.valorTotalPvp.toFixed(0)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Gráfico 2: Distribución por Serie */}
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-3 flex items-center justify-between">
+                        <span>Distribución de Pares por Serie</span>
+                        <PieChart size={13} className="text-sky-500" />
+                      </h4>
+                      <div className="space-y-2.5">
+                        {inventarioFifoData.graficos?.distribucionSerie?.map((item: any, idx: number) => {
+                          const paleta = ['bg-sky-500', 'bg-emerald-500', 'bg-indigo-500', 'bg-amber-500', 'bg-purple-500'];
+                          const colorCls = paleta[idx % paleta.length];
+                          return (
+                            <div key={idx} className="space-y-1">
+                              <div className="flex justify-between text-[11px]">
+                                <span className="font-bold text-[var(--foreground)]">{item.serie}</span>
+                                <span className="font-mono font-bold text-[var(--foreground)]">{item.pares} p ({item.porcentaje}%)</span>
+                              </div>
+                              <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden">
+                                <div className={`h-full ${colorCls} rounded-full transition-all`} style={{ width: `${item.porcentaje}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Gráfico 3: Semáforo del Estado del Inventario */}
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs flex flex-col justify-between">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-3 flex items-center justify-between">
+                        <span>Estado de Existencias</span>
+                        <Activity size={13} className="text-amber-500" />
+                      </h4>
+
+                      <div className="space-y-3 my-auto">
+                        {/* Óptimo */}
+                        <div className="flex items-center justify-between p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Stock Óptimo (&gt; 2 pares)</span>
+                          </div>
+                          <span className="text-xs font-black font-mono text-emerald-700 dark:text-emerald-400">
+                            {inventarioFifoData.graficos?.estadoInventario?.optimoCount || 0} mod ({inventarioFifoData.graficos?.estadoInventario?.optimoPct || 0}%)
+                          </span>
+                        </div>
+
+                        {/* Mínimo */}
+                        <div className="flex items-center justify-between p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                            <span className="text-xs font-bold text-amber-700 dark:text-amber-400">Stock Mínimo (1-2 pares)</span>
+                          </div>
+                          <span className="text-xs font-black font-mono text-amber-700 dark:text-amber-400">
+                            {inventarioFifoData.graficos?.estadoInventario?.minimoCount || 0} mod ({inventarioFifoData.graficos?.estadoInventario?.minimoPct || 0}%)
+                          </span>
+                        </div>
+
+                        {/* Agotado */}
+                        <div className="flex items-center justify-between p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                            <span className="text-xs font-bold text-red-700 dark:text-red-400">Sin Stock (0 pares)</span>
+                          </div>
+                          <span className="text-xs font-black font-mono text-red-700 dark:text-red-400">
+                            {inventarioFifoData.graficos?.estadoInventario?.agotadoCount || 0} mod ({inventarioFifoData.graficos?.estadoInventario?.agotadoPct || 0}%)
+                          </span>
+                        </div>
+                      </div>
+
+                      <p className="text-[10px] text-[var(--muted-foreground)] mt-2">
+                        Alimentado en tiempo real con salidas de bodega y mostrador.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Barra de Filtros del Reporte de Inventario */}
+                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                      {/* Buscador */}
+                      <div className="relative">
+                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
+                          Buscar Calzado
+                        </label>
+                        <div className="relative">
+                          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                          <input
+                            type="text"
+                            placeholder="Modelo, color, código o taller..."
+                            value={filtroFifoBusqueda}
+                            onChange={(e) => setFiltroFifoBusqueda(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                          />
+                          {filtroFifoBusqueda && (
+                            <button
+                              type="button"
+                              onClick={() => setFiltroFifoBusqueda('')}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Filtro por Rotación */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
+                          Por Rotación
+                        </label>
+                        <select
+                          value={filtroFifoRotacion}
+                          onChange={(e) => setFiltroFifoRotacion(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none"
+                        >
+                          <option value="TODOS">Todos los estados</option>
+                          <option value="MAS_VENDIDOS">Más vendidos (&gt; 5 pares)</option>
+                          <option value="MENOS_VENDIDOS">Menos vendidos (&le; 5 pares)</option>
+                          <option value="STOCK_BAJO"> Stock mínimo (&le; 2 pares)</option>
+                          <option value="SIN_STOCK">Agotados (0 pares)</option>
+                        </select>
+                      </div>
+
+                      {/* Filtro por Orden */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
+                          Ordenar Por
+                        </label>
+                        <select
+                          value={filtroFifoOrden}
+                          onChange={(e: any) => setFiltroFifoOrden(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none"
+                        >
+                          <option value="NOMBRE_ASC">Nombre (A → Z)</option>
+                          <option value="NOMBRE_DESC">Nombre (Z → A)</option>
+                          <option value="INVERSION_DESC">Mayor Inversión FIFO</option>
+                          <option value="PARES_DESC">Mayor Cantidad de Pares</option>
+                        </select>
+                      </div>
+
+                      {/* Filtro por Serie */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
+                          Serie
+                        </label>
+                        <select
+                          value={filtroFifoSerie}
+                          onChange={(e) => setFiltroFifoSerie(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none"
+                        >
+                          <option value="TODAS">Todas las Series</option>
+                          {inventarioFifoData.filtrosDisponibles?.series?.map((s: string) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Filtro por Taller Proveedor */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
+                          Taller Artesanal
+                        </label>
+                        <select
+                          value={filtroFifoProveedor}
+                          onChange={(e) => setFiltroFifoProveedor(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none"
+                        >
+                          <option value="TODOS">Todos los Talleres</option>
+                          {inventarioFifoData.filtrosDisponibles?.proveedores?.map((p: any) => (
+                            <option key={p.id} value={p.id}>{p.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tabla Detallada con Desglose de Lotes FIFO */}
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
+                    <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Package size={16} className="text-emerald-600" />
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--foreground)]">
+                          Modelos y Lotes en Bodega ({inventarioFifoData.modelos?.length || 0})
+                        </h4>
+                      </div>
+                      <span className="text-[11px] text-[var(--muted-foreground)]">
+                        Haz clic en &quot;Ver Lotes FIFO&quot; para inspeccionar costos de compra unitarios
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[var(--muted)]/50 text-[10px] uppercase tracking-wider text-[var(--muted-foreground)] border-b border-[var(--border)]">
+                          <tr>
+                            <th className="py-3 px-3">Calzado / Modelo</th>
+                            <th className="py-3 px-3">Serie & Taller</th>
+                            <th className="py-3 px-3">Curva de Tallas</th>
+                            <th className="py-3 px-3 text-right">Costo FIFO</th>
+                            <th className="py-3 px-3 text-right">PVP</th>
+                            <th className="py-3 px-3 text-center">Stock</th>
+                            <th className="py-3 px-3 text-right">Valor FIFO</th>
+                            <th className="py-3 px-3 text-right">Ganancia</th>
+                            <th className="py-3 px-3 text-center">Estado</th>
+                            <th className="py-3 px-3 text-center">Lotes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border)]">
+                          {inventarioFifoData.modelos?.length === 0 ? (
+                            <tr>
+                              <td colSpan={10} className="py-8 text-center text-[var(--muted-foreground)]">
+                                No se encontraron modelos con los filtros seleccionados.
+                              </td>
+                            </tr>
+                          ) : (
+                            inventarioFifoData.modelos.map((m: any) => {
+                              const expandido = modeloFifoExpandidoId === m.id;
+                              return (
+                                <React.Fragment key={m.id}>
+                                  <tr className={`hover:bg-[var(--muted)]/30 transition-colors ${expandido ? 'bg-emerald-500/5' : ''}`}>
+                                    {/* Modelo */}
+                                    <td className="py-3 px-3">
+                                      <div className="flex items-center gap-2.5">
+                                        {m.imageUrl ? (
+                                          <img
+                                            src={m.imageUrl}
+                                            alt={m.nombre}
+                                            className="w-10 h-10 rounded-xl object-cover border border-[var(--border)] shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-slate-400">
+                                            <Package size={18} />
+                                          </div>
+                                        )}
+                                        <div>
+                                          <div className="font-bold text-[var(--foreground)]">{m.nombre}</div>
+                                          <div className="text-[10px] text-[var(--muted-foreground)] font-mono">
+                                            {m.color} · Cód: {m.baseCode}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    {/* Serie & Taller */}
+                                    <td className="py-3 px-3">
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-600 border border-sky-500/20 block w-fit mb-1">
+                                        {m.serieNombre}
+                                      </span>
+                                      <span className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[140px] block">
+                                        {m.proveedorNombre}
+                                      </span>
+                                    </td>
+
+                                    {/* Curva de Tallas */}
+                                    <td className="py-3 px-3">
+                                      <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                        {m.curvaTallas?.map((t: any) => (
+                                          <span
+                                            key={t.numero}
+                                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                              t.cantidad === 0
+                                                ? 'bg-red-500/10 text-red-600'
+                                                : t.cantidad <= 2
+                                                ? 'bg-amber-500/10 text-amber-600'
+                                                : 'bg-emerald-500/10 text-emerald-600'
+                                            }`}
+                                          >
+                                            T{t.numero}:{t.cantidad}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </td>
+
+                                    {/* Costo FIFO Activo */}
+                                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-700 dark:text-slate-300">
+                                      ${m.costoFifoActivo.toFixed(2)}
+                                    </td>
+
+                                    {/* PVP */}
+                                    <td className="py-3 px-3 text-right font-mono font-bold text-indigo-600">
+                                      ${m.pvp.toFixed(2)}
+                                    </td>
+
+                                    {/* Stock Total */}
+                                    <td className="py-3 px-3 text-center">
+                                      <span className="font-mono font-black text-sm">
+                                        {m.stockTotal}
+                                      </span>
+                                      <span className="text-[9px] text-[var(--muted-foreground)] block">pares</span>
+                                    </td>
+
+                                    {/* Valor Total FIFO */}
+                                    <td className="py-3 px-3 text-right font-mono font-black text-emerald-600 dark:text-emerald-400">
+                                      ${m.valorTotalFifo.toFixed(2)}
+                                    </td>
+
+                                    {/* Ganancia Total */}
+                                    <td className="py-3 px-3 text-right">
+                                      <div className="font-mono font-black text-emerald-600">
+                                        ${m.gananciaTotal.toFixed(2)}
+                                      </div>
+                                      <div className="text-[9px] text-emerald-600/80 font-bold">
+                                        {m.margenPct}% marg.
+                                      </div>
+                                    </td>
+
+                                    {/* Estado */}
+                                    <td className="py-3 px-3 text-center">
+                                      {m.estadoStock === 'AGOTADO' ? (
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-600 border border-red-500/20">
+                                          Agotado
+                                        </span>
+                                      ) : m.estadoStock === 'MINIMO' ? (
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                                          Mínimo
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                          Óptimo
+                                        </span>
+                                      )}
+                                    </td>
+
+                                    {/* Botón Lotes */}
+                                    <td className="py-3 px-3 text-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => setModeloFifoExpandidoId(expandido ? null : m.id)}
+                                        className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all flex items-center gap-1 mx-auto cursor-pointer ${
+                                          expandido
+                                            ? 'bg-emerald-600 text-white shadow-2xs'
+                                            : 'bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)]'
+                                        }`}
+                                      >
+                                        <span>Lotes ({m.lotes?.length || 0})</span>
+                                        {expandido ? <ChevronDown size={12} className="rotate-180 transition-transform" /> : <ChevronDown size={12} />}
+                                      </button>
+                                    </td>
+                                  </tr>
+
+                                  {/* Subfila Desplegable de Lotes FIFO */}
+                                  {expandido && (
+                                    <tr className="bg-slate-50/70 dark:bg-slate-900/40">
+                                      <td colSpan={10} className="p-4">
+                                        <div className="space-y-2 border border-emerald-500/20 bg-[var(--card)] rounded-2xl p-3.5 shadow-2xs">
+                                          <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+                                            <span className="text-[11px] font-black uppercase text-emerald-600 tracking-wider flex items-center gap-1.5">
+                                              <Boxes size={13} />
+                                              Trazabilidad FIFO de Lotes: {m.nombre} ({m.color})
+                                            </span>
+                                            <span className="text-[10px] text-[var(--muted-foreground)]">
+                                              El sistema consume primero los lotes con fecha más antigua
+                                            </span>
+                                          </div>
+
+                                          {m.lotes && m.lotes.length > 0 ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+                                              {m.lotes.map((lote: any) => (
+                                                <div
+                                                  key={lote.id}
+                                                  className={`p-3 rounded-xl border text-xs space-y-1.5 ${
+                                                    lote.estado === 'ACTIVO'
+                                                      ? 'bg-emerald-500/10 border-emerald-500/30'
+                                                      : lote.estado === 'EN_ESPERA'
+                                                      ? 'bg-blue-500/5 border-blue-500/20'
+                                                      : 'bg-slate-100/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 opacity-60'
+                                                  }`}
+                                                >
+                                                  <div className="flex items-center justify-between">
+                                                    <span className="font-mono font-black text-xs text-[var(--foreground)]">{lote.codigo}</span>
+                                                    {lote.estado === 'ACTIVO' ? (
+                                                      <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-600 text-white animate-pulse">
+                                                        EN CONSUMO (ACTIVO)
+                                                      </span>
+                                                    ) : lote.estado === 'EN_ESPERA' ? (
+                                                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/20 text-blue-700 dark:text-blue-300">
+                                                        EN ESPERA
+                                                      </span>
+                                                    ) : (
+                                                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+                                                        AGOTADO
+                                                      </span>
+                                                    )}
+                                                  </div>
+
+                                                  <div className="text-[10px] text-[var(--muted-foreground)] flex justify-between">
+                                                    <span>Ingreso: {new Date(lote.entryDate).toLocaleDateString('es-EC')}</span>
+                                                    {lote.tallaNumero && <span>Talla: T{lote.tallaNumero}</span>}
+                                                  </div>
+
+                                                  <div className="flex justify-between items-center pt-1 border-t border-[var(--border)] text-[11px]">
+                                                    <span className="text-[var(--muted-foreground)]">Pares restantes:</span>
+                                                    <span className="font-mono font-black text-xs">
+                                                      {lote.cantidadDisponible} de {lote.cantidadRecibida} p
+                                                    </span>
+                                                  </div>
+
+                                                  <div className="grid grid-cols-3 gap-1 pt-1 text-[10px] text-center bg-[var(--background)]/70 p-1.5 rounded-lg">
+                                                    <div>
+                                                      <span className="text-[9px] text-[var(--muted-foreground)] block">Costo</span>
+                                                      <span className="font-mono font-bold">${lote.unitCost.toFixed(2)}</span>
+                                                    </div>
+                                                    <div>
+                                                      <span className="text-[9px] text-[var(--muted-foreground)] block">PVP</span>
+                                                      <span className="font-mono font-bold text-indigo-600">${lote.pvp.toFixed(2)}</span>
+                                                    </div>
+                                                    <div>
+                                                      <span className="text-[9px] text-[var(--muted-foreground)] block">Ganancia</span>
+                                                      <span className="font-mono font-black text-emerald-600">+${lote.gananciaPar.toFixed(2)}</span>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="py-4 text-center text-xs text-[var(--muted-foreground)]">
+                                              No hay lotes FIFO específicos registrados; este modelo utiliza el costo base del producto.
+                                            </div>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="p-8 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl">
+                  Selecciona la pestaña para consultar el inventario FIFO.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 12: REPORTE DE ENTREGAS Y PEDIDOS PENDIENTES             */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'entregas_pedidos' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Cabecera del Módulo */}
+              <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                      CONTROL OPERATIVO DE PEDIDOS Y ENTREGAS
+                    </span>
+                    <span className="text-xs text-[var(--muted-foreground)] font-mono">
+                      Cliente → Tallas Faltantes → Liquidación
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
+                    <Truck size={18} className="text-amber-600" />
+                    <span>Reporte de Entregas y Pedidos Pendientes</span>
+                  </h3>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Identifica de inmediato a qué clientes se les adeuda calzado, qué curvas o números específicos faltan entregar y saldos por cobrar.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleReporteEntregasPdf('preview')}
+                    disabled={generandoEntregasPdf || loadingEntregas || !entregasData}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    {generandoEntregasPdf ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
+                    <span>Previsualizar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleReporteEntregasPdf('download')}
+                    disabled={generandoEntregasPdf || loadingEntregas || !entregasData}
+                    className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                    title="Exportar y descargar el reporte de todos los pedidos y pares pendientes de entrega"
+                  >
+                    {generandoEntregasPdf ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                    <span>Exportar Pendientes de Entrega</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Subpestañas Simples de Trabajo */}
+              <div className="flex items-center gap-2 p-1.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl w-fit shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setSubTabEntregas('PENDIENTES')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                    subTabEntregas === 'PENDIENTES'
+                      ? 'bg-amber-500 text-slate-950 shadow-xs'
+                      : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  }`}
+                >
+                  <span>Pendientes de Entrega</span>
+                  {entregasData?.kpis?.totalPedidosPendientes !== undefined && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-slate-900/20 text-slate-950 font-black">
+                      {entregasData.kpis.totalPedidosPendientes}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSubTabEntregas('ENTREGADOS')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                    subTabEntregas === 'ENTREGADOS'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  }`}
+                >
+                  <span>Pedidos Entregados</span>
+                  {entregasData?.kpis?.totalPedidosEntregados !== undefined && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white/20 text-white font-black">
+                      {entregasData.kpis.totalPedidosEntregados}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSubTabEntregas('TODOS')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                    subTabEntregas === 'TODOS'
+                      ? 'bg-[#0F172A] text-white shadow-xs'
+                      : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  }`}
+                >
+                  <span>Todos los Pedidos</span>
+                </button>
+              </div>
+
+              {loadingEntregas ? (
+                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
+                  <Loader2 size={32} className="animate-spin text-amber-600" />
+                  <span className="text-xs font-bold">Cargando estado operativo de entregas...</span>
+                </div>
+              ) : entregasData ? (
+                <>
+                  {/* Tarjetas KPI de Entregas */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {/* KPI 1: Pedidos con Saldo Pendiente */}
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
+                        <span>Pedidos Pendientes</span>
+                        <Clock size={14} className="text-amber-500" />
+                      </div>
+                      <div className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">
+                        {entregasData.kpis.totalPedidosPendientes} <span className="text-xs font-normal text-[var(--muted-foreground)]">órdenes</span>
+                      </div>
+                      <p className="text-[10px] text-[var(--muted-foreground)]">
+                        Con pares pendientes de retiro
+                      </p>
+                    </div>
+
+                    {/* KPI 2: Total Pares que Faltan */}
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
+                        <span>Pares por Entregar</span>
+                        <Package size={14} className="text-red-500" />
+                      </div>
+                      <div className="text-xl font-black font-mono text-red-600 dark:text-red-400">
+                        {entregasData.kpis.totalParesPendientes} <span className="text-xs font-normal text-[var(--muted-foreground)]">pares</span>
+                      </div>
+                      <p className="text-[10px] text-[var(--muted-foreground)]">
+                        Adeudados a clientes en Cevallos
+                      </p>
+                    </div>
+
+                    {/* KPI 3: Pedidos Completados */}
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
+                        <span>Pedidos Entregados</span>
+                        <CheckCircle2 size={14} className="text-emerald-500" />
+                      </div>
+                      <div className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                        {entregasData.kpis.totalPedidosEntregados} <span className="text-xs font-normal text-[var(--muted-foreground)]">órdenes</span>
+                      </div>
+                      <p className="text-[10px] text-[var(--muted-foreground)]">
+                        {entregasData.kpis.totalParesEntregados} pares despachados
+                      </p>
+                    </div>
+
+                    {/* KPI 4: Saldo Pendiente de Cobro */}
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)] uppercase">
+                        <span>Saldo por Cobrar</span>
+                        <DollarSign size={14} className="text-indigo-500" />
+                      </div>
+                      <div className="text-xl font-black font-mono text-indigo-600 dark:text-indigo-400">
+                        ${entregasData.kpis.saldoPendienteCobro.toFixed(2)}
+                      </div>
+                      <p className="text-[10px] text-[var(--muted-foreground)]">
+                        Cobro al liquidar los pares restantes
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Buscador Rápido de Entregas */}
+                  <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs flex items-center justify-between gap-3">
+                    <div className="relative flex-1 max-w-md">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                      <input
+                        type="text"
+                        placeholder="Buscar por cliente, teléfono, número de nota o calzado..."
+                        value={filtroEntregasBusqueda}
+                        onChange={(e) => setFiltroEntregasBusqueda(e.target.value)}
+                        className="w-full pl-9 pr-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                      />
+                      {filtroEntregasBusqueda && (
+                        <button
+                          type="button"
+                          onClick={() => setFiltroEntregasBusqueda('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+
+                    <span className="text-xs font-bold text-[var(--muted-foreground)]">
+                      Mostrando {entregasData.pedidos?.length || 0} pedidos
+                    </span>
+                  </div>
+
+                  {/* Tabla de Pedidos y Entregas Pendientes */}
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[var(--muted)]/50 text-[10px] uppercase tracking-wider text-[var(--muted-foreground)] border-b border-[var(--border)]">
+                          <tr>
+                            <th className="py-3 px-3">N° Pedido / Fecha</th>
+                            <th className="py-3 px-3">Cliente & Contacto</th>
+                            <th className="py-3 px-3">Calzado Solicitado</th>
+                            <th className="py-3 px-3">Pares que Faltan Entregar</th>
+                            <th className="py-3 px-3">Progreso de Entrega</th>
+                            <th className="py-3 px-3 text-right">Saldo de Dinero</th>
+                            <th className="py-3 px-3 text-center">Acción Rápida</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border)]">
+                          {entregasData.pedidos?.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="py-12 text-center text-[var(--muted-foreground)]">
+                                <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-500 opacity-80" />
+                                <div className="font-bold text-sm text-[var(--foreground)]">No hay pedidos pendientes en esta vista</div>
+                                <div className="text-xs">¡Todas las entregas de calzado están al día!</div>
+                              </td>
+                            </tr>
+                          ) : (
+                            entregasData.pedidos.map((p: any) => {
+                              const estaLiquidando = liquidandoPedidoId === p.id;
+                              return (
+                                <tr key={p.id} className="hover:bg-[var(--muted)]/30 transition-colors">
+                                  {/* N° Pedido & Fecha */}
+                                  <td className="py-3.5 px-3">
+                                    <div className="font-mono font-black text-xs text-[var(--foreground)]">{p.numeroPedido}</div>
+                                    <div className="text-[10px] text-[var(--muted-foreground)]">
+                                      {new Date(p.createdAt).toLocaleDateString('es-EC')}
+                                    </div>
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-[var(--muted-foreground)] mt-0.5 inline-block">
+                                      {p.tipoPago}
+                                    </span>
+                                  </td>
+
+                                  {/* Cliente & Contacto */}
+                                  <td className="py-3.5 px-3">
+                                    <div className="font-bold text-[var(--foreground)]">{p.cliente?.nombre}</div>
+                                    <div className="flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)] mt-0.5">
+                                      {p.cliente?.telefono ? (
+                                        <a
+                                          href={`https://wa.me/593${p.cliente.telefono.replace(/^0/, '')}`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="text-emerald-600 hover:underline flex items-center gap-1 font-mono"
+                                          title="Escribir al cliente por WhatsApp"
+                                        >
+                                          <Phone size={11} />
+                                          {p.cliente.telefono}
+                                        </a>
+                                      ) : (
+                                        <span>Sin teléfono</span>
+                                      )}
+                                      <span className="px-1 py-0.2 rounded text-[9px] font-extrabold bg-blue-500/10 text-blue-600">
+                                        Score {p.cliente?.scoring || 'B'}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Calzado Solicitado */}
+                                  <td className="py-3.5 px-3">
+                                    <div className="font-bold text-[var(--foreground)]">{p.calzadoResumen}</div>
+                                    <div className="text-[10px] text-[var(--muted-foreground)]">
+                                      {p.lineasDetalle?.length || 1} curva(s) en orden
+                                    </div>
+                                  </td>
+
+                                  {/* Pares que Faltan Entregar (DESTACADO) */}
+                                  <td className="py-3.5 px-3">
+                                    {p.paresPendientes > 0 ? (
+                                      <div className="p-2 bg-amber-500/10 border border-amber-500/25 rounded-xl space-y-0.5 max-w-[220px]">
+                                        <div className="text-[10px] font-extrabold uppercase text-amber-700 dark:text-amber-400">
+                                          {p.paresPendientes} {p.paresPendientes === 1 ? 'par adeudado' : 'pares adeudados'}
+                                        </div>
+                                        <div className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                                          {p.resumenPendientesTexto}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600">
+                                        <CheckCircle2 size={14} />
+                                        <span>Entregado Completo</span>
+                                      </div>
+                                    )}
+                                  </td>
+
+                                  {/* Progreso de Entrega */}
+                                  <td className="py-3.5 px-3">
+                                    <div className="space-y-1 w-[130px]">
+                                      <div className="flex justify-between text-[10px] font-mono">
+                                        <span className="font-bold">{p.paresEntregados} de {p.totalPares} p</span>
+                                        <span className="text-[var(--muted-foreground)]">{p.porcentajeEntrega}%</span>
+                                      </div>
+                                      <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full transition-all ${
+                                            p.porcentajeEntrega === 100
+                                              ? 'bg-emerald-500'
+                                              : p.porcentajeEntrega > 0
+                                              ? 'bg-amber-500'
+                                              : 'bg-red-400'
+                                          }`}
+                                          style={{ width: `${p.porcentajeEntrega}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-[9px] text-[var(--muted-foreground)] block">
+                                        {p.paresPendientes > 0 ? `Faltan ${p.paresPendientes} pares` : 'Completado'}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Saldo de Dinero */}
+                                  <td className="py-3.5 px-3 text-right font-mono">
+                                    <div className="font-black text-sm text-[var(--foreground)]">
+                                      ${p.saldoPendiente.toFixed(2)}
+                                    </div>
+                                    <div className="text-[10px] text-[var(--muted-foreground)]">
+                                      Total: ${p.montoTotal.toFixed(2)}
+                                    </div>
+                                  </td>
+
+                                  {/* Acción Rápida */}
+                                  <td className="py-3.5 px-3 text-center">
+                                    {p.paresPendientes > 0 ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleLiquidarEntrega(p.id)}
+                                        disabled={estaLiquidando}
+                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 mx-auto cursor-pointer shadow-2xs disabled:opacity-50"
+                                        title="Registrar la entrega de los pares restantes al cliente"
+                                      >
+                                        {estaLiquidando ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                                        <span>Entregar Pares Restantes</span>
+                                      </button>
+                                    ) : (
+                                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                        Liquidado 100%
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="p-8 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl">
+                  Selecciona la pestaña para consultar las entregas pendientes.
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Modal de Detalle de Venta POS / Ticket Térmico */}
+      {ventaPosDetalle && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setVentaPosDetalle(null); }}
+          onClick={(e) => { if (e.target === e.currentTarget) setVentaPosDetalle(null); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl max-w-md w-full h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 bg-[var(--muted)]/40 border-b border-[var(--border)] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Receipt size={16} className="text-emerald-600" />
+                <span className="font-extrabold text-xs uppercase tracking-wider">
+                  Detalle de Venta {ventaPosDetalle.numeroNota}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVentaPosDetalle(null)}
+                className="p-1 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+              <div className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-2xl space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted-foreground)]">Fecha:</span>
+                  <span className="font-bold">{new Date(ventaPosDetalle.fecha).toLocaleString('es-EC')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted-foreground)]">Sucursal:</span>
+                  <span className="font-bold">{ventaPosDetalle.sucursalNombre}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted-foreground)]">Cliente:</span>
+                  <span className="font-bold">{ventaPosDetalle.cliente?.nombre} ({ventaPosDetalle.cliente?.cedula})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted-foreground)]">Vendedor:</span>
+                  <span className="font-bold">{ventaPosDetalle.vendedor?.nombre}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted-foreground)]">Método de Pago:</span>
+                  <span className="font-bold text-emerald-600">{ventaPosDetalle.metodoPago}</span>
+                </div>
+                {ventaPosDetalle.detallePago && (
+                  <div className="flex justify-between text-[11px] pt-1 border-t border-[var(--border)]">
+                    <span className="text-[var(--muted-foreground)]">Ref/Voucher:</span>
+                    <span className="font-medium truncate max-w-[200px]">{ventaPosDetalle.detallePago}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <span className="font-extrabold uppercase text-[10px] tracking-wider text-[var(--muted-foreground)]">
+                  Líneas de Calzado Vendidas
+                </span>
+                <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-2xl overflow-hidden">
+                  {ventaPosDetalle.lineas?.map((l: any, i: number) => (
+                    <div key={i} className="p-2.5 flex items-center justify-between bg-[var(--card)] text-xs">
+                      <div>
+                        <div className="font-bold">{l.modelName || l.nombre}</div>
+                        <div className="text-[10px] text-[var(--muted-foreground)]">
+                          Talla: {l.talla} · {l.color} {l.serie ? `· Serie ${formatearNombreSerie(l.serie)}` : ''}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold">{l.cantidad} par(es) x ${Number(l.precioUnitario).toFixed(2)}</div>
+                        <div className="font-mono font-black text-emerald-600">${Number(l.subtotal).toFixed(2)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex justify-between items-center text-sm font-black">
+                <span>TOTAL VENTA:</span>
+                <span className="text-emerald-600 font-mono text-base">${Number(ventaPosDetalle.total).toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-[var(--muted)]/40 border-t border-[var(--border)] flex justify-end">
+              <button
+                type="button"
+                onClick={() => setVentaPosDetalle(null)}
+                className="px-4 py-2 bg-[#0F172A] text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Universal de Previsualización de PDF */}
+      <PdfPreviewModal
+        isOpen={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        pdfDoc={pdfDocPreview}
+        titulo={previewTitulo}
+        nombreArchivo={previewNombreArchivo}
+      />
+    </div>
+  );
+}
