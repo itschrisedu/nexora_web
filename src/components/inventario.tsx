@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { db } from "../db/local-db";
@@ -742,15 +742,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                       {modelProducts
                         .filter(p => (p.color || 'Único') === activeColor)
                         .map(p => {
-                          const isAdulto = ((p.serie?.nombre || '').toUpperCase().includes('ADULTO') || (p.serie?.nombre || '').toUpperCase().includes('CABALLERO') || (p.serie?.nombre || '').toUpperCase().includes('HOMBRE')) && !(p.serie?.nombre || '').toUpperCase().includes('GRANDE');
-                          const isJuvenil = (p.serie?.nombre || '').toUpperCase().includes('JUVENIL');
-                          const tallas = (p.tallas || (p as any).stockPorTalla || []).filter((t: any) => {
-                            const num = Number(t.numero ?? t.nombre);
-                            const cant = Number(t.stock ?? t.cantidad ?? t.disponible ?? 0);
-                            if (isAdulto && num === 43 && cant === 0) return false;
-                            if (isJuvenil && num >= 39 && cant === 0) return false;
-                            return true;
-                          });
+                          const tallas = (p.tallas || (p as any).stockPorTalla || []);
                           const totalStock = tallas.reduce((acc: number, t: any) => acc + (t.stock ?? t.cantidad ?? t.disponible ?? 0), 0);
                           const bajo = stockBajo(p);
 
