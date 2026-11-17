@@ -424,7 +424,7 @@ const SERIES_NOMBRES: Record<string, string> = {
 
   ADULTO: "adulto (38-43)",
 
-  JUVENIL: "juvenil (34-38)",
+  JUVENIL: "juvenil",
 
   NINO: "junior (27-32)",
 
@@ -622,15 +622,33 @@ const getCurvaDocena = (
 
 
 
-  // Juvenil
+  // Juvenil - usa las tallas reales configuradas en la serie
 
   if (name.includes('JUVENIL') || (nums.includes(34) && nums.includes(38))) {
 
-    if (tipo === 'DOCENA') return { 34: 2, 35: 3, 36: 3, 37: 2, 38: 2 };
+    const res: Record<number, number> = {};
 
-    if (tipo === 'MEDIA_A') return { 34: 1, 35: 2, 36: 1, 37: 1, 38: 1 };
+    if (tipo === 'DOCENA') {
 
-    return { 34: 1, 35: 1, 36: 2, 37: 1, 38: 1 };
+      // Distribuir 12 pares entre las tallas reales
+
+      const total = 12;
+
+      const base = Math.floor(total / n);
+
+      const extra = total - base * n;
+
+      nums.forEach((num, idx) => { res[num] = base + (idx < extra ? 1 : 0); });
+
+    } else {
+
+      // Media docena: 1 par por talla
+
+      nums.forEach(num => { res[num] = 1; });
+
+    }
+
+    return res;
 
   }
 
@@ -6727,8 +6745,8 @@ export default function ModelosComponent({
                                     const tallas = (p.tallas || (p as any).stockPorTalla || []).filter((t: any) => {
                                       const num = Number(t.numero ?? t.nombre);
                                       const cant = Number(t.cantidad ?? t.stock ?? t.disponible ?? 0);
-                                      if (isAdulto && num === 43 && cant === 0) return false;
-                                      if (isJuvenil && num >= 39 && cant === 0) return false;
+                                      // (filtro adulto eliminado - se respetan las tallas configuradas)
+                                      // (filtro juvenil eliminado - se respetan las tallas configuradas)
                                       return true;
                                     });
 
@@ -8528,7 +8546,7 @@ export default function ModelosComponent({
 
                                 <div className="flex flex-wrap gap-2">
 
-                                  {[...(s.tallas || [])].filter(t => (s.nombre || '').toUpperCase().includes('JUVENIL') ? t.numero <= 38 : true).sort((a, b) => a.numero - b.numero).map(t => {
+                                  {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
 
                                     const count = selectedTallaIds.filter(id => id === t.id).length;
 
@@ -9468,7 +9486,7 @@ export default function ModelosComponent({
 
                                 <div className="flex flex-wrap gap-2">
 
-                                  {[...(s.tallas || [])].filter(t => (s.nombre || '').toUpperCase().includes('JUVENIL') ? t.numero <= 38 : true).sort((a, b) => a.numero - b.numero).map(t => {
+                                  {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
 
                                     const count = selectedTallaIds.filter(id => id === t.id).length;
 
@@ -11668,7 +11686,7 @@ export default function ModelosComponent({
 
                                 <div className="flex flex-wrap gap-2">
 
-                                  {[...(s.tallas || [])].filter(t => (s.nombre || '').toUpperCase().includes('JUVENIL') ? t.numero <= 38 : true).sort((a, b) => a.numero - b.numero).map(t => {
+                                  {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
 
                                     const count = selectedTallaIds.filter(id => id === t.id).length;
 
