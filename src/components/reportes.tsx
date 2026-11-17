@@ -5460,9 +5460,11 @@ export default function ReportesComponent({
 
                     return (
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="space-y-4">
 
-                        {modelosFiltrados.slice(0, limiteModelosVentas).map((mod: any, mIdx: number) => (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+                          {modelosFiltrados.slice(0, limiteModelosVentas).map((mod: any, mIdx: number) => (
 
                           <div
 
@@ -5611,7 +5613,7 @@ export default function ReportesComponent({
                           </button>
                         </div>
                       )}
-                    </>
+                    </div>
                   );
                 }
 
