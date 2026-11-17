@@ -19,6 +19,18 @@ import {
   capitalizarNombreCompleto,
 } from "@/utils/text-formatters";
 
+const getFechaHoraActualLocal = () => {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const getFechaActualLocal = (diasOffset = 0) => {
+  const d = new Date(Date.now() + diasOffset * 86400000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
 interface NuevoClienteModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -69,10 +81,10 @@ export default function NuevoClienteModal({
   const [deudaAnteriorMonto, setDeudaAnteriorMonto] = useState("");
   const [deudaAnteriorConcepto, setDeudaAnteriorConcepto] = useState("Saldo anterior pendiente");
   const [deudaAnteriorFechaEmision, setDeudaAnteriorFechaEmision] = useState(() =>
-    new Date().toISOString().split("T")[0]
+    getFechaHoraActualLocal()
   );
   const [deudaAnteriorFechaVencimiento, setDeudaAnteriorFechaVencimiento] = useState(() =>
-    new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0]
+    getFechaActualLocal(30)
   );
   const [deudaAnteriorNotas, setDeudaAnteriorNotas] = useState("");
 
@@ -263,10 +275,9 @@ export default function NuevoClienteModal({
               clientId: clienteCreadoId,
               monto: montoNum,
               concepto: deudaAnteriorConcepto.trim() || "Saldo anterior pendiente",
-              fechaEmision: deudaAnteriorFechaEmision || new Date().toISOString().split("T")[0],
+              fechaEmision: deudaAnteriorFechaEmision ? new Date(deudaAnteriorFechaEmision).toISOString() : new Date().toISOString(),
               fechaVencimiento:
-                deudaAnteriorFechaVencimiento ||
-                new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+                deudaAnteriorFechaVencimiento || getFechaActualLocal(30),
               notas: deudaAnteriorNotas.trim() || undefined,
               sucursalId:
                 activeSucursalId && activeSucursalId !== "TODAS"
@@ -544,13 +555,13 @@ export default function NuevoClienteModal({
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
-                          Fecha Emisión
+                          Fecha y Hora de Registro
                         </label>
                         <input
-                          type="date"
+                          type="datetime-local"
                           value={deudaAnteriorFechaEmision}
                           onChange={(e) => setDeudaAnteriorFechaEmision(e.target.value)}
                           className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-600"
@@ -567,6 +578,19 @@ export default function NuevoClienteModal({
                           className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-600"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
+                        Observación / Respaldo (Opcional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Anotación en libreta #4 pág 12"
+                        value={deudaAnteriorNotas}
+                        onChange={(e) => setDeudaAnteriorNotas(e.target.value)}
+                        className="w-full px-3 py-1.5 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-600"
+                      />
                     </div>
                   </div>
                 )}

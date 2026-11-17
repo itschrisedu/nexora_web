@@ -3536,63 +3536,35 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         });
 
       } else if (m.tipo === 'DEUDA_INICIAL') {
-
         const montoDeuda = Number(m.monto || 0);
-
         totalEntregasMonto += montoDeuda;
-
         entregas.push({
-
-          fecha: m.fecha ? m.fecha.split('T')[0] : '',
-
+          fecha: m.fecha ? new Date(m.fecha).toLocaleDateString('es-EC') : '',
           fechaRaw: m.fecha || '',
-
           pedidoId: m.id,
-
           numeroNota: m.numeroCodigo || (m.titulo ? m.titulo.replace(/[^0-9]/g, '') : 'MANUAL'),
-
-          vendedor: m.vendedorNombre || 'Administración',
-
-          entregadoPor: m.entregadoPor || 'Administración',
-
+          vendedor: m.registradoPor || m.procesadoPor || m.vendedorNombre || 'Administración',
+          entregadoPor: m.registradoPor || m.procesadoPor || m.entregadoPor || 'Administración',
           fechaEntrega: m.fecha,
-
           montoTotal: montoDeuda,
-
           totalPares: 0,
-
           tipo: 'DEUDA_INICIAL',
-
+          observacion: m.observacion || undefined,
           items: [
-
             {
-
-              modelo: m.titulo || 'Deuda / Saldo a Crédito Inicial',
-
+              modelo: m.titulo || 'Saldo Anterior / Deuda Inicial',
               color: '',
-
               serie: 'Cuenta Corriente',
-
               codigo: m.numeroCodigo || '',
-
               imageUrl: null,
-
               tallas: [],
-
               curvaTallas: '',
-
               totalPares: 0,
-
-              etiquetaVolumen: m.descripcion || 'Registro de deuda previa migrada',
-
+              etiquetaVolumen: m.observacion ? `${m.descripcion} (Obs: ${m.observacion})` : (m.descripcion || 'Registro de deuda previa migrada'),
               precioUnitario: montoDeuda,
-
               subtotal: montoDeuda,
-
             },
-
           ],
-
         });
 
       } else if (m.tipo === 'ABONO') {
@@ -10083,7 +10055,29 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                     )}
 
+                                  
+
+                                    {/* Registrado por (para saldo inicial / deuda anterior) */}
+                                    {(m.tipo === 'DEUDA_INICIAL' || m.registradoPor) && (m.registradoPor || m.procesadoPor) && (
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20"
+                                        title={`Registrado por ${m.registradoPor || m.procesadoPor}${m.registradoPorRol || m.procesadoPorRol ? ` (${m.registradoPorRol || m.procesadoPorRol})` : ''}`}
+                                      >
+                                        <UserCheck size={10} className="shrink-0" />
+                                        <span>Registrado por: {m.registradoPor || m.procesadoPor}</span>
+                                        {(m.registradoPorRol || m.procesadoPorRol) && (
+                                          <span className="text-[9px] opacity-75 font-normal">({m.registradoPorRol || m.procesadoPorRol})</span>
+                                        )}
+                                      </span>
+                                    )}
                                   </div>
+
+                                  {m.observacion && (
+                                    <div className="text-[11px] text-amber-950 dark:text-amber-200 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-300/50 dark:border-amber-800/50 rounded-lg px-2.5 py-1 mt-1 font-medium flex items-start gap-1.5">
+                                      <FileText size={12} className="shrink-0 text-amber-600 mt-0.5" />
+                                      <span><strong className="font-bold text-amber-900 dark:text-amber-300">Observación:</strong> {m.observacion}</span>
+                                    </div>
+                                  )}
 
 
 
@@ -10325,7 +10319,34 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
 
 
-                                {lineas.length > 0 ? (
+                                {m.tipo === 'DEUDA_INICIAL' ? (
+                                  <div className="p-3 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 rounded-xl space-y-2 text-xs">
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-amber-900 dark:text-amber-300 uppercase text-[10px]">Detalle del Saldo / Deuda Inicial</span>
+                                      <span className="font-black text-amber-700 dark:text-amber-400 font-mono">${Number(m.monto).toFixed(2)}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-[10px] text-[var(--muted-foreground)] block font-semibold">Concepto / Motivo:</span>
+                                      <span className="font-semibold text-[var(--foreground)]">{m.descripcion || 'Saldo anterior pendiente'}</span>
+                                    </div>
+                                    {m.observacion && (
+                                      <div>
+                                        <span className="text-[10px] text-[var(--muted-foreground)] block font-semibold">Observación / Respaldo:</span>
+                                        <span className="font-medium text-[var(--foreground)]">{m.observacion}</span>
+                                      </div>
+                                    )}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-amber-200/40 text-[11px]">
+                                      <div>
+                                        <span className="text-[10px] text-[var(--muted-foreground)] block">Registrado por:</span>
+                                        <span className="font-medium text-[var(--foreground)]">{m.registradoPor || m.procesadoPor || 'Administración'}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-[10px] text-[var(--muted-foreground)] block">Fecha y Hora de Registro:</span>
+                                        <span className="font-medium text-[var(--foreground)]">{new Date(m.fecha).toLocaleString('es-EC')}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : lineas.length > 0 ? (
 
                                   <div className="space-y-2">
 

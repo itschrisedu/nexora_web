@@ -33,6 +33,7 @@ export interface HistorialEntregaDetallada {
   montoTotal: number;
   totalPares?: number;
   tipo?: string;
+  observacion?: string;
   items: HistorialComercialItemEntrega[];
 }
 
@@ -968,8 +969,20 @@ export async function armarMensajeWhatsAppHistorial(
     msg += `📦 *DETALLE DE ENTREGAS REALIZADAS (Cronológico):*\n`;
     const ordenadas = [...data.entregas].sort((a, b) => new Date(a.fechaEntrega || a.fecha).getTime() - new Date(b.fechaEntrega || b.fecha).getTime());
     ordenadas.forEach((ent) => {
+      if (ent.tipo === 'DEUDA_INICIAL') {
+        const notaStr = ent.numeroNota ? ` (${ent.numeroNota})` : '';
+        const responsableStr = ent.vendedor ? ` • Registrado por: ${ent.vendedor}` : '';
+        const obsStr = ent.observacion ? `
+   📝 Obs: ${ent.observacion}` : '';
+        msg += `🔹 *${ent.fecha}* — Saldo / Deuda Inicial${notaStr}${responsableStr}${obsStr}
+   💰 Monto: $${ent.montoTotal.toFixed(2)}
+
+`;
+        return;
+      }
       const notaStr = ent.numeroNota ? ` (Nota ${ent.numeroNota})` : '';
-      msg += `🔹 *${ent.fecha}*${notaStr}\n`;
+      msg += `🔹 *${ent.fecha}*${notaStr}
+`;
       ent.items.forEach((it) => {
         const colorStr = it.color ? ` (${it.color})` : '';
         const serieStr = it.serie && it.serie !== 'Estándar' ? ` • Serie: ${it.serie}` : '';
