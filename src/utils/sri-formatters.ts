@@ -31,7 +31,7 @@ export function formatearRangoTallasSerie(serieNombre?: string, tallasNumeros?: 
 
   if (s.includes('ADULTO') || s.includes('CABALLERO') || s.includes('HOMBRE')) return '38-43';
   if (s.includes('DAMA') || s.includes('MUJER') || s.includes('FEMENINO')) return '34-39';
-  if (s.includes('JUVENIL') || s.includes('JUNIOR')) return '34-38';
+  if (s.includes('JUVENIL') || s.includes('JUNIOR')) return '34-39';
   if (s.includes('NIÑO') || s.includes('NINO') || s.includes('ESCOLAR') || s.includes('INFANTIL')) return '27-32';
   if (s.includes('PEQUEÑO') || s.includes('PEQUENO')) return '21-26';
   if (s.includes('BEBE') || s.includes('BEBÉ')) return '18-20';

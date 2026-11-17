@@ -53,6 +53,11 @@ export const getCurvaDocena = (serieName: string, tipo: TipoCurva): Record<numbe
 
   // 3. Serie Juvenil
   if (name.includes('JUVENIL')) {
+    if (name.includes('39') || name.includes('34-39') || name.includes('34 A 39')) {
+      if (tipo === 'DOCENA') return { 34: 2, 35: 2, 36: 2, 37: 2, 38: 2, 39: 2 };
+      if (tipo === 'MEDIA_A') return { 34: 1, 35: 1, 36: 1, 37: 1, 38: 1, 39: 1 };
+      return { 34: 1, 35: 1, 36: 1, 37: 1, 38: 1, 39: 1 };
+    }
     if (tipo === 'DOCENA') return { 34: 2, 35: 3, 36: 3, 37: 2, 38: 2 };
     if (tipo === 'MEDIA_A') return { 34: 1, 35: 2, 36: 1, 37: 1, 38: 1 };
     return { 34: 1, 35: 1, 36: 2, 37: 1, 38: 1 };

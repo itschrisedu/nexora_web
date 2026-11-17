@@ -464,11 +464,7 @@ const getNombreSerie = (s: SerieConfig | string | null | undefined, seriesList?:
 
   if (target && target.tallas && target.tallas.length > 0) {
 
-    const isJuv = (target.nombre || '').toUpperCase().includes('JUVENIL');
-
-    const rawTallas = isJuv ? target.tallas.filter(t => t.numero <= 38) : target.tallas;
-
-    const sorted = [...(rawTallas.length > 0 ? rawTallas : target.tallas)].sort((a, b) => a.numero - b.numero);
+    const sorted = [...target.tallas].sort((a, b) => a.numero - b.numero);
 
     const min = sorted[0].numero;
 
@@ -622,33 +618,25 @@ const getCurvaDocena = (
 
 
 
-  // Juvenil - usa las tallas reales configuradas en la serie
+  // Juvenil
 
   if (name.includes('JUVENIL') || (nums.includes(34) && nums.includes(38))) {
 
-    const res: Record<number, number> = {};
+    if (nums.includes(39) || n >= 6) {
 
-    if (tipo === 'DOCENA') {
+      if (tipo === 'DOCENA') return { 34: 2, 35: 2, 36: 2, 37: 2, 38: 2, 39: 2 };
 
-      // Distribuir 12 pares entre las tallas reales
+      if (tipo === 'MEDIA_A') return { 34: 1, 35: 1, 36: 1, 37: 1, 38: 1, 39: 1 };
 
-      const total = 12;
-
-      const base = Math.floor(total / n);
-
-      const extra = total - base * n;
-
-      nums.forEach((num, idx) => { res[num] = base + (idx < extra ? 1 : 0); });
-
-    } else {
-
-      // Media docena: 1 par por talla
-
-      nums.forEach(num => { res[num] = 1; });
+      return { 34: 1, 35: 1, 36: 1, 37: 1, 38: 1, 39: 1 };
 
     }
 
-    return res;
+    if (tipo === 'DOCENA') return { 34: 2, 35: 3, 36: 3, 37: 2, 38: 2 };
+
+    if (tipo === 'MEDIA_A') return { 34: 1, 35: 2, 36: 1, 37: 1, 38: 1 };
+
+    return { 34: 1, 35: 1, 36: 2, 37: 1, 38: 1 };
 
   }
 

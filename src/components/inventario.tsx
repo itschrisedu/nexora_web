@@ -69,7 +69,7 @@ const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--bord
 
 const SERIES_NOMBRES: Record<string, string> = {
   ADULTO: "adulto (38-43)",
-  JUVENIL: "juvenil",
+  JUVENIL: "juvenil (34-39)",
   NINO: "junior (27-32)",
   NINO_PEQUENO_A: "niño (21-26)",
   BEBE: "bebe (18-20)",

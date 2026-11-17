@@ -776,7 +776,7 @@ const SERIES_NOMBRES: Record<string, string> = {
 
   ADULTO: "adulto (38-43)",
 
-  JUVENIL: "juvenil (34-38)",
+  JUVENIL: "juvenil (34-39)",
 
   NINO: "junior (27-32)",
 
