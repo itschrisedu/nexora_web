@@ -536,6 +536,12 @@ interface ClienteHistorial {
 
     procesadoPorRol?: string;
 
+    registradoPor?: string;
+
+    registradoPorRol?: string;
+
+    observacion?: string;
+
     reciboRef?: string | null;
 
     notas?: string | null;
