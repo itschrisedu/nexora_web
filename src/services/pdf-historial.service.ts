@@ -631,12 +631,19 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
   });
 
   (data.abonos || []).forEach((ab) => {
+    const refLimpia = ab.referencia && !ab.referencia.toLowerCase().includes('abono') && !ab.referencia.toLowerCase().includes('cuenta')
+      ? ` (Ref: #${ab.referencia.replace(/^#/, '')})`
+      : '';
+    const cleanRecibo = ab.numeroComprobante
+      ? (String(ab.numeroComprobante).startsWith('Recibo') ? ab.numeroComprobante : `Recibo #${String(ab.numeroComprobante).replace(/^#/, '')}`)
+      : 'Recibo de Abono';
+
     movimientosCronologicos.push({
       fecha: ab.fecha,
       fechaRaw: ab.fechaRaw || ab.fecha,
       tipo: 'ABONO',
-      referencia: ab.numeroComprobante ? `Recibo #${ab.numeroComprobante}` : 'Recibo de Abono',
-      detalle: `Abono ${ab.formaPago || 'EFECTIVO'}`,
+      referencia: cleanRecibo,
+      detalle: `Abono ${ab.formaPago || 'EFECTIVO'}${refLimpia}`,
       cargo: 0,
       abono: Number(ab.monto || 0),
       secuenciaDoc: extraerNumeroSecuencia(ab.numeroComprobante),

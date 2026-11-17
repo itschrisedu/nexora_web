@@ -2314,106 +2314,62 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
 
 
-    const gruposMap = new Map<string, {
+    todosAbonos.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
+    const gruposList: Array<{
       id: string;
-
       montoTotal: number;
-
       metodo: string;
-
       createdAt: string;
-
+      createdAtMs: number;
       notas: string;
-
       reciboRef?: string;
-
       usuarioNombre?: string;
-
       usuarioSucursal?: string;
-
       esCobroOtraSucursal?: boolean;
-
-      notasAfectadas: Array<{ numeroNota: string | number; monto: number }>;
-
-    }>();
-
-
+    }> = [];
 
     todosAbonos.forEach((a) => {
-
+      const aTime = new Date(a.createdAt).getTime();
       const matchRec = a.notas?.match(/\[REC-([A-Z0-9]+)\]/i);
+      const recTag = matchRec ? `REC-${matchRec[1]}` : undefined;
+      const notasLimpias = a.notas
+        ? a.notas.replace(/\[REC-[A-Z0-9]+\]\s*/i, '').replace(/\[PRONTO PAGO.*?\]\s*/i, '').trim()
+        : '';
 
-      const key = matchRec
-
-        ? `REC-${matchRec[1]}`
-
-        : `MANUAL-${a.createdAt ? a.createdAt.slice(0, 16) : a.id}-${a.metodo}-${a.usuarioNombre || ''}`;
-
-
-
-      const notasLimpias = a.notas ? a.notas.replace(/\[REC-[A-Z0-9]+\]\s*/i, '').trim() : '';
-
-
-
-      if (!gruposMap.has(key)) {
-
-        gruposMap.set(key, {
-
-          id: a.id,
-
-          montoTotal: a.monto,
-
-          metodo: a.metodo,
-
-          createdAt: a.createdAt,
-
-          notas: notasLimpias,
-
-          reciboRef: matchRec ? `REC-${matchRec[1]}` : undefined,
-
-          usuarioNombre: a.usuarioNombre,
-
-          usuarioSucursal: a.usuarioSucursal,
-
-          esCobroOtraSucursal: a.esCobroOtraSucursal,
-
-          notasAfectadas: [{ numeroNota: a.numeroNota || 'S/N', monto: a.monto }],
-
-        });
-
-      } else {
-
-        const g = gruposMap.get(key)!;
-
-        g.montoTotal += a.monto;
-
-        if (!g.notas && notasLimpias) g.notas = notasLimpias;
-
-        const yaExisteNota = g.notasAfectadas.find((n) => n.numeroNota === a.numeroNota);
-
-        if (yaExisteNota) {
-
-          yaExisteNota.monto += a.monto;
-
-        } else {
-
-          g.notasAfectadas.push({ numeroNota: a.numeroNota || 'S/N', monto: a.monto });
-
+      const match = gruposList.find((g) => {
+        if (recTag && g.reciboRef && recTag === g.reciboRef) return true;
+        const diff = Math.abs(aTime - g.createdAtMs);
+        if (diff <= 180000 && a.metodo === g.metodo) {
+          if (recTag && g.reciboRef && recTag !== g.reciboRef) return false;
+          return true;
         }
+        return false;
+      });
 
+      if (match) {
+        match.montoTotal = Math.round((match.montoTotal + a.monto) * 100) / 100;
+        if (!match.reciboRef && recTag) match.reciboRef = recTag;
+        if (!match.notas && notasLimpias) match.notas = notasLimpias;
+      } else {
+        gruposList.push({
+          id: a.id,
+          montoTotal: a.monto,
+          metodo: a.metodo,
+          createdAt: a.createdAt,
+          createdAtMs: aTime,
+          notas: notasLimpias,
+          reciboRef: recTag,
+          usuarioNombre: a.usuarioNombre,
+          usuarioSucursal: a.usuarioSucursal,
+          esCobroOtraSucursal: a.esCobroOtraSucursal,
+        });
       }
-
     });
 
-
-
-    return Array.from(gruposMap.values())
-
+    return gruposList
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-
       .slice(0, 3);
-
   }, [carteraSeleccionada]);
 
 
@@ -3655,26 +3611,39 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
 
 
-    abonos.sort((a, b) => {
+    // Consolidación de seguridad para que el extracto PDF refleje pagos íntegros sin fragmentaciones internas
+    const abonosConsolidados: any[] = [];
+    abonos.forEach((ab) => {
+      const matchRec = ab.numeroComprobante ? String(ab.numeroComprobante).replace(/\D/g, '') : '';
+      const tAb = new Date(ab.fechaRaw || ab.fecha).getTime();
+      const match = abonosConsolidados.find((ex) => {
+        if (matchRec && ex.numeroComprobante && String(ex.numeroComprobante).includes(matchRec)) return true;
+        const tEx = new Date(ex.fechaRaw || ex.fecha).getTime();
+        if (Math.abs(tAb - tEx) <= 180000 && ab.formaPago === ex.formaPago) {
+          return true;
+        }
+        return false;
+      });
 
-      if (a.fechaRaw && b.fechaRaw && a.fechaRaw !== b.fechaRaw) {
-
-        const tA = new Date(a.fechaRaw).getTime();
-
-        const tB = new Date(b.fechaRaw).getTime();
-
-        if (!isNaN(tA) && !isNaN(tB) && tA !== tB) return tA - tB;
-
+      if (match) {
+        match.monto = Math.round((match.monto + ab.monto) * 100) / 100;
+        if (!match.numeroComprobante && ab.numeroComprobante) match.numeroComprobante = ab.numeroComprobante;
+        if (!match.referencia && ab.referencia) match.referencia = ab.referencia;
+      } else {
+        abonosConsolidados.push({ ...ab });
       }
+    });
 
+    abonosConsolidados.sort((a, b) => {
+      if (a.fechaRaw && b.fechaRaw && a.fechaRaw !== b.fechaRaw) {
+        const tA = new Date(a.fechaRaw).getTime();
+        const tB = new Date(b.fechaRaw).getTime();
+        if (!isNaN(tA) && !isNaN(tB) && tA !== tB) return tA - tB;
+      }
       if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
-
       const numA = parseInt(a.numeroComprobante?.replace(/\D/g, '') || '0', 10);
-
       const numB = parseInt(b.numeroComprobante?.replace(/\D/g, '') || '0', 10);
-
       return numA - numB;
-
     });
 
 
@@ -3821,7 +3790,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       entregas,
 
-      abonos,
+      abonos: abonosConsolidados,
 
       devoluciones,
 
@@ -7847,7 +7816,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                     <span className="text-[10px] text-[var(--muted-foreground)]">
 
-                      Se descontará automáticamente de las notas pendientes (FIFO)
+                      Abono directo a la cuenta corriente del cliente
 
                     </span>
 
@@ -8181,29 +8150,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
 
 
-                          {/* Desglose de notas donde se descontó internamente */}
 
-                          <div className="mt-1 flex items-center gap-1 flex-wrap text-[10px]">
-
-                            <span className="text-[var(--muted-foreground)] font-semibold">Descontado en:</span>
-
-                            {a.notasAfectadas.map((na, idx) => (
-
-                              <span
-
-                                key={idx}
-
-                                className="px-1.5 py-0.2 bg-[var(--card)] border border-[var(--border)] rounded font-mono text-[9px] text-[var(--foreground)]"
-
-                              >
-
-                                {na.numeroNota} (${na.monto.toFixed(2)})
-
-                              </span>
-
-                            ))}
-
-                          </div>
 
 
 
@@ -8355,7 +8302,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                     <span className="text-[10px] text-[var(--muted-foreground)]">
 
-                      El saldo de cada nota se descuenta internamente en orden cronológico (FIFO).
+                      Detalle cronológico de despachos y notas registradas.
 
                     </span>
 
@@ -10215,7 +10162,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                           fecha: new Date(m.fecha).toLocaleDateString('es-EC'),
 
-                                          notas: m.descripcion,
+                                          notas: m.referencia || m.comprobante || undefined,
+
+                                          numeroNota: m.reciboRef ? `Recibo #${m.reciboRef}` : (m.numeroCodigo || 'Recibo de Abono'),
+
+                                          usuarioNombre: m.cobradoPor,
+
+                                          sucursalNombre: m.cobradoPorSucursal,
 
                                           saldoAnterior: m.saldoAnterior !== undefined ? Number(m.saldoAnterior) : undefined,
 
@@ -10265,7 +10218,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                               fecha: new Date(m.fecha).toLocaleDateString('es-EC'),
 
-                                              notas: m.descripcion,
+                                              notas: m.referencia || m.comprobante || undefined,
+
+                                              numeroNota: m.reciboRef ? `Recibo #${m.reciboRef}` : (m.numeroCodigo || 'Recibo de Abono'),
+
+                                              usuarioNombre: m.cobradoPor,
+
+                                              sucursalNombre: m.cobradoPorSucursal,
 
                                               saldoAnterior: m.saldoAnterior !== undefined ? Number(m.saldoAnterior) : undefined,
 
