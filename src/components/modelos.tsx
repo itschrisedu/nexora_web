@@ -464,7 +464,11 @@ const getNombreSerie = (s: SerieConfig | string | null | undefined, seriesList?:
 
   if (target && target.tallas && target.tallas.length > 0) {
 
-    const sorted = [...target.tallas].sort((a, b) => a.numero - b.numero);
+    const isJuv = (target.nombre || '').toUpperCase().includes('JUVENIL');
+
+    const rawTallas = isJuv ? target.tallas.filter(t => t.numero <= 38) : target.tallas;
+
+    const sorted = [...(rawTallas.length > 0 ? rawTallas : target.tallas)].sort((a, b) => a.numero - b.numero);
 
     const min = sorted[0].numero;
 
@@ -528,7 +532,6205 @@ const getCurvaDocena = (
 
   const has43 = nums.includes(43);
 
-  const tallas = (p.tallas || (p as any).stockPorTalla || []);
+  const isAdulto = name.includes('ADULTO') || name.includes('CABALLERO') || name.includes('HOMBRE') || name === 'TALLA_GRANDE' || has38;
+
+
+
+  // 1. Adulto: si incluye talla 43 (ej. 38 a 43, 6 tallas) -> 2 pares cada talla = 12 pares exactos
+
+  if (isAdulto && has38 && has43 && (n === 6 || nums[nums.length - 1] >= 43)) {
+
+    if (tipo === 'DOCENA') return { 38: 2, 39: 2, 40: 2, 41: 2, 42: 2, 43: 2 };
+
+    if (tipo === 'MEDIA_A') return { 38: 1, 39: 1, 40: 1, 41: 1, 42: 1, 43: 1 };
+
+    return { 38: 1, 39: 1, 40: 1, 41: 1, 42: 1, 43: 1 };
+
+  }
+
+
+
+  // 2. Adulto: si va de 38 a 42 (5 tallas sin la 43) -> 38:2, 39:3, 40:3, 41:2, 42:2 = 12 pares exactos (repetidas 39 y 40)
+
+  if (isAdulto && has38 && has42 && !has43 && (n === 5 || nums[nums.length - 1] === 42)) {
+
+    if (tipo === 'DOCENA') return { 38: 2, 39: 3, 40: 3, 41: 2, 42: 2 };
+
+    if (tipo === 'MEDIA_A') return { 38: 1, 39: 2, 40: 1, 41: 1, 42: 1 };
+
+    return { 38: 1, 39: 1, 40: 2, 41: 1, 42: 1 };
+
+  }
+
+
+
+  // Si no se pasaron tallas explícitas, fallback por nombre de serie:
+
+  if (isAdulto) {
+
+    if (name.includes('43') || name.includes('38-43') || name.includes('38 A 43')) {
+
+      if (tipo === 'DOCENA') return { 38: 2, 39: 2, 40: 2, 41: 2, 42: 2, 43: 2 };
+
+      if (tipo === 'MEDIA_A') return { 38: 1, 39: 1, 40: 1, 41: 1, 42: 1, 43: 1 };
+
+      return { 38: 1, 39: 1, 40: 1, 41: 1, 42: 1, 43: 1 };
+
+    }
+
+    if (tipo === 'DOCENA') return { 38: 2, 39: 3, 40: 3, 41: 2, 42: 2 };
+
+    if (tipo === 'MEDIA_A') return { 38: 1, 39: 2, 40: 1, 41: 1, 42: 1 };
+
+    return { 38: 1, 39: 1, 40: 2, 41: 1, 42: 1 };
+
+  }
+
+
+
+  // Dama / Mujer
+
+  if (name.includes('DAMA') || name.includes('MUJER') || nums.includes(35)) {
+
+    if (nums.includes(34) && nums.includes(39)) {
+
+      if (tipo === 'DOCENA') return { 34: 1, 35: 2, 36: 3, 37: 3, 38: 2, 39: 1 };
+
+      if (tipo === 'MEDIA_A') return { 34: 1, 35: 1, 36: 2, 37: 1, 38: 1, 39: 0 };
+
+      return { 34: 0, 35: 1, 36: 1, 37: 2, 38: 1, 39: 1 };
+
+    }
+
+    if (name.includes('34') || name.includes('39')) {
+
+      if (tipo === 'DOCENA') return { 34: 1, 35: 2, 36: 3, 37: 3, 38: 2, 39: 1 };
+
+      if (tipo === 'MEDIA_A') return { 34: 1, 35: 1, 36: 2, 37: 1, 38: 1, 39: 0 };
+
+      return { 34: 0, 35: 1, 36: 1, 37: 2, 38: 1, 39: 1 };
+
+    }
+
+    if (tipo === 'DOCENA') return { 35: 2, 36: 3, 37: 3, 38: 2, 39: 2 };
+
+    if (tipo === 'MEDIA_A') return { 35: 1, 36: 2, 37: 1, 38: 1, 39: 1 };
+
+    return { 35: 1, 36: 1, 37: 2, 38: 1, 39: 1 };
+
+  }
+
+
+
+  // Juvenil
+
+  if (name.includes('JUVENIL') || (nums.includes(34) && nums.includes(38))) {
+
+    if (tipo === 'DOCENA') return { 34: 2, 35: 3, 36: 3, 37: 2, 38: 2 };
+
+    if (tipo === 'MEDIA_A') return { 34: 1, 35: 2, 36: 1, 37: 1, 38: 1 };
+
+    return { 34: 1, 35: 1, 36: 2, 37: 1, 38: 1 };
+
+  }
+
+
+
+  // Si tiene exactamente 6 tallas, 2 pares cada una
+
+  if (n === 6) {
+
+    const res: Record<number, number> = {};
+
+    nums.forEach(num => { res[num] = tipo === 'DOCENA' ? 2 : 1; });
+
+    return res;
+
+  }
+
+
+
+  return {};
+
+};
+
+
+
+// Genera la distribución base de 12 pares (1 docena) para cualquier serie
+
+const getDocenaBaseParaSerie = (sObj?: SerieConfig | null): Record<number, number> => {
+
+  if (!sObj || !sObj.tallas || sObj.tallas.length === 0) return {};
+
+  const sorted = [...sObj.tallas].sort((a, b) => a.numero - b.numero);
+
+  const nums = sorted.map(t => t.numero);
+
+  const n = nums.length;
+
+  const result: Record<number, number> = {};
+
+
+
+  // Caso Adulto con talla 43 (38 al 43, 6 tallas): 2 pares por cada talla = 12 pares exactos
+
+  if (nums.includes(38) && nums.includes(43) && n === 6) {
+
+    nums.forEach(num => { result[num] = 2; });
+
+    return result;
+
+  }
+
+
+
+  // Caso Adulto sin talla 43 (38 al 42, 5 tallas): repetidas 39 y 40 con 3 pares cada una = 12 pares
+
+  if (nums.includes(38) && nums.includes(42) && !nums.includes(43) && n === 5) {
+
+    return { 38: 2, 39: 3, 40: 3, 41: 2, 42: 2 };
+
+  }
+
+
+
+  // Obtener plantilla estándar con tallas reales
+
+  const std = getCurvaDocena(sObj, 'DOCENA', nums);
+
+  if (Object.keys(std).length > 0) {
+
+    const stdSum = Object.values(std).reduce((a, b) => a + b, 0);
+
+    if (stdSum === 12) return std;
+
+  }
+
+
+
+  // Caso estándar 6 tallas: 2 pares por cada talla = 12 pares exactos
+
+  if (n === 6) {
+
+    nums.forEach(num => { result[num] = 2; });
+
+    return result;
+
+  }
+
+
+
+  // Caso 5 tallas general: extremos 2, intermedias 3 (2+3+3+2+2 = 12)
+
+  if (n === 5) {
+
+    result[nums[0]] = 2;
+
+    result[nums[1]] = 3;
+
+    result[nums[2]] = 3;
+
+    result[nums[3]] = 2;
+
+    result[nums[4]] = 2;
+
+    return result;
+
+  }
+
+
+
+  // Distribución proporcional si la serie tiene otra cantidad de tallas para sumar siempre 12 pares
+
+  if (n > 0) {
+
+    const base = Math.floor(12 / n);
+
+    let rem = 12 % n;
+
+    const startRem = Math.floor((n - rem) / 2);
+
+    nums.forEach((num, i) => {
+
+      const extra = (i >= startRem && rem > 0) ? 1 : 0;
+
+      if (extra) rem--;
+
+      result[num] = Math.max(1, base + extra);
+
+    });
+
+  }
+
+  return result;
+
+};
+
+
+
+const buildTallaIdsFromCurva = (sObj: SerieConfig, curva: Record<number, number>): string[] => {
+
+  if (!sObj.tallas) return [];
+
+  const result: string[] = [];
+
+  for (const t of sObj.tallas) {
+
+    const qty = curva[t.numero] || 0;
+
+    for (let i = 0; i < qty; i++) {
+
+      result.push(t.id);
+
+    }
+
+  }
+
+  return result;
+
+};
+
+
+
+const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors";
+
+
+
+export const normalizeDecimalInput = (val: string): string => {
+
+  let cleaned = val.replace(',', '.').replace(/[^0-9.]/g, '');
+
+  const parts = cleaned.split('.');
+
+  if (parts.length > 2) {
+
+    cleaned = parts[0] + '.' + parts.slice(1).join('');
+
+  }
+
+  if (cleaned.length > 1 && cleaned.startsWith('0') && cleaned[1] !== '.') {
+
+    cleaned = cleaned.replace(/^0+/, '');
+
+    if (cleaned === '') cleaned = '0';
+
+  }
+
+  return cleaned;
+
+};
+
+
+
+export const parseDecimalNumber = (val: any): number => {
+
+  if (val === null || val === undefined) return 0;
+
+  const num = parseFloat(String(val).replace(',', '.'));
+
+  return isNaN(num) ? 0 : num;
+
+};
+
+
+
+function Lbl({ t, req }: { t: string; req?: boolean }) {
+
+  return (
+
+    <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+
+      {t}{req && <span className="text-red-400 ml-0.5">*</span>}
+
+    </label>
+
+  );
+
+}
+
+
+
+const compressImageToWebP = (base64Str: string, maxWidth = 800, maxHeight = 800, quality = 0.7): Promise<string> => {
+
+  return new Promise((resolve, reject) => {
+
+    const img = new Image();
+
+    img.src = base64Str;
+
+    img.onload = () => {
+
+      const canvas = document.createElement("canvas");
+
+      let width = img.width;
+
+      let height = img.height;
+
+
+
+      if (width > height) {
+
+        if (width > maxWidth) {
+
+          height = Math.round((height * maxWidth) / width);
+
+          width = maxWidth;
+
+        }
+
+      } else {
+
+        if (height > maxHeight) {
+
+          width = Math.round((width * maxHeight) / height);
+
+          height = maxHeight;
+
+        }
+
+      }
+
+
+
+      canvas.width = width;
+
+      canvas.height = height;
+
+
+
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+
+        resolve(base64Str);
+
+        return;
+
+      }
+
+
+
+      // Pintar fondo blanco puro para evitar que imágenes transparentes sin fondo queden con fondo oscuro
+
+      ctx.fillStyle = "#FFFFFF";
+
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const webpBase64 = canvas.toDataURL("image/webp", quality);
+
+      resolve(webpBase64);
+
+    };
+
+    img.onerror = (err) => {
+
+      reject(err);
+
+    };
+
+  });
+
+};
+
+
+
+export default function ModelosComponent({
+
+  online,
+
+  userRole,
+
+  activeSucursalId,
+
+  sucursales,
+
+}: ModelosProps) {
+
+  const isAdmin = !userRole || userRole === "ROL_ADMIN" || userRole === "ROL_SUPER_ADMIN";
+
+  const isBodeguero = userRole === "ROL_BODEGUERO";
+
+  const isVendedor = userRole === "ROL_VENDEDOR";
+
+
+
+  // Pestaña activa: 'local' (Mi Catálogo Local) o 'red' (Modelos Disponibles en la Red Comercial)
+
+  const [activeTab, setActiveTab] = useState<'local' | 'red'>('local');
+
+  const [modelosRed, setModelosRed] = useState<ModeloRed[]>([]);
+
+  const [redSucursales, setRedSucursales] = useState<{ id: string; nombre: string }[]>([]);
+
+  const [filterRedSucursal, setFilterRedSucursal] = useState<string>("TODAS");
+
+  const [importingModelId, setImportingModelId] = useState<string | null>(null);
+
+
+
+  // Modal selector de importación detallada de variantes
+
+  const [importModalData, setImportModalData] = useState<{
+
+    isOpen: boolean;
+
+    model: ModeloRed | null;
+
+    selectedVariantIds: string[];
+
+  }>({
+
+    isOpen: false,
+
+    model: null,
+
+    selectedVariantIds: [],
+
+  });
+
+
+
+  const [modelos, setModelos] = useState<ModeloAgrupado[]>([]);
+
+  const [series, setSeries] = useState<SerieConfig[]>([]);
+
+  const [loading, setLoading] = useState(false);
+
+  const [search, setSearch] = useState("");
+
+  const [showCreate, setShowCreate] = useState(false);
+
+  const [showPrice, setShowPrice] = useState(false);
+
+  const [priceProd, setPriceProd] = useState<Producto | null>(null);
+
+  const [error, setError] = useState("");
+
+  const [success, setSuccess] = useState("");
+
+  const [saving, setSaving] = useState(false);
+
+
+
+  // Tallas personalizadas seleccionadas por serie: { [serieId]: tallaId[] }
+
+  const [customTallas, setCustomTallas] = useState<Record<string, string[]>>({});
+
+  // Distribución de docena configurada por serie (para calcular medias docenas o docenas personalizadas)
+
+  const [docenaPersonalizadaPorSerie, setDocenaPersonalizadaPorSerie] = useState<Record<string, Record<number, number>>>({});
+
+  // Opción de curva de stock inicial seleccionada para bodega (DOCENA | MEDIA_A | MEDIA_B | NINGUNA) sin alterar la docena base
+
+  const [stockOptionCreacion, setStockOptionCreacion] = useState<Record<string, 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA'>>({});
+
+
+
+  // Modales de Crear / Editar Serie
+
+  const [showCreateSeriesModal, setShowCreateSeriesModal] = useState(false);
+
+  const [newSerieNombre, setNewSerieNombre] = useState("");
+
+  const [newSerieTallasDesde, setNewSerieTallasDesde] = useState("38");
+
+  const [newSerieTallasHasta, setNewSerieTallasHasta] = useState("43");
+
+
+
+  const [showEditSeriesModal, setShowEditSeriesModal] = useState(false);
+
+  const [editingSerie, setEditingSerie] = useState<SerieConfig | null>(null);
+
+  const [editSerieNombre, setEditSerieNombre] = useState("");
+
+  const [editSerieTallasDesde, setEditSerieTallasDesde] = useState("");
+
+  const [editSerieTallasHasta, setEditSerieTallasHasta] = useState("");
+
+
+
+  // Acordeones abiertos
+
+  const [expandedModels, setExpandedModels] = useState<Record<string, boolean>>({});
+
+
+
+  // Referencias para mantener el foco y scroll en el modelo que se está configurando/editando
+
+  const lastActiveModelIdRef = useRef<string | null>(null);
+
+  const lastActiveModelCodeRef = useRef<string | null>(null);
+
+
+
+  // Modal de confirmación UI (reemplaza window.confirm sin 'localhost:3000 dice')
+
+  const [confirmModal, setConfirmModal] = useState<{
+
+    isOpen: boolean;
+
+    title: string;
+
+    message: string;
+
+    confirmText?: string;
+
+    cancelText?: string;
+
+    danger?: boolean;
+
+    onConfirm: () => void | Promise<void>;
+
+  }>({
+
+    isOpen: false,
+
+    title: "",
+
+    message: "",
+
+    onConfirm: () => {},
+
+  });
+
+
+
+  // Color seleccionado para previsualización por cada modelo
+
+  const [selectedColorForModel, setSelectedColorForModel] = useState<Record<string, string>>({});
+
+
+
+  // Formulario de creación masiva
+
+  const [baseCode, setBaseCode] = useState("");
+
+  const [baseCodeManual, setBaseCodeManual] = useState(false);
+
+  const [name, setName] = useState("");
+
+
+
+  const handleNameChange = (val: string) => {
+
+    setName(val);
+
+    const existingCodes = modelos.map((m) => m.baseCode);
+
+    const autoCode = generarCodigoBaseModelo(val, existingCodes);
+
+    setBaseCode(autoCode);
+
+  };
+
+  const [brand, setBrand] = useState("");
+
+  const [material, setMaterial] = useState("");
+
+  const [colors, setColors] = useState<ColorInput[]>([{ color: "", foto: null, supplierId: "" }]);
+
+  const [serieIds, setSerieIds] = useState<string[]>([]);
+
+  // Soporte para modelos heredables de la Matriz (Sucursales)
+
+  const [isMatrizTenant, setIsMatrizTenant] = useState(true);
+
+  const [matrizNombre, setMatrizNombre] = useState("Matriz Principal");
+
+  const [modelosMatrizDisponibles, setModelosMatrizDisponibles] = useState<ModeloMatriz[]>([]);
+
+  const [selectedMatrizModelId, setSelectedMatrizModelId] = useState<string>("");
+
+  // Precios individuales por serie: { [serieId]: { costPrice: string, salePrice: string } }
+
+  const [seriesPrices, setSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
+
+  const [stockInicial, setStockInicial] = useState("1"); // 1 por defecto
+
+
+
+  // Estado para el modal de ampliación de imagen (Lightbox)
+
+  const [zoomImage, setZoomImage] = useState<{
+
+    url: string;
+
+    title: string;
+
+    subtitle?: string;
+
+    color?: string;
+
+    brand?: string;
+
+  } | null>(null);
+
+
+
+  // Estado para el modal de añadir nuevo color a modelo existente
+
+  const [showAddColorModal, setShowAddColorModal] = useState(false);
+
+  const [selectedModelForColor, setSelectedModelForColor] = useState<ModeloAgrupado | null>(null);
+
+  const [supplierId, setSupplierId] = useState("");
+
+  const [listaProveedores, setListaProveedores] = useState<{ id: string; razonSocial: string; ruc?: string; contacto?: string }[]>([]);
+
+
+
+  const [newColorName, setNewColorName] = useState("");
+
+  const [newColorFoto, setNewColorFoto] = useState<string | null>(null);
+
+  const [newColorSupplierId, setNewColorSupplierId] = useState("");
+
+  const [newColorSerieIds, setNewColorSerieIds] = useState<string[]>([]);
+
+  const [newColorSeriesPrices, setNewColorSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
+
+  const [newColorCustomTallas, setNewColorCustomTallas] = useState<Record<string, string[]>>({});
+
+  const [newColorDocenaPersonalizadaPorSerie, setNewColorDocenaPersonalizadaPorSerie] = useState<Record<string, Record<number, number>>>({});
+
+  // Opción de curva de stock inicial seleccionada para bodega (DOCENA | MEDIA_A | MEDIA_B | NINGUNA) sin alterar la docena base
+
+  const [newColorStockOption, setNewColorStockOption] = useState<Record<string, 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA'>>({});
+
+  const [newColorStockInicial, setNewColorStockInicial] = useState("1");
+
+
+
+  const [newCosto, setNewCosto] = useState("");
+
+  const [newVenta, setNewVenta] = useState("");
+
+  const [motivo, setMotivo] = useState("");
+
+
+
+  // ── Estado para modal de Edición Integral de Variante ──
+
+  const [showEditProduct, setShowEditProduct] = useState(false);
+
+  const [editProduct, setEditProduct] = useState<Producto | null>(null);
+
+  const [editProductColor, setEditProductColor] = useState("");
+
+  const [editProductSerieId, setEditProductSerieId] = useState("");
+
+  const [editProductImage, setEditProductImage] = useState<string | null>(null);
+
+  const [editProductImageChanged, setEditProductImageChanged] = useState(false);
+
+  const [editProductCosto, setEditProductCosto] = useState("");
+
+  const [editProductVenta, setEditProductVenta] = useState("");
+
+  const [editProductSupplierId, setEditProductSupplierId] = useState("");
+
+  const [editProductMotivo, setEditProductMotivo] = useState("");
+
+  const [knownSeriesCosts, setKnownSeriesCosts] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
+
+  const [editProductTallas, setEditProductTallas] = useState<{ tallaId: string; numero: number; cantidad: number }[]>([]);
+
+  const [newTallaNumeroInput, setNewTallaNumeroInput] = useState("");
+
+  const [tallaInputError, setTallaInputError] = useState("");
+
+
+
+  // ── Estado para modal de Edición de Series y Precios del Proveedor para el Modelo ──
+
+  const [showSupplierSeriesModal, setShowSupplierSeriesModal] = useState(false);
+
+  const [supplierSeriesTargetModel, setSupplierSeriesTargetModel] = useState<ModeloAgrupado | null>(null);
+
+  const [supplierSeriesTargetSupplierId, setSupplierSeriesTargetSupplierId] = useState<string | null>(null);
+
+  const [supplierSeriesTargetSupplierName, setSupplierSeriesTargetSupplierName] = useState<string>("");
+
+  const [supplierSeriesActiveIds, setSupplierSeriesActiveIds] = useState<string[]>([]);
+
+  const [supplierSeriesPrices, setSupplierSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
+
+  const [supplierSeriesCustomTallas, setSupplierSeriesCustomTallas] = useState<Record<string, string[]>>({});
+
+  const [supplierSeriesStockOption, setSupplierSeriesStockOption] = useState<Record<string, 'DOCENA' | 'NINGUNA'>>({});
+
+
+
+  // ── Estado para modal de Edición del Modelo Base y sus Series ──
+
+  const [showEditModel, setShowEditModel] = useState(false);
+
+  const [editModel, setEditModel] = useState<ModeloAgrupado | null>(null);
+
+  const [editModelName, setEditModelName] = useState("");
+
+  const [editModelBrand, setEditModelBrand] = useState("");
+
+  const [editModelBaseCode, setEditModelBaseCode] = useState("");
+
+  const [editModelMaterial, setEditModelMaterial] = useState("");
+
+  const [editModelSupplierId, setEditModelSupplierId] = useState("");
+
+  const [editModelAlternateIds, setEditModelAlternateIds] = useState<string[]>([]);
+
+  const [editModelSerieIds, setEditModelSerieIds] = useState<string[]>([]);
+
+  const [editModelSeriesPrices, setEditModelSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
+
+  const [editModelCustomTallas, setEditModelCustomTallas] = useState<Record<string, string[]>>({});
+
+  const [editModelVariants, setEditModelVariants] = useState<{
+
+    productId: string;
+
+    color: string;
+
+    fotoUrl?: string;
+
+    serieId: string;
+
+    costPrice: number;
+
+    salePrice: number;
+
+    tallas: { tallaId: string; numero: number; cantidad: number }[];
+
+  }[]>([]);
+
+  const [editModelSelectedVariantId, setEditModelSelectedVariantId] = useState<string>("");
+
+
+
+  // ── Estado para Proveedor Alternos en Creación ──
+
+  const [createAlternateIds, setCreateAlternateIds] = useState<string[]>([]);
+
+  const [syncingModelId, setSyncingModelId] = useState<string | null>(null);
+
+
+
+  // ── Estado para mini-formulario de agregar proveedor rápido ──
+
+  const [showQuickSupplier, setShowQuickSupplier] = useState(false);
+
+  const [qsRuc, setQsRuc] = useState("");
+
+  const [qsNombres, setQsNombres] = useState("");
+
+  const [qsApellidos, setQsApellidos] = useState("");
+
+  const [qsNombreComercial, setQsNombreComercial] = useState("");
+
+  const [qsContacto, setQsContacto] = useState("");
+
+  const [qsEmail, setQsEmail] = useState("");
+
+  const [qsDireccion, setQsDireccion] = useState("");
+
+  const [qsSaving, setQsSaving] = useState(false);
+
+  const [qsError, setQsError] = useState("");
+
+  const [qsContext, setQsContext] = useState<'create' | 'edit' | 'addColor'>('create');
+
+
+
+  const [marginPct, setMarginPct] = useState<number>(getStoredProfitMargin());
+
+
+
+  // Control de descartes y cierre seguro de modales
+
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+
+  const pendingCloseRef = useRef<(() => void) | null>(null);
+
+
+
+  const safeDismiss = useCallback((closeFn: () => void, isDirty: boolean) => {
+
+    if (isDirty) {
+
+      pendingCloseRef.current = closeFn;
+
+      setShowDiscardModal(true);
+
+    } else {
+
+      closeFn();
+
+    }
+
+  }, []);
+
+
+
+  const isDirtyCreate = useCallback(() => {
+
+    return showCreate && (name.trim() !== "" || brand.trim() !== "" || baseCode.trim() !== "" || serieIds.length > 0 || colors.some(c => c.color.trim() !== "" || c.foto !== null));
+
+  }, [showCreate, name, brand, baseCode, serieIds.length, colors]);
+
+
+
+  const isDirtyAddColor = useCallback(() => {
+
+    return showAddColorModal && (
+
+      newColorName.trim() !== "" ||
+
+      newColorFoto !== null ||
+
+      newColorSupplierId !== (selectedModelForColor?.supplierId || "")
+
+    );
+
+  }, [showAddColorModal, newColorName, newColorFoto, newColorSupplierId, selectedModelForColor]);
+
+
+
+  const isDirtyPrice = useCallback(() => {
+
+    return showPrice && (newCosto.trim() !== "" || newVenta.trim() !== "" || motivo.trim() !== "");
+
+  }, [showPrice, newCosto, newVenta, motivo]);
+
+
+
+  const isDirtyCreateSeries = useCallback(() => {
+
+    return showCreateSeriesModal && newSerieNombre.trim() !== "";
+
+  }, [showCreateSeriesModal, newSerieNombre]);
+
+
+
+  const isDirtyEditSeries = useCallback(() => {
+
+    return showEditSeriesModal && editingSerie !== null && (editSerieNombre !== editingSerie.nombre);
+
+  }, [showEditSeriesModal, editingSerie, editSerieNombre]);
+
+
+
+  const isDirtyEditProduct = useCallback(() => {
+
+    return showEditProduct && editProduct !== null && (editProductColor !== (editProduct.color || "") || editProductVenta !== String(editProduct.precioVenta || ""));
+
+  }, [showEditProduct, editProduct, editProductColor, editProductVenta]);
+
+
+
+  const isDirtyEditModel = useCallback(() => {
+
+    return showEditModel && editModel !== null && (editModelName !== editModel.name || editModelBrand !== (editModel.brand || ""));
+
+  }, [showEditModel, editModel, editModelName, editModelBrand]);
+
+
+
+  const isDirtyQuickSupplier = useCallback(() => {
+
+    return showQuickSupplier && (
+
+      qsRuc.trim() !== "" ||
+
+      qsNombres.trim() !== "" ||
+
+      qsApellidos.trim() !== "" ||
+
+      qsNombreComercial.trim() !== "" ||
+
+      qsContacto.trim() !== "" ||
+
+      qsEmail.trim() !== "" ||
+
+      qsDireccion.trim() !== ""
+
+    );
+
+  }, [showQuickSupplier, qsRuc, qsNombres, qsApellidos, qsNombreComercial, qsContacto, qsEmail, qsDireccion]);
+
+
+
+  // Manejador global de la tecla Escape
+
+  useEffect(() => {
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+
+      if (e.key !== 'Escape') return;
+
+      if (zoomImage) {
+
+        e.preventDefault();
+
+        setZoomImage(null);
+
+        return;
+
+      }
+
+      if (showDiscardModal) return;
+
+      if (confirmModal.isOpen) {
+
+        e.preventDefault();
+
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
+        return;
+
+      }
+
+      if (importModalData.isOpen) {
+
+        e.preventDefault();
+
+        setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] });
+
+        return;
+
+      }
+
+      if (showQuickSupplier) {
+
+        e.preventDefault();
+
+        safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier());
+
+        return;
+
+      }
+
+      if (showCreateSeriesModal) {
+
+        e.preventDefault();
+
+        safeDismiss(() => setShowCreateSeriesModal(false), isDirtyCreateSeries());
+
+        return;
+
+      }
+
+      if (showEditSeriesModal) {
+
+        e.preventDefault();
+
+        safeDismiss(() => setShowEditSeriesModal(false), isDirtyEditSeries());
+
+        return;
+
+      }
+
+      if (showPrice) {
+
+        e.preventDefault();
+
+        safeDismiss(() => { setShowPrice(false); setPriceProd(null); }, isDirtyPrice());
+
+        return;
+
+      }
+
+      if (showAddColorModal) {
+
+        e.preventDefault();
+
+        safeDismiss(() => { setShowAddColorModal(false); setSelectedModelForColor(null); }, isDirtyAddColor());
+
+        return;
+
+      }
+
+      if (showEditProduct) {
+
+        e.preventDefault();
+
+        safeDismiss(() => { setShowEditProduct(false); setEditProduct(null); }, isDirtyEditProduct());
+
+        return;
+
+      }
+
+      if (showEditModel) {
+
+        e.preventDefault();
+
+        safeDismiss(() => { setShowEditModel(false); setEditModel(null); }, isDirtyEditModel());
+
+        return;
+
+      }
+
+      if (showCreate) {
+
+        e.preventDefault();
+
+        safeDismiss(() => { setShowCreate(false); resetForm(); }, isDirtyCreate());
+
+        return;
+
+      }
+
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => document.removeEventListener('keydown', handleKeyDown);
+
+  }, [
+
+    zoomImage, showDiscardModal, confirmModal.isOpen, showQuickSupplier, showCreateSeriesModal,
+
+    showEditSeriesModal, showPrice, showAddColorModal, showEditProduct, showEditModel,
+
+    showCreate, safeDismiss, isDirtyQuickSupplier, isDirtyCreateSeries, isDirtyEditSeries,
+
+    isDirtyPrice, isDirtyAddColor, isDirtyEditProduct, isDirtyEditModel, isDirtyCreate
+
+  ]);
+
+
+
+  const isSuperAdmin = userRole === "ROL_SUPER_ADMIN";
+
+  const sucursalLabel = useMemo(() => {
+
+    if (activeSucursalId && activeSucursalId !== 'TODAS') {
+
+      const suc = sucursales?.find((s) => s.id === activeSucursalId);
+
+      return suc?.name || 'Local Seleccionado';
+
+    }
+
+    return isSuperAdmin ? 'Consolidado General (Todos los locales)' : 'Mi Bodega Local';
+
+  }, [activeSucursalId, sucursales, isSuperAdmin]);
+
+
+
+  const resumenInventario = useMemo(() => {
+
+    let totalPares = 0;
+
+    let capitalInvertido = 0;
+
+    let valorComercial = 0;
+
+    const totalModelosCount = modelos.length;
+
+
+
+    modelos.forEach((m: any) => {
+
+      (m.products || []).forEach((p: any) => {
+
+        const costo = Number(p.precioCosto || 0);
+
+        const venta = Number(p.precioVenta || 0);
+
+        (p.tallas || (p as any).stockPorTalla || []).forEach((t: any) => {
+
+          const qty = Number(t.cantidad ?? t.stock ?? t.disponible ?? 0);
+
+          if (qty > 0) {
+
+            totalPares += qty;
+
+            capitalInvertido += qty * costo;
+
+            valorComercial += qty * venta;
+
+          }
+
+        });
+
+      });
+
+    });
+
+
+
+    const gananciaBruta = Math.max(0, valorComercial - capitalInvertido);
+
+    const margenPct = valorComercial > 0 ? Math.round((gananciaBruta / valorComercial) * 100) : 0;
+
+
+
+    return {
+
+      totalPares,
+
+      capitalInvertido,
+
+      valorComercial,
+
+      gananciaBruta,
+
+      margenPct,
+
+      totalModelosCount,
+
+    };
+
+  }, [modelos]);
+
+
+
+  useEffect(() => {
+
+    loadData();
+
+    const handleMarginUpdate = (e: any) => {
+
+      if (e.detail?.marginPct) setMarginPct(e.detail.marginPct);
+
+      else setMarginPct(getStoredProfitMargin());
+
+    };
+
+    window.addEventListener("nexora:margin-changed", handleMarginUpdate);
+
+    return () => window.removeEventListener("nexora:margin-changed", handleMarginUpdate);
+
+  }, [online, activeSucursalId]);
+
+
+
+  const loadData = async (isSilent = false) => {
+
+    if (!isSilent && modelos.length === 0) {
+
+      setLoading(true);
+
+    }
+
+    try {
+
+      const sucParam = activeSucursalId ? `?sucursalId=${activeSucursalId}` : '';
+
+      const [mdls, redRes] = await Promise.all([
+
+        ApiService.get(`/inventario/modelos${sucParam}`).catch(() => []),
+
+        ApiService.get("/inventario/modelos/red").catch(() => null),
+
+      ]);
+
+      if (Array.isArray(mdls)) {
+
+        setModelos(mdls);
+
+        const costMap: Record<string, { costPrice: string; salePrice: string }> = {};
+
+        mdls.forEach((m: any) => {
+
+          (m.products || []).forEach((p: any) => {
+
+            const sid = (p.serie as any)?.id || (p as any).serieId;
+
+            const supId = p.supplierId || (p.supplier as any)?.id || m.supplierId || 'default';
+
+            if (sid && p.precioCosto > 0) {
+
+              costMap[`${sid}_${supId}`] = { costPrice: String(p.precioCosto), salePrice: String(p.precioVenta) };
+
+              if (!costMap[sid]) {
+
+                costMap[sid] = { costPrice: String(p.precioCosto), salePrice: String(p.precioVenta) };
+
+              }
+
+            }
+
+          });
+
+        });
+
+        setKnownSeriesCosts(prev => ({ ...costMap, ...prev }));
+
+      } else {
+
+        setModelos([]);
+
+      }
+
+
+
+      if (redRes) {
+
+        setIsMatrizTenant(Boolean(redRes.isMatriz));
+
+        setRedSucursales(Array.isArray(redRes.redSucursales) ? redRes.redSucursales : []);
+
+        setModelosRed(Array.isArray(redRes.modelosRed) ? redRes.modelosRed : []);
+
+        setModelosMatrizDisponibles(Array.isArray(redRes.modelosRed) ? redRes.modelosRed : []);
+
+      }
+
+
+
+      if (online) {
+
+        try {
+
+          const [srs, provs] = await Promise.all([
+
+            ApiService.get("/configuracion/series").catch(() => []),
+
+            ApiService.get("/proveedores").catch(() => []),
+
+          ]);
+
+
+
+          if (Array.isArray(srs)) {
+
+            const filtradasYOrdenadas = srs
+
+              .filter((s: any) => s.nombre !== "NINO_PEQUENO_B")
+
+              .sort((a: any, b: any) => {
+
+                const idxA = SERIES_ORDEN.indexOf(a.nombre);
+
+                const idxB = SERIES_ORDEN.indexOf(b.nombre);
+
+                const valA = idxA === -1 ? 999 : idxA;
+
+                const valB = idxB === -1 ? 999 : idxB;
+
+                return valA - valB;
+
+              });
+
+            setSeries(filtradasYOrdenadas);
+
+          }
+
+
+
+          if (Array.isArray(provs)) {
+
+            setListaProveedores(provs);
+
+          }
+
+        } catch {}
+
+      }
+
+    } catch (e: any) {
+
+      console.error("Error cargando modelos:", e);
+
+    } finally {
+
+      setLoading(false);
+
+      // Restaurar foco visual y scroll sin perder la posición del modelo que se estaba configurando
+
+      const targetId = lastActiveModelIdRef.current;
+
+      const targetCode = lastActiveModelCodeRef.current;
+
+      if (targetId || targetCode) {
+
+        const scrollToElement = (attempt = 0) => {
+
+          let el: HTMLElement | null = null;
+
+          if (targetId) {
+
+            el = document.getElementById(`modelo-card-${targetId}`) || document.getElementById(`modelo-red-${targetId}`);
+
+          }
+
+          if (!el && targetCode) {
+
+            el = document.querySelector(`[data-basecode="${targetCode}"]`);
+
+          }
+
+          if (el) {
+
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            el.classList.add('ring-2', 'ring-blue-500', 'ring-offset-2', 'transition-all');
+
+            setTimeout(() => {
+
+              el?.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-2');
+
+            }, 2000);
+
+            lastActiveModelIdRef.current = null;
+
+            lastActiveModelCodeRef.current = null;
+
+          } else if (attempt < 8) {
+
+            setTimeout(() => scrollToElement(attempt + 1), 80);
+
+          } else {
+
+            lastActiveModelIdRef.current = null;
+
+            lastActiveModelCodeRef.current = null;
+
+          }
+
+        };
+
+        setTimeout(() => scrollToElement(), 60);
+
+      }
+
+    }
+
+  };
+
+
+
+  const resetForm = () => {
+
+    setSelectedMatrizModelId("");
+
+    setBaseCode("");
+
+    setBaseCodeManual(false);
+
+    setName("");
+
+    setBrand("");
+
+    setMaterial("");
+
+    setSupplierId("");
+
+    setCreateAlternateIds([]);
+
+    setColors([{ color: "", foto: null, supplierId: "" }]);
+
+    setSerieIds([]);
+
+    setSeriesPrices({});
+
+    setCustomTallas({});
+
+    setStockInicial("1");
+
+    setError("");
+
+  };
+
+
+
+  const handleSelectMatrizModel = (matrizId: string) => {
+
+    setSelectedMatrizModelId(matrizId);
+
+    if (!matrizId) return;
+
+
+
+    const mm = modelosMatrizDisponibles.find((m) => m.id === matrizId);
+
+    if (!mm) return;
+
+
+
+    // Rellenar datos base del modelo
+
+    setBaseCode(mm.baseCode);
+
+    setName(mm.name);
+
+    setBrand(mm.brand);
+
+    setMaterial(mm.material || "");
+
+
+
+    // Rellenar colores reutilizando URLs de Cloudinary existentes (sin duplicar subidas)
+
+    if (mm.colores && mm.colores.length > 0) {
+
+      setColors(
+
+        mm.colores.map((c) => ({
+
+          color: c.color,
+
+          foto: c.fotoUrl, // URL existente de Cloudinary
+
+        }))
+
+      );
+
+    }
+
+
+
+    // Activar series correspondientes y configurar precios de referencia sugeridos
+
+    const activeSeriesIds: string[] = [];
+
+    const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
+
+    const initialCustomTallas: Record<string, string[]> = {};
+
+
+
+    mm.series.forEach((ms) => {
+
+      const sObj = series.find((s) => s.id === ms.id || s.nombre === ms.nombre);
+
+      if (sObj) {
+
+        activeSeriesIds.push(sObj.id);
+
+        initialPrices[sObj.id] = {
+
+          costPrice: ms.costPrice > 0 ? String(ms.costPrice) : "",
+
+          salePrice: ms.salePrice > 0 ? String(ms.salePrice) : "",
+
+        };
+
+        if (sObj.tallas) {
+
+          const curva = getDocenaBaseParaSerie(sObj);
+
+          if (Object.keys(curva).length > 0) {
+
+            initialCustomTallas[sObj.id] = buildTallaIdsFromCurva(sObj, curva);
+
+          } else {
+
+            const ids: string[] = [];
+
+            sObj.tallas.forEach((t) => {
+
+              ids.push(t.id);
+
+              ids.push(t.id);
+
+            });
+
+            initialCustomTallas[sObj.id] = ids;
+
+          }
+
+        }
+
+      }
+
+    });
+
+
+
+    if (activeSeriesIds.length > 0) {
+
+      setSerieIds(activeSeriesIds);
+
+      setSeriesPrices(initialPrices);
+
+      setCustomTallas(initialCustomTallas);
+
+    }
+
+  };
+
+
+
+  // ── Crear proveedor rápido desde modal catálogo ──
+
+  const handleQuickCreateSupplier = async (e: React.FormEvent) => {
+
+    e.preventDefault();
+
+    setQsError("");
+
+    if (!qsNombres.trim() || !qsApellidos.trim()) {
+
+      setQsError("Nombres y Apellidos del proveedor son obligatorios.");
+
+      return;
+
+    }
+
+
+
+    if (!qsContacto.trim()) {
+
+      setQsError("El número de teléfono / WhatsApp es obligatorio.");
+
+      return;
+
+    }
+
+
+
+    const rucClean = qsRuc.trim().replace(/\D/g, "");
+
+    if (rucClean && !validarRuc(rucClean) && !validarCedula(rucClean)) {
+
+      setQsError("El documento ingresado no es válido (debe tener 10 dígitos de cédula o 13 dígitos de RUC válidos en Ecuador).");
+
+      return;
+
+    }
+
+
+
+    if (qsEmail) {
+
+      const emailVal = validarEmailEstricto(qsEmail);
+
+      if (!emailVal.valido) {
+
+        setQsError(emailVal.mensaje || "El correo electrónico no es válido.");
+
+        return;
+
+      }
+
+    }
+
+
+
+    const razonSocialFinal = qsNombreComercial.trim() || `${qsNombres.trim()} ${qsApellidos.trim()}`;
+
+
+
+    setQsSaving(true);
+
+    try {
+
+      const res = await ApiService.post("/proveedores", {
+
+        ruc: rucClean || undefined,
+
+        razonSocial: razonSocialFinal,
+
+        nombreComercial: qsNombreComercial.trim() || undefined,
+
+        nombres: qsNombres.trim(),
+
+        apellidos: qsApellidos.trim(),
+
+        contacto: formatearTelefono(qsContacto),
+
+        direccion: qsDireccion ? formatearDireccion(qsDireccion) : undefined,
+
+        email: qsEmail ? formatearEmail(qsEmail) : undefined,
+
+      });
+
+      const newId = res.id;
+
+      // Recargar lista de proveedores
+
+      const provs = await ApiService.get("/proveedores");
+
+      if (Array.isArray(provs)) setListaProveedores(provs);
+
+      // Auto-seleccionar como principal si no hay uno, o como alterno
+
+      if (qsContext === 'create') {
+
+        if (!supplierId) {
+
+          setSupplierId(newId);
+
+        } else {
+
+          setCreateAlternateIds(prev => [...prev, newId]);
+
+        }
+
+      } else if (qsContext === 'addColor') {
+
+        setNewColorSupplierId(newId);
+
+      } else {
+
+        if (!editModelSupplierId) {
+
+          setEditModelSupplierId(newId);
+
+        } else {
+
+          setEditModelAlternateIds(prev => [...prev, newId]);
+
+        }
+
+      }
+
+      setSuccess(`Proveedor "${razonSocialFinal}" creado y asignado.`);
+
+      setShowQuickSupplier(false);
+
+      setQsRuc(""); setQsNombres(""); setQsApellidos(""); setQsNombreComercial(""); setQsContacto(""); setQsEmail(""); setQsDireccion(""); setQsError("");
+
+      setTimeout(() => setSuccess(""), 4000);
+
+    } catch (err: any) {
+
+      setQsError(err.message || "Error al crear el proveedor.");
+
+    } finally {
+
+      setQsSaving(false);
+
+    }
+
+  };
+
+
+
+  const handleFoto = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+
+    const f = e.target.files?.[0];
+
+    if (!f) return;
+
+    const reader = new FileReader();
+
+    reader.onloadend = async () => {
+
+      try {
+
+        const compressed = await compressImageToWebP(reader.result as string);
+
+        setColors(prev => {
+
+          const copy = [...prev];
+
+          copy[index].foto = compressed;
+
+          return copy;
+
+        });
+
+      } catch (err) {
+
+        console.error("Error comprimiendo imagen:", err);
+
+      }
+
+    };
+
+    reader.readAsDataURL(f);
+
+  };
+
+
+
+  const addColorField = () => {
+
+    setColors(prev => [...prev, { color: "", foto: null, supplierId: "" }]);
+
+  };
+
+
+
+  const removeColorField = (index: number) => {
+
+    if (colors.length === 1) return;
+
+    setColors(prev => prev.filter((_, i) => i !== index));
+
+  };
+
+
+
+  // Helper para obtener la distribución de docena (12 pares) activa para una serie
+
+  const getDocenaConfigurada = (serieId: string, isNewColor = false): Record<number, number> => {
+
+    const sObj = series.find(s => s.id === serieId);
+
+    if (!sObj) return {};
+
+    const custom = isNewColor
+
+      ? newColorDocenaPersonalizadaPorSerie[serieId]
+
+      : docenaPersonalizadaPorSerie[serieId];
+
+    if (custom && Object.keys(custom).length > 0) {
+
+      const sum = Object.values(custom).reduce((a, b) => a + b, 0);
+
+      if (sum === 12) return custom;
+
+    }
+
+    return getDocenaBaseParaSerie(sObj);
+
+  };
+
+
+
+  // Registra la distribución si suma exactamente 12 pares (docena personalizada)
+
+  const registrarSiEsDocena = (serieId: string, arrIds: string[], isNewColor = false) => {
+
+    const sObj = series.find(s => s.id === serieId);
+
+    if (!sObj || !sObj.tallas) return;
+
+    if (arrIds.length === 12) {
+
+      const dist: Record<number, number> = {};
+
+      sObj.tallas.forEach(t => {
+
+        dist[t.numero] = arrIds.filter(id => id === t.id).length;
+
+      });
+
+      if (isNewColor) {
+
+        setNewColorDocenaPersonalizadaPorSerie(prev => ({ ...prev, [serieId]: dist }));
+
+      } else {
+
+        setDocenaPersonalizadaPorSerie(prev => ({ ...prev, [serieId]: dist }));
+
+      }
+
+    }
+
+  };
+
+
+
+  const toggleSerie = (id: string) => {
+
+    setSerieIds(prev => {
+
+      if (prev.includes(id)) {
+
+        setSeriesPrices(sp => {
+
+          const copy = { ...sp };
+
+          delete copy[id];
+
+          return copy;
+
+        });
+
+        setCustomTallas(ct => {
+
+          const copy = { ...ct };
+
+          delete copy[id];
+
+          return copy;
+
+        });
+
+        return prev.filter(x => x !== id);
+
+      } else {
+
+        const sObj = series.find(s => s.id === id);
+
+        if (sObj) {
+
+          const docena = getDocenaBaseParaSerie(sObj);
+
+          const ids = buildTallaIdsFromCurva(sObj, docena);
+
+          setCustomTallas(ct => ({ ...ct, [id]: ids }));
+
+        } else {
+
+          setCustomTallas(ct => ({ ...ct, [id]: [] }));
+
+        }
+
+        setSeriesPrices(sp => ({
+
+          ...sp,
+
+          [id]: { costPrice: "", salePrice: "" }
+
+        }));
+
+        return [...prev, id];
+
+      }
+
+    });
+
+  };
+
+
+
+  const getDocenaLabelExt = (totalPares: number) => {
+
+    if (totalPares === 0) return "Sin Stock (0 pares)";
+
+    if (totalPares === 6) return "½ Docena (6 pares)";
+
+    if (totalPares === 12) return "1 Docena Completa (12 pares)";
+
+    if (totalPares > 0 && totalPares % 12 === 0) return `${totalPares / 12} Docenas (${totalPares} pares)`;
+
+    if (totalPares > 0 && totalPares % 6 === 0) return `${totalPares / 6} Medias Docenas (${totalPares} pares)`;
+
+    return `${totalPares} pares`;
+
+  };
+
+
+
+  const detectarTipoCurva = (
+
+    serieId: string,
+
+    selectedIds: string[],
+
+    isNewColor = false
+
+  ): 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA' | 'CUSTOM' => {
+
+    if (!selectedIds || selectedIds.length === 0) return 'NINGUNA';
+
+    const sObj = series.find(s => s.id === serieId);
+
+    if (!sObj || !sObj.tallas) return 'CUSTOM';
+
+
+
+    const docena = getDocenaConfigurada(serieId, isNewColor);
+
+    const mediaA = dividirDocenaEnMediaDocena(docena, 'MEDIA_A', 6);
+
+    const mediaB = dividirDocenaEnMediaDocena(docena, 'MEDIA_B', 6);
+
+
+
+    const docenaIds = buildTallaIdsFromCurva(sObj, docena);
+
+    const mediaAIds = buildTallaIdsFromCurva(sObj, mediaA);
+
+    const mediaBIds = buildTallaIdsFromCurva(sObj, mediaB);
+
+
+
+    const sCurrent = [...selectedIds].sort().join(',');
+
+    if (sCurrent === [...docenaIds].sort().join(',')) return 'DOCENA';
+
+    if (sCurrent === [...mediaAIds].sort().join(',')) return 'MEDIA_A';
+
+    if (sCurrent === [...mediaBIds].sort().join(',')) return 'MEDIA_B';
+
+
+
+    return 'CUSTOM';
+
+  };
+
+
+
+  // Seleccionar opción de stock inicial en el formulario de CREACIÓN sin alterar la docena configurada en los steppers
+
+  const aplicarCurvaEnCreacion = (serieId: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA') => {
+
+    setStockOptionCreacion(prev => ({ ...prev, [serieId]: tipo }));
+
+  };
+
+
+
+  const restablecerDocenaEstandarEnCreacion = (serieId: string) => {
+
+    const sObj = series.find(s => s.id === serieId);
+
+    if (!sObj || !sObj.tallas) return;
+
+    const docena = getDocenaBaseParaSerie(sObj);
+
+    const ids = buildTallaIdsFromCurva(sObj, docena);
+
+    setCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+
+    registrarSiEsDocena(serieId, ids, false);
+
+  };
+
+
+
+  const aplicarCurvaATodasEnCreacion = (tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA') => {
+
+    serieIds.forEach(sid => aplicarCurvaEnCreacion(sid, tipo));
+
+  };
+
+
+
+  const toggleTallaInSerie = (serieId: string, tallaId: string) => {
+
+    setCustomTallas(prev => {
+
+      const current = prev[serieId] || [];
+
+      const count = current.filter(id => id === tallaId).length;
+
+      const updated = count > 0 ? current.filter(id => id !== tallaId) : [...current, tallaId];
+
+      registrarSiEsDocena(serieId, updated, false);
+
+      return { ...prev, [serieId]: updated };
+
+    });
+
+  };
+
+
+
+  const addTallaRepeatInSerie = (serieId: string, tallaId: string) => {
+
+    setCustomTallas(prev => {
+
+      const current = prev[serieId] || [];
+
+      const updated = [...current, tallaId];
+
+      registrarSiEsDocena(serieId, updated, false);
+
+      return { ...prev, [serieId]: updated };
+
+    });
+
+  };
+
+
+
+  const removeOneTallaInSerie = (serieId: string, tallaId: string) => {
+
+    setCustomTallas(prev => {
+
+      const current = prev[serieId] || [];
+
+      const idx = current.indexOf(tallaId);
+
+      if (idx > -1) {
+
+        const copy = [...current];
+
+        copy.splice(idx, 1);
+
+        registrarSiEsDocena(serieId, copy, false);
+
+        return { ...prev, [serieId]: copy };
+
+      }
+
+      return prev;
+
+    });
+
+  };
+
+
+
+  // Preselección estricta de serie por proveedor:
+
+  // Si el proveedor ya tiene variantes previas en este modelo, preseleccionar estrictamente solo sus series asignadas.
+
+  const getSeriesPreseleccionadasParaProveedor = (m: ModeloAgrupado, supId: string): string[] => {
+
+    if (!m || !m.products || m.products.length === 0) return [];
+
+
+
+    const prodsDelProveedor = m.products.filter(p => {
+
+      const pSupId = p.supplierId || (p.supplier as any)?.id;
+
+      if (supId) {
+
+        return pSupId === supId;
+
+      } else {
+
+        return !pSupId || pSupId === m.supplierId;
+
+      }
+
+    });
+
+
+
+    const seriesDelProveedor = Array.from(
+
+      new Set(prodsDelProveedor.map(p => (p.serie as any)?.id || (p as any).serieId).filter(Boolean))
+
+    ) as string[];
+
+
+
+    if (seriesDelProveedor.length > 0) {
+
+      return seriesDelProveedor;
+
+    }
+
+
+
+    // Si aún no tiene variantes en este modelo, usar las series generales del modelo
+
+    const todasSeriesModelo = Array.from(
+
+      new Set(m.products.map(p => (p.serie as any)?.id || (p as any).serieId).filter(Boolean))
+
+    ) as string[];
+
+
+
+    return todasSeriesModelo;
+
+  };
+
+
+
+  const openAddColorModal = (m: ModeloAgrupado) => {
+
+    lastActiveModelIdRef.current = m.id;
+
+    setExpandedModels(prev => ({ ...prev, [m.id]: true }));
+
+    setSelectedModelForColor(m);
+
+    setNewColorName("");
+
+    setNewColorFoto(null);
+
+    const defaultSupId = m.supplierId || (m.suppliers && m.suppliers.length > 0 ? m.suppliers[0].id : "");
+
+    setNewColorSupplierId(defaultSupId);
+
+
+
+    // Preselección estricta de serie según el proveedor inicial
+
+    const preselectedSerieIds = getSeriesPreseleccionadasParaProveedor(m, defaultSupId);
+
+    setNewColorSerieIds(preselectedSerieIds);
+
+    
+
+    const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
+
+    const initialCustomTallas: Record<string, string[]> = {};
+
+
+
+    preselectedSerieIds.forEach(sid => {
+
+      // Buscar si este proveedor ya tiene precio registrado para esta serie
+
+      const prod = m.products.find(p => (p.supplierId === defaultSupId || p.supplier?.id === defaultSupId) && p.serie?.id === sid)
+
+        || (defaultSupId === m.supplierId ? m.products.find(p => p.serie?.id === sid) : undefined);
+
+
+
+      initialPrices[sid] = {
+
+        costPrice: prod ? String(prod.precioCosto) : "",
+
+        salePrice: prod ? String(prod.precioVenta) : "",
+
+      };
+
+      const sObj = series.find(s => s.id === sid);
+
+      if (sObj?.tallas) {
+
+        const docena = getDocenaBaseParaSerie(sObj);
+
+        initialCustomTallas[sid] = buildTallaIdsFromCurva(sObj, docena);
+
+      }
+
+    });
+
+
+
+    setNewColorSeriesPrices(initialPrices);
+
+    setNewColorCustomTallas(initialCustomTallas);
+
+    setNewColorStockOption({});
+
+    setNewColorStockInicial("1");
+
+    setError("");
+
+    setShowAddColorModal(true);
+
+  };
+
+
+
+  const handleSupplierChangeInAddColor = (newSupId: string) => {
+
+    setNewColorSupplierId(newSupId);
+
+    if (!selectedModelForColor) return;
+
+
+
+    // Preselección estricta de serie según el proveedor seleccionado
+
+    const preselectedSerieIds = getSeriesPreseleccionadasParaProveedor(selectedModelForColor, newSupId);
+
+    setNewColorSerieIds(preselectedSerieIds);
+
+
+
+    // Actualizar los precios para cada serie activa según el historial de este proveedor en el modelo o en knownSeriesCosts
+
+    setNewColorSeriesPrices(prev => {
+
+      const updated = { ...prev };
+
+      preselectedSerieIds.forEach(sid => {
+
+        const cacheKey = `${sid}_${newSupId || 'default'}`;
+
+        const matchingProd = selectedModelForColor.products?.find(
+
+          p => (p.supplierId === newSupId || (p.supplier as any)?.id === newSupId) && ((p.serie as any)?.id === sid || (p as any).serieId === sid)
+
+        );
+
+
+
+        if (matchingProd && matchingProd.precioCosto > 0) {
+
+          updated[sid] = {
+
+            costPrice: String(matchingProd.precioCosto),
+
+            salePrice: String(matchingProd.precioVenta),
+
+          };
+
+        } else if (knownSeriesCosts[cacheKey]) {
+
+          updated[sid] = {
+
+            costPrice: knownSeriesCosts[cacheKey].costPrice,
+
+            salePrice: knownSeriesCosts[cacheKey].salePrice,
+
+          };
+
+        } else if (!newSupId || newSupId === selectedModelForColor.supplierId) {
+
+          const baseProd = selectedModelForColor.products?.find(p => ((p.serie as any)?.id === sid || (p as any).serieId === sid));
+
+          if (baseProd && baseProd.precioCosto > 0) {
+
+            updated[sid] = {
+
+              costPrice: String(baseProd.precioCosto),
+
+              salePrice: String(baseProd.precioVenta),
+
+            };
+
+          }
+
+        }
+
+      });
+
+      return updated;
+
+    });
+
+
+
+    setNewColorCustomTallas(prev => {
+
+      const updated = { ...prev };
+
+      preselectedSerieIds.forEach(sid => {
+
+        if (!updated[sid] || updated[sid].length === 0) {
+
+          const sObj = series.find(s => s.id === sid);
+
+          if (sObj?.tallas) {
+
+            const docena = getDocenaBaseParaSerie(sObj);
+
+            updated[sid] = buildTallaIdsFromCurva(sObj, docena);
+
+          }
+
+        }
+
+      });
+
+      return updated;
+
+    });
+
+  };
+
+
+
+  const handleCostPriceChangeInNewColor = (serieId: string, newCost: string) => {
+
+    const costVal = parseFloat(newCost);
+
+    const autoSuggestedSale = !isNaN(costVal) && costVal > 0 ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
+
+
+
+    setNewColorSeriesPrices(prev => {
+
+      const currentSerie = prev[serieId] || { costPrice: "", salePrice: "" };
+
+      const shouldUpdateSale = !currentSerie.salePrice || currentSerie.salePrice === "0" || currentSerie.salePrice === "0.00";
+
+      return {
+
+        ...prev,
+
+        [serieId]: {
+
+          costPrice: newCost,
+
+          salePrice: shouldUpdateSale && autoSuggestedSale ? autoSuggestedSale : currentSerie.salePrice,
+
+        },
+
+      };
+
+    });
+
+  };
+
+
+
+  const replicarCostoEnNuevoColor = (sourceSerieId: string) => {
+
+    const source = newColorSeriesPrices[sourceSerieId];
+
+    if (!source || !source.costPrice) return;
+
+    const costVal = parseFloat(source.costPrice);
+
+    const suggestedSale = !isNaN(costVal) && costVal > 0 ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
+
+
+
+    setNewColorSeriesPrices(prev => {
+
+      const updated = { ...prev };
+
+      newColorSerieIds.forEach(sid => {
+
+        updated[sid] = {
+
+          costPrice: source.costPrice,
+
+          salePrice: source.salePrice || suggestedSale,
+
+        };
+
+      });
+
+      return updated;
+
+    });
+
+  };
+
+
+
+  const toggleNewColorSerie = (id: string) => {
+
+    setNewColorSerieIds(prev => {
+
+      if (prev.includes(id)) {
+
+        setNewColorSeriesPrices(sp => {
+
+          const copy = { ...sp };
+
+          delete copy[id];
+
+          return copy;
+
+        });
+
+        setNewColorCustomTallas(ct => {
+
+          const copy = { ...ct };
+
+          delete copy[id];
+
+          return copy;
+
+        });
+
+        return prev.filter(x => x !== id);
+
+      } else {
+
+        const sObj = series.find(s => s.id === id);
+
+        if (sObj && sObj.tallas) {
+
+          const docena = getDocenaBaseParaSerie(sObj);
+
+          const ids = buildTallaIdsFromCurva(sObj, docena);
+
+          setNewColorCustomTallas(ct => ({ ...ct, [id]: ids }));
+
+        }
+
+        setNewColorSeriesPrices(sp => ({
+
+          ...sp,
+
+          [id]: { costPrice: "", salePrice: "" }
+
+        }));
+
+        return [...prev, id];
+
+      }
+
+    });
+
+  };
+
+
+
+  // Seleccionar opción de stock inicial en Nuevo Color sin alterar la docena configurada en los steppers
+
+  const aplicarCurvaEnNuevoColor = (serieId: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA') => {
+
+    setNewColorStockOption(prev => ({ ...prev, [serieId]: tipo }));
+
+  };
+
+
+
+  const restablecerDocenaEstandarEnEditModel = (serieId: string) => {
+
+    const sObj = series.find(s => s.id === serieId);
+
+    if (!sObj || !sObj.tallas) return;
+
+    const docena = getDocenaBaseParaSerie(sObj);
+
+    const ids = buildTallaIdsFromCurva(sObj, docena);
+
+    setEditModelCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+
+  };
+
+
+
+  const restablecerDocenaEstandarEnNuevoColor = (serieId: string) => {
+
+    const sObj = series.find(s => s.id === serieId);
+
+    if (!sObj || !sObj.tallas) return;
+
+    const docena = getDocenaBaseParaSerie(sObj);
+
+    const ids = buildTallaIdsFromCurva(sObj, docena);
+
+    setNewColorCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+
+    registrarSiEsDocena(serieId, ids, true);
+
+  };
+
+
+
+  const aplicarCurvaATodasEnNuevoColor = (tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA') => {
+
+    newColorSerieIds.forEach(sid => aplicarCurvaEnNuevoColor(sid, tipo));
+
+  };
+
+
+
+  const toggleTallaInNewColorSerie = (serieId: string, tallaId: string) => {
+
+    setNewColorCustomTallas(prev => {
+
+      const current = prev[serieId] || [];
+
+      const count = current.filter(id => id === tallaId).length;
+
+      const updated = count > 0 ? current.filter(id => id !== tallaId) : [...current, tallaId];
+
+      registrarSiEsDocena(serieId, updated, true);
+
+      return { ...prev, [serieId]: updated };
+
+    });
+
+  };
+
+
+
+  const addTallaRepeatInNewColorSerie = (serieId: string, tallaId: string) => {
+
+    setNewColorCustomTallas(prev => {
+
+      const current = prev[serieId] || [];
+
+      const updated = [...current, tallaId];
+
+      registrarSiEsDocena(serieId, updated, true);
+
+      return { ...prev, [serieId]: updated };
+
+    });
+
+  };
+
+
+
+  const removeOneTallaInNewColorSerie = (serieId: string, tallaId: string) => {
+
+    setNewColorCustomTallas(prev => {
+
+      const current = prev[serieId] || [];
+
+      const idx = current.indexOf(tallaId);
+
+      if (idx > -1) {
+
+        const copy = [...current];
+
+        copy.splice(idx, 1);
+
+        registrarSiEsDocena(serieId, copy, true);
+
+        return { ...prev, [serieId]: copy };
+
+      }
+
+      return prev;
+
+    });
+
+  };
+
+
+
+  // Handlers para Crear y Editar Series
+
+  const handleCreateSeriesWithTallas = async (e: React.FormEvent) => {
+
+    e.preventDefault();
+
+    if (!newSerieNombre.trim()) { setError("Ingresa un nombre para la serie."); return; }
+
+    const desde = parseInt(newSerieTallasDesde);
+
+    const hasta = parseInt(newSerieTallasHasta);
+
+    if (isNaN(desde) || isNaN(hasta) || hasta < desde) {
+
+      setError("Ingresa un rango de tallas válido (ej: 38 a 43).");
+
+      return;
+
+    }
+
+    setSaving(true);
+
+    setError("");
+
+    try {
+
+      const createdSerie = await ApiService.post("/configuracion/series-completa", {
+
+        nombre: newSerieNombre,
+
+        tallasDesde: desde,
+
+        tallasHasta: hasta,
+
+      });
+
+      setSuccess(`Serie "${createdSerie.nombre}" creada correctamente.`);
+
+      setShowCreateSeriesModal(false);
+
+      setNewSerieNombre("");
+
+      await loadData();
+
+      if (createdSerie?.id) {
+
+        if (showEditProduct) {
+
+          setSupplierSeriesActiveIds([createdSerie.id]);
+
+          setEditProductSerieId(createdSerie.id);
+
+          const docena = getDocenaBaseParaSerie(createdSerie);
+
+          const ids = buildTallaIdsFromCurva(createdSerie, docena);
+
+          setSupplierSeriesCustomTallas(ct => ({ ...ct, [createdSerie.id]: ids }));
+
+        } else if (showSupplierSeriesModal) {
+
+          setSupplierSeriesActiveIds(prev => (prev.includes(createdSerie.id) ? prev : [...prev, createdSerie.id]));
+
+          const docena = getDocenaBaseParaSerie(createdSerie);
+
+          const ids = buildTallaIdsFromCurva(createdSerie, docena);
+
+          setSupplierSeriesCustomTallas(ct => ({ ...ct, [createdSerie.id]: ids }));
+
+        } else if (showAddColorModal) {
+
+          setNewColorSerieIds(prev => (prev.includes(createdSerie.id) ? prev : [...prev, createdSerie.id]));
+
+          const docena = getDocenaBaseParaSerie(createdSerie);
+
+          const ids = buildTallaIdsFromCurva(createdSerie, docena);
+
+          setNewColorCustomTallas(ct => ({ ...ct, [createdSerie.id]: ids }));
+
+        } else {
+
+          toggleSerie(createdSerie.id);
+
+        }
+
+      }
+
+      setTimeout(() => setSuccess(""), 4000);
+
+    } catch (err: any) {
+
+      setError(err.message || "Error al crear la serie.");
+
+    } finally {
+
+      setSaving(false);
+
+    }
+
+  };
+
+
+
+  const openEditSeriesModal = (s: SerieConfig) => {
+
+    setEditingSerie(s);
+
+    setEditSerieNombre(s.nombre);
+
+    const sorted = s.tallas && s.tallas.length > 0 ? [...s.tallas].sort((a, b) => a.numero - b.numero) : [];
+
+    setEditSerieTallasDesde(sorted.length > 0 ? String(sorted[0].numero) : "38");
+
+    setEditSerieTallasHasta(sorted.length > 0 ? String(sorted[sorted.length - 1].numero) : "43");
+
+    setError("");
+
+    setShowEditSeriesModal(true);
+
+  };
+
+
+
+  const handleUpdateSeries = async (e: React.FormEvent) => {
+
+    e.preventDefault();
+
+    if (!editingSerie) return;
+
+    const desde = parseInt(editSerieTallasDesde);
+
+    const hasta = parseInt(editSerieTallasHasta);
+
+    if (isNaN(desde) || isNaN(hasta) || hasta < desde) {
+
+      setError("Ingresa un rango de tallas válido (ej: 38 a 43).");
+
+      return;
+
+    }
+
+    setSaving(true);
+
+    setError("");
+
+    try {
+
+      const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
+
+        nombre: editSerieNombre,
+
+        tallasDesde: desde,
+
+        tallasHasta: hasta,
+
+      });
+
+      const sUpdated = updatedSerieRes?.serie || updatedSerieRes;
+
+      if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
+
+        const docena = getDocenaBaseParaSerie(sUpdated);
+
+        const ids = buildTallaIdsFromCurva(sUpdated, docena);
+
+        setEditModelCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+
+        setSupplierSeriesCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+
+        setNewColorCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+
+      }
+
+      setSuccess(`Serie "${editSerieNombre}" actualizada correctamente.`);
+
+      setShowEditSeriesModal(false);
+
+      setEditingSerie(null);
+
+      await loadData();
+
+      setTimeout(() => setSuccess(""), 4000);
+
+    } catch (err: any) {
+
+      setError(err.message || "Error al actualizar la serie.");
+
+    } finally {
+
+      setSaving(false);
+
+    }
+
+  };
+
+
+
+  const handleNewColorFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+    const f = e.target.files?.[0];
+
+    if (!f) return;
+
+    const reader = new FileReader();
+
+    reader.onloadend = async () => {
+
+      try {
+
+        const compressed = await compressImageToWebP(reader.result as string);
+
+        setNewColorFoto(compressed);
+
+      } catch (err) {
+
+        console.error("Error comprimiendo imagen:", err);
+
+      }
+
+    };
+
+    reader.readAsDataURL(f);
+
+  };
+
+
+
+  const handleCreateNewColor = async (e: React.FormEvent) => {
+
+    e.preventDefault();
+
+    if (!selectedModelForColor) return;
+
+    setError("");
+
+
+
+    if (!newColorName.trim()) {
+
+      setError("Ingresa el nombre del nuevo color.");
+
+      return;
+
+    }
+
+
+
+    if (newColorSerieIds.length === 0) {
+
+      setError("Activa al menos una serie para este nuevo color.");
+
+      return;
+
+    }
+
+
+
+    for (const sid of newColorSerieIds) {
+
+      const sp = newColorSeriesPrices[sid];
+
+      const serieName = series.find(s => s.id === sid)?.nombre || sid;
+
+      if (!sp || !sp.costPrice || !sp.salePrice) {
+
+        setError(`Ingresa ambos precios para la serie "${getNombreSerie(serieName)}".`);
+
+        return;
+
+      }
+
+      if (parseDecimalNumber(sp.costPrice) <= 0 || parseDecimalNumber(sp.salePrice) <= 0) {
+
+        setError(`Los precios de la serie "${getNombreSerie(serieName)}" deben ser mayores a 0.`);
+
+        return;
+
+      }
+
+    }
+
+
+
+    const seriesPricesMap: Record<string, { costPrice: number; salePrice: number }> = {};
+
+    for (const sid of newColorSerieIds) {
+
+      const sp = newColorSeriesPrices[sid];
+
+      seriesPricesMap[sid] = {
+
+        costPrice: parseDecimalNumber(sp.costPrice),
+
+        salePrice: parseDecimalNumber(sp.salePrice),
+
+      };
+
+    }
+
+
+
+    setSaving(true);
+
+    try {
+
+      let finalImageUrl = newColorFoto || undefined;
+
+      if (newColorFoto && online) {
+
+        finalImageUrl = await uploadToCloudinary(newColorFoto, 'nexora_modelos');
+
+      }
+
+
+
+      // Construir customTallas según lo configurado directamente por el usuario en los steppers
+
+      const customTallasParaBackend: Record<string, string[]> = {};
+
+      for (const sid of newColorSerieIds) {
+
+        const stockOpt = newColorStockOption[sid] || 'DOCENA';
+
+        if (stockOpt === 'NINGUNA') {
+
+          customTallasParaBackend[sid] = [];
+
+        } else {
+
+          customTallasParaBackend[sid] = newColorCustomTallas[sid] || [];
+
+        }
+
+      }
+
+
+
+      const totalParesColor = Object.values(customTallasParaBackend).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+
+      const effectiveStockInicialColor = totalParesColor > 0 ? 1 : 0;
+
+
+
+      const addedColor = formatearColorEstandar(newColorName);
+
+
+
+      await ApiService.post(`/inventario/modelos/${selectedModelForColor.id}/colores`, {
+
+        color: addedColor,
+
+        imageUrl: finalImageUrl,
+
+        serieIds: newColorSerieIds,
+
+        stockInicial: effectiveStockInicialColor,
+
+        seriesPrices: seriesPricesMap,
+
+        customTallas: customTallasParaBackend,
+
+        supplierId: newColorSupplierId || undefined,
+
+      });
+
+
+
+      const modelId = selectedModelForColor.id;
+
+
+
+      setSuccess(`Nuevo color "${addedColor}" añadido exitosamente al modelo "${selectedModelForColor.name}".`);
+
+      setShowAddColorModal(false);
+
+      setSelectedModelForColor(null);
+
+
+
+      // Auto-seleccionar el nuevo color y expandir variante
+
+      setSelectedColorForModel(prev => ({ ...prev, [modelId]: addedColor }));
+
+      setExpandedModels(prev => ({ ...prev, [modelId]: true }));
+
+      lastActiveModelIdRef.current = modelId;
+
+
+
+      loadData(true);
+
+      setTimeout(() => setSuccess(""), 4000);
+
+    } catch (err: any) {
+
+      setError(err.message || "Error al añadir el nuevo color.");
+
+    } finally {
+
+      setSaving(false);
+
+    }
+
+  };
+
+
+
+  const handleCreate = async (e: React.FormEvent) => {
+
+    e.preventDefault();
+
+    setError("");
+
+
+
+    if (!baseCode || !name || !brand) {
+
+      setError("Completa todos los campos obligatorios del modelo.");
+
+      return;
+
+    }
+
+
+
+    const filteredColors = colors.filter(c => c.color.trim() !== "");
+
+    if (filteredColors.length === 0) {
+
+      setError("Debes ingresar al menos un color.");
+
+      return;
+
+    }
+
+
+
+    if (serieIds.length === 0) {
+
+      setError("Activa al menos una serie.");
+
+      return;
+
+    }
+
+
+
+    // Validar que cada serie activa tenga precios válidos
+
+    for (const sid of serieIds) {
+
+      const sp = seriesPrices[sid];
+
+      const serieName = series.find(s => s.id === sid)?.nombre || sid;
+
+      if (!sp || !sp.costPrice || !sp.salePrice) {
+
+        setError(`Ingresa ambos precios para la serie "${getNombreSerie(serieName)}".`);
+
+        return;
+
+      }
+
+      if (parseDecimalNumber(sp.costPrice) <= 0 || parseDecimalNumber(sp.salePrice) <= 0) {
+
+        setError(`Los precios de la serie "${getNombreSerie(serieName)}" deben ser mayores a 0.`);
+
+        return;
+
+      }
+
+    }
+
+
+
+    // Construir mapa de precios por serie
+
+    const seriesPricesMap: Record<string, { costPrice: number; salePrice: number }> = {};
+
+    for (const sid of serieIds) {
+
+      const sp = seriesPrices[sid];
+
+      seriesPricesMap[sid] = {
+
+        costPrice: parseDecimalNumber(sp.costPrice),
+
+        salePrice: parseDecimalNumber(sp.salePrice),
+
+      };
+
+    }
+
+
+
+    // Usar los precios de la primera serie como fallback global (requerido por el DTO)
+
+    const firstPrices = seriesPricesMap[serieIds[0]];
+
+
+
+    setSaving(true);
+
+    try {
+
+      const colorsWithImages = await Promise.all(
+
+        filteredColors.map(async (c) => {
+
+          let imgUrl = c.foto || undefined;
+
+          if (c.foto && online) {
+
+            // Solo subir a Cloudinary si es una imagen nueva (Base64/Blob);
+
+            // Si ya es una URL existente de Cloudinary (de la matriz), reutilizarla directamente.
+
+            if (c.foto.startsWith("data:image") || c.foto.startsWith("blob:")) {
+
+              imgUrl = await uploadToCloudinary(c.foto, "nexora_modelos");
+
+            } else {
+
+              imgUrl = c.foto;
+
+            }
+
+          }
+
+          return {
+
+            color: c.color,
+
+            imageUrl: imgUrl,
+
+            supplierId: c.supplierId || supplierId || undefined,
+
+          };
+
+        })
+
+      );
+
+
+
+      // Construir customTallas según lo configurado directamente por el usuario en los steppers
+
+      const customTallasParaBackend: Record<string, string[]> = {};
+
+      for (const sid of serieIds) {
+
+        const stockOpt = stockOptionCreacion[sid] || 'DOCENA';
+
+        if (stockOpt === 'NINGUNA') {
+
+          customTallasParaBackend[sid] = [];
+
+        } else {
+
+          customTallasParaBackend[sid] = customTallas[sid] || [];
+
+        }
+
+      }
+
+
+
+      const totalParesCreacion = Object.values(customTallasParaBackend).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+
+      const effectiveStockInicialCreacion = totalParesCreacion > 0 ? 1 : 0;
+
+
+
+      await ApiService.post("/inventario/modelos", {
+
+        baseCode,
+
+        name,
+
+        brand,
+
+        material: material || undefined,
+
+        costPrice: firstPrices.costPrice,
+
+        salePrice: firstPrices.salePrice,
+
+        colors: colorsWithImages,
+
+        serieIds,
+
+        stockInicial: effectiveStockInicialCreacion,
+
+        stockMinimo: 0,
+
+        seriesPrices: seriesPricesMap,
+
+        customTallas: customTallasParaBackend,
+
+        supplierId: supplierId || undefined,
+
+        alternateSupplierIds: createAlternateIds.filter(Boolean),
+
+      });
+
+
+
+      const createdBaseCode = baseCode;
+
+      setSuccess("Modelo y sus variantes creados exitosamente.");
+
+      setShowCreate(false);
+
+      resetForm();
+
+      lastActiveModelCodeRef.current = createdBaseCode;
+
+      loadData(true);
+
+      setTimeout(() => setSuccess(""), 4000);
+
+    } catch (err: any) {
+
+      setError(err.message || "Error al crear el modelo.");
+
+    } finally {
+
+      setSaving(false);
+
+    }
+
+  };
+
+
+
+  const openPrice = (p: Producto, modelId?: string) => {
+
+    const actualModelId = modelId || p.modelId;
+
+    if (actualModelId) {
+
+      lastActiveModelIdRef.current = actualModelId;
+
+      setExpandedModels(prev => ({ ...prev, [actualModelId]: true }));
+
+    }
+
+    setPriceProd(p);
+
+    setNewCosto(String(p.precioCosto));
+
+    setNewVenta(String(p.precioVenta));
+
+    setMotivo("");
+
+    setError("");
+
+    setShowPrice(true);
+
+  };
+
+
+
+  const handleUpdatePrice = async (e: React.FormEvent) => {
+
+    e.preventDefault();
+
+    if (!priceProd || !newCosto || !newVenta) { setError("Ingresa ambos precios."); return; }
+
+    setSaving(true);
+
+    try {
+
+      if (priceProd.modelId) {
+
+        lastActiveModelIdRef.current = priceProd.modelId;
+
+        setExpandedModels(prev => ({ ...prev, [priceProd.modelId!]: true }));
+
+      }
+
+      await ApiService.patch(`/inventario/productos/${priceProd.id}/precio`, {
+
+        nuevoPrecioCosto: parseDecimalNumber(newCosto),
+
+        nuevoPrecioVenta: parseDecimalNumber(newVenta),
+
+        motivo: motivo || "Actualización manual de precios",
+
+      });
+
+      setSuccess("Precios actualizados.");
+
+      setShowPrice(false);
+
+      setPriceProd(null);
+
+      loadData(true);
+
+      setTimeout(() => setSuccess(""), 4000);
+
+    } catch (err: any) {
+
+      setError(err.message || "Error al actualizar precios.");
+
+    } finally {
+
+      setSaving(false);
+
+    }
+
+  };
+
+
+
+  // ── Abrir modal de edición integral de variante ──
+
+  const openEditProduct = (p: Producto, modelId?: string) => {
+
+    const actualModelId = modelId || p.modelId;
+
+    if (actualModelId) {
+
+      lastActiveModelIdRef.current = actualModelId;
+
+      setExpandedModels(prev => ({ ...prev, [actualModelId]: true }));
+
+    }
+
+    setEditProduct({ ...p, modelId: actualModelId });
+
+    setEditProductColor(p.color);
+
+    setEditProductImage(p.fotoUrl || null);
+
+    setEditProductImageChanged(false);
+
+    setEditProductCosto(String(p.precioCosto));
+
+    setEditProductVenta(String(p.precioVenta));
+
+    setEditProductSupplierId(p.supplierId || (p.supplier as any)?.id || "");
+
+    setEditProductMotivo("");
+
+    const sid = (p.serie as any)?.id || (p as any).serieId || "";
+
+    setEditProductSerieId(sid);
+
+
+
+    const selectedSerie = series.find(s => s.id === sid);
+
+    const rawTallas = (p.tallas || (p as any).stockPorTalla || []);
+
+    const existingMap: Record<number, { tallaId: string; cantidad: number }> = {};
+
+    rawTallas.forEach((t: any) => {
+
+      existingMap[t.numero] = {
+
+        tallaId: t.tallaId || t.id,
+
+        cantidad: t.cantidad ?? t.disponible ?? 0,
+
+      };
+
+    });
+
+
+
+    let tallasData: { tallaId: string; numero: number; cantidad: number }[] = [];
+
+    if (selectedSerie?.tallas) {
+
+      // Garantizar que TODAS las tallas de la serie base estén presentes siempre en la variante
+
+      tallasData = selectedSerie.tallas.map(st => ({
+
+        tallaId: existingMap[st.numero]?.tallaId || st.id,
+
+        numero: st.numero,
+
+        cantidad: existingMap[st.numero]?.cantidad ?? 0,
+
+      }));
+
+      // Si existían tallas adicionales fuera de la serie base con stock, preservarlas
+
+      rawTallas.forEach((t: any) => {
+
+        if (!selectedSerie.tallas!.some(st => st.numero === t.numero)) {
+
+          tallasData.push({
+
+            tallaId: t.tallaId || t.id,
+
+            numero: t.numero,
+
+            cantidad: t.cantidad ?? t.disponible ?? 0,
+
+          });
+
+        }
+
+      });
+
+    } else {
+
+      tallasData = rawTallas.map((t: any) => ({
+
+        tallaId: t.tallaId || t.id,
+
+        numero: t.numero,
+
+        cantidad: t.cantidad ?? t.disponible ?? 0,
+
+      }));
+
+    }
+
+
+
+    setEditProductTallas(tallasData);
+
+    setNewTallaNumeroInput("");
+
+
+
+    // Inicializar datos de series y precios del proveedor para el componente interactivo
+
+    const targetModel = modelos.find((mod: ModeloAgrupado) => mod.id === actualModelId);
+
+    if (targetModel) {
+
+      setSupplierSeriesTargetModel(targetModel);
+
+      const supId = p.supplierId || (p.supplier as any)?.id || targetModel.supplierId || null;
+
+      setSupplierSeriesTargetSupplierId(supId);
+
+
+
+      const supObj = listaProveedores.find(s => s.id === supId);
+
+      const supName = p.supplier?.razonSocial || supObj?.razonSocial || targetModel.supplier?.razonSocial || "Proveedor";
+
+      setSupplierSeriesTargetSupplierName(supName);
+
+
+
+      const prodsSup = (targetModel.products || []).filter((prod: any) => {
+
+        const prodSupId = prod.supplierId || prod.supplier?.id;
+
+        if (supId) {
+
+          return prodSupId === supId || (!prodSupId && supId === targetModel.supplierId);
+
+        } else {
+
+          return !prodSupId || prodSupId === targetModel.supplierId;
+
+        }
+
+      });
+
+
+
+      // Para editar una variante específica, la ÚNICA serie activa debe ser la serie de ESTA variante
+
+      const activeSids = sid ? [sid] : (series.length > 0 ? [series[0].id] : []);
+
+
+
+      const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
+
+      const initialTallas: Record<string, string[]> = {};
+
+      const initialStockOptions: Record<string, 'DOCENA' | 'NINGUNA'> = {};
+
+
+
+      series.forEach(s => {
+
+        if (s.id === sid) {
+
+          // Serie correspondiente a esta variante
+
+          initialPrices[s.id] = {
+
+            costPrice: String(p.precioCosto || ""),
+
+            salePrice: String(p.precioVenta || ""),
+
+          };
+
+
+
+          const currentVariantTallaIds: string[] = [];
+
+          if (s.tallas && rawTallas && rawTallas.length > 0) {
+
+            rawTallas.forEach((t: any) => {
+
+              const qty = t.cantidad ?? t.disponible ?? 0;
+
+              const matchingTalla = s.tallas!.find(st => st.numero === t.numero || st.id === t.tallaId || st.id === t.id);
+
+              if (matchingTalla && qty > 0) {
+
+                for (let k = 0; k < qty; k++) {
+
+                  currentVariantTallaIds.push(matchingTalla.id);
+
+                }
+
+              }
+
+            });
+
+          }
+
+          initialTallas[s.id] = currentVariantTallaIds;
+
+          initialStockOptions[s.id] = currentVariantTallaIds.length === 12 ? 'DOCENA' : 'NINGUNA';
+
+        } else {
+
+          // Para las otras series, NO inventar stock ficticio: van en 0
+
+          const prodConPrecio = prodsSup.find((prod: any) => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id) && Number(prod.precioCosto) > 0);
+
+          initialPrices[s.id] = {
+
+            costPrice: String(prodConPrecio?.precioCosto || ""),
+
+            salePrice: String(prodConPrecio?.precioVenta || ""),
+
+          };
+
+          initialTallas[s.id] = [];
+
+          initialStockOptions[s.id] = 'NINGUNA';
+
+        }
+
+      });
+
+
+
+      if (sid && !initialPrices[sid]?.costPrice && p.precioCosto) {
+
+        initialPrices[sid] = {
+
+          costPrice: String(p.precioCosto),
+
+          salePrice: String(p.precioVenta),
+
+        };
+
+      }
+
+
+
+      setSupplierSeriesActiveIds(activeSids);
+
+      setSupplierSeriesPrices(initialPrices);
+
+      setSupplierSeriesCustomTallas(initialTallas);
+
+      setSupplierSeriesStockOption(initialStockOptions);
+
+    }
+
+
+
+    setError("");
+
+    setShowEditProduct(true);
+
+  };
+
+
+
+  // ── Abrir modal de Edición de Series y Precios del Proveedor para el Modelo ──
+
+  const openEditSupplierSeries = (p: Producto, m: ModeloAgrupado, specificSupplierVariants?: Producto[]) => {
+
+    lastActiveModelIdRef.current = m.id;
+
+    setSupplierSeriesTargetModel(m);
+
+
+
+    const supId = p.supplierId || (p.supplier as any)?.id || m.supplierId || null;
+
+    setSupplierSeriesTargetSupplierId(supId);
+
+
+
+    const supObj = listaProveedores.find(s => s.id === supId);
+
+    const supName = p.supplier?.razonSocial || supObj?.razonSocial || m.supplier?.razonSocial || "Proveedor";
+
+    setSupplierSeriesTargetSupplierName(supName);
+
+    const supSigla = supObj?.razonSocial ? generarSiglaProveedor(supObj.razonSocial) : (p.supplierSigla || '');
+
+
+
+    // Identificar variantes de este modelo que pertenecen estrictamente a este proveedor
+
+    const prodsSup = (m.products || []).filter(prod => {
+
+      const prodSupId = prod.supplierId || (prod as any).supplier?.id;
+
+      if (supId) {
+
+        if (prodSupId === supId) return true;
+
+        if (prodSupId && prodSupId !== supId) return false;
+
+        if (supSigla && (prod.codigo || (prod as any).code)) {
+
+          const c = prod.codigo || (prod as any).code || '';
+
+          if (c.includes(`-${supSigla}-`)) return true;
+
+          const otherSiglas = listaProveedores
+
+            .filter(sp => sp.id !== supId)
+
+            .map(sp => generarSiglaProveedor(sp.razonSocial))
+
+            .filter(Boolean);
+
+          if (otherSiglas.some(os => c.includes(`-${os}-`))) return false;
+
+        }
+
+        return !prodSupId && supId === m.supplierId;
+
+      } else {
+
+        return !prodSupId;
+
+      }
+
+    });
+
+
+
+    // Variantes de referencia para determinar qué series tiene activas este proveedor
+
+    const referenceVariants = (specificSupplierVariants && specificSupplierVariants.length > 0)
+
+      ? specificSupplierVariants
+
+      : prodsSup;
+
+
+
+    // Series activas para este proveedor en este modelo (aquellas con al menos un producto activo)
+
+    const activeSids = Array.from(
+
+      new Set(
+
+        referenceVariants
+
+          .filter(prod => prod.activo !== false)
+
+          .map(prod => (prod.serie as any)?.id || (prod as any).serieId)
+
+          .filter(Boolean)
+
+      )
+
+    ) as string[];
+
+
+
+    // Precios de cada serie para este proveedor
+
+    const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
+
+    const initialTallas: Record<string, string[]> = {};
+
+
+
+    series.forEach(s => {
+
+      const prodConPrecio = referenceVariants.find(prod => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id) && Number(prod.precioCosto) > 0)
+
+        || prodsSup.find(prod => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id) && Number(prod.precioCosto) > 0);
+
+      if (prodConPrecio) {
+
+        initialPrices[s.id] = {
+
+          costPrice: String(prodConPrecio.precioCosto || ""),
+
+          salePrice: String(prodConPrecio.precioVenta || ""),
+
+        };
+
+      } else {
+
+        const cacheKey = `${s.id}_${supId || 'default'}`;
+
+        if (knownSeriesCosts[cacheKey]) {
+
+          initialPrices[s.id] = { ...knownSeriesCosts[cacheKey] };
+
+        } else if (knownSeriesCosts[s.id]) {
+
+          initialPrices[s.id] = { ...knownSeriesCosts[s.id] };
+
+        } else {
+
+          initialPrices[s.id] = { costPrice: "", salePrice: "" };
+
+        }
+
+      }
+
+
+
+      if (s.tallas) {
+
+        const curva = getDocenaBaseParaSerie(s);
+
+        if (Object.keys(curva).length > 0) {
+
+          initialTallas[s.id] = buildTallaIdsFromCurva(s, curva);
+
+        } else {
+
+          const defaultIds: string[] = [];
+
+          s.tallas.forEach(t => { defaultIds.push(t.id); defaultIds.push(t.id); });
+
+          initialTallas[s.id] = defaultIds;
+
+        }
+
+      }
+
+    });
+
+
+
+    setSupplierSeriesActiveIds(activeSids);
+
+    setSupplierSeriesPrices(initialPrices);
+
+    setSupplierSeriesCustomTallas(initialTallas);
+
+    setError("");
+
+    setShowSupplierSeriesModal(true);
+
+  };
+
+
+
+  const toggleSupplierSerie = (id: string) => {
+
+    // Si estamos editando una variante individual, solo puede haber 1 serie activa asignada
+
+    if (showEditProduct) {
+
+      setSupplierSeriesActiveIds([id]);
+
+      setEditProductSerieId(id);
+
+      const sObj = series.find(s => s.id === id);
+
+      if (sObj && sObj.tallas && (!supplierSeriesCustomTallas[id] || supplierSeriesCustomTallas[id].length === 0)) {
+
+        const docena = getDocenaBaseParaSerie(sObj);
+
+        const ids = buildTallaIdsFromCurva(sObj, docena);
+
+        setSupplierSeriesCustomTallas(ct => ({ ...ct, [id]: ids }));
+
+      }
+
+      return;
+
+    }
+
+    setSupplierSeriesActiveIds(prev => {
+
+      if (prev.includes(id)) {
+
+        return prev.filter(x => x !== id);
+
+      } else {
+
+        const sObj = series.find(s => s.id === id);
+
+        if (sObj && sObj.tallas && (!supplierSeriesCustomTallas[id] || supplierSeriesCustomTallas[id].length === 0)) {
+
+          const docena = getDocenaBaseParaSerie(sObj);
+
+          const ids = buildTallaIdsFromCurva(sObj, docena);
+
+          setSupplierSeriesCustomTallas(ct => ({ ...ct, [id]: ids }));
+
+        }
+
+        if (!supplierSeriesPrices[id]) {
+
+          setSupplierSeriesPrices(sp => ({
+
+            ...sp,
+
+            [id]: { costPrice: "", salePrice: "" },
+
+          }));
+
+        }
+
+        return [...prev, id];
+
+      }
+
+    });
+
+  };
+
+
+
+  const addTallaRepeatInSupplierSeries = (serieId: string, tallaId: string) => {
+
+    setSupplierSeriesCustomTallas(prev => {
+
+      const current = prev[serieId] || [];
+
+      const updated = [...current, tallaId];
+
+      setSupplierSeriesStockOption(so => ({
+
+        ...so,
+
+        [serieId]: updated.length === 12 ? 'DOCENA' : 'NINGUNA'
+
+      }));
+
+      return { ...prev, [serieId]: updated };
+
+    });
+
+  };
+
+
+
+  const removeOneTallaInSupplierSeries = (serieId: string, tallaId: string) => {
+
+    setSupplierSeriesCustomTallas(prev => {
+
+      const current = prev[serieId] || [];
+
+      const idx = current.indexOf(tallaId);
+
+      if (idx > -1) {
+
+        const copy = [...current];
+
+        copy.splice(idx, 1);
+
+        setSupplierSeriesStockOption(so => ({
+
+          ...so,
+
+          [serieId]: copy.length === 12 ? 'DOCENA' : 'NINGUNA'
+
+        }));
+
+        return { ...prev, [serieId]: copy };
+
+      }
+
+      return prev;
+
+    });
+
+  };
+
+
+
+  const restablecerDocenaEstandarEnSupplierSeries = (serieId: string) => {
+
+    const sObj = series.find(s => s.id === serieId);
+
+    if (!sObj || !sObj.tallas) return;
+
+    const docena = getDocenaBaseParaSerie(sObj);
+
+    const ids = buildTallaIdsFromCurva(sObj, docena);
+
+    setSupplierSeriesCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+
+    setSupplierSeriesStockOption(prev => ({ ...prev, [serieId]: 'DOCENA' }));
+
+  };
+
+
+
+  const aplicarCurvaEnSupplierSeries = (serieId: string, tipo: 'DOCENA' | 'NINGUNA') => {
+
+    setSupplierSeriesStockOption(prev => ({ ...prev, [serieId]: tipo }));
+
+    const sObj = series.find(s => s.id === serieId);
+
+    if (!sObj || !sObj.tallas) return;
+
+
+
+    if (tipo === 'DOCENA') {
+
+      const docena = getDocenaBaseParaSerie(sObj);
+
+      const idsParaSumar = buildTallaIdsFromCurva(sObj, docena);
+
+      setSupplierSeriesCustomTallas(prev => {
+
+        const actuales = prev[serieId] || [];
+
+        return { ...prev, [serieId]: [...actuales, ...idsParaSumar] };
+
+      });
+
+    } else if (tipo === 'NINGUNA') {
+
+      setSupplierSeriesCustomTallas(prev => ({ ...prev, [serieId]: [] }));
+
+    }
+
+  };
+
+
+
+  const handleSupplierChangeInEditProduct = (newSupId: string) => {
+
+    setEditProductSupplierId(newSupId);
+
+    setSupplierSeriesTargetSupplierId(newSupId || null);
+
+
+
+    const actualModelId = (editProduct?.modelId || (editProduct as any)?.model?.id || (editProduct as any)?.modelo?.id);
+
+    const targetModel = supplierSeriesTargetModel || modelos.find((mod: ModeloAgrupado) => mod.id === actualModelId);
+
+    if (!targetModel) return;
+
+
+
+    setSupplierSeriesPrices(prev => {
+
+      const updated = { ...prev };
+
+      series.forEach(s => {
+
+        const cacheKey = `${s.id}_${newSupId || 'default'}`;
+
+        if (knownSeriesCosts[cacheKey]) {
+
+          updated[s.id] = { ...knownSeriesCosts[cacheKey] };
+
+        } else {
+
+          const matchingProd = targetModel.products?.find(
+
+            (p: any) => (p.supplierId === newSupId || (p.supplier as any)?.id === newSupId) && (((p.serie as any)?.id === s.id) || (p as any).serieId === s.id)
+
+          );
+
+          if (matchingProd && matchingProd.precioCosto > 0) {
+
+            updated[s.id] = {
+
+              costPrice: String(matchingProd.precioCosto),
+
+              salePrice: String(matchingProd.precioVenta),
+
+            };
+
+          }
+
+        }
+
+      });
+
+      return updated;
+
+    });
+
+  };
+
+
+
+  const handleSaveSupplierSeries = async (e: React.FormEvent) => {
+
+    e.preventDefault();
+
+    if (!supplierSeriesTargetModel) return;
+
+    setError("");
+
+
+
+    for (const sid of supplierSeriesActiveIds) {
+
+      const sp = supplierSeriesPrices[sid];
+
+      const cost = parseDecimalNumber(sp?.costPrice);
+
+      const sale = parseDecimalNumber(sp?.salePrice);
+
+      if (isNaN(cost) || cost <= 0 || isNaN(sale) || sale <= 0) {
+
+        const sName = series.find(s => s.id === sid)?.nombre || "seleccionada";
+
+        setError(`Debes ingresar un precio de compra y venta válidos (mayores a 0) para la serie activa "${sName}".`);
+
+        return;
+
+      }
+
+    }
+
+
+
+    setSaving(true);
+
+    try {
+
+      const seriesPricesNumeric: Record<string, { costPrice: number; salePrice: number }> = {};
+
+      for (const sid of supplierSeriesActiveIds) {
+
+        const sp = supplierSeriesPrices[sid];
+
+        if (sp) {
+
+          seriesPricesNumeric[sid] = {
+
+            costPrice: parseDecimalNumber(sp.costPrice),
+
+            salePrice: parseDecimalNumber(sp.salePrice),
+
+          };
+
+        }
+
+      }
+
+
+
+      const res = await ApiService.put(`/inventario/modelos/${supplierSeriesTargetModel.id}/proveedor-series`, {
+
+        supplierId: supplierSeriesTargetSupplierId,
+
+        serieIds: supplierSeriesActiveIds,
+
+        seriesPrices: seriesPricesNumeric,
+
+        customTallas: supplierSeriesCustomTallas,
+
+      });
+
+
+
+      setKnownSeriesCosts(prev => {
+
+        const next = { ...prev };
+
+        for (const sid of supplierSeriesActiveIds) {
+
+          const sp = supplierSeriesPrices[sid];
+
+          if (sp) {
+
+            next[`${sid}_${supplierSeriesTargetSupplierId || 'default'}`] = { ...sp };
+
+            next[sid] = { ...sp };
+
+          }
+
+        }
+
+        return next;
+
+      });
+
+
+
+      lastActiveModelIdRef.current = supplierSeriesTargetModel.id;
+
+      setSuccess(res?.message || `Series y precios del proveedor sincronizados exitosamente en todos los colores.`);
+
+      setShowSupplierSeriesModal(false);
+
+      setSupplierSeriesTargetModel(null);
+
+      await loadData(true);
+
+      setTimeout(() => setSuccess(""), 4000);
+
+    } catch (err: any) {
+
+      setError(err.message || "Error al actualizar las series del proveedor.");
+
+    } finally {
+
+      setSaving(false);
+
+    }
+
+  };
+
+
+
+  const handleChangeEditSerie = (newSerieId: string) => {
+
+    setEditProductSerieId(newSerieId);
+
+    const selectedSerie = series.find(s => s.id === newSerieId);
+
+    if (selectedSerie && selectedSerie.tallas) {
+
+      const existingMap: Record<number, number> = {};
+
+      editProductTallas.forEach(t => {
+
+        existingMap[t.numero] = t.cantidad;
+
+      });
+
+
+
+      const docena = getDocenaBaseParaSerie(selectedSerie);
+
+      const newTallasList = selectedSerie.tallas.map(t => ({
+
+        tallaId: t.id,
+
+        numero: t.numero,
+
+        cantidad: existingMap[t.numero] !== undefined ? existingMap[t.numero] : (docena[t.numero] ?? 0),
+
+      }));
+
+      setEditProductTallas(newTallasList);
+
+
+
+      // Auto-propagar precio conocido de la serie si existe
+
+      const cacheKey = `${newSerieId}_${editProductSupplierId || 'default'}`;
+
+      if (knownSeriesCosts[cacheKey]) {
+
+        setEditProductCosto(knownSeriesCosts[cacheKey].costPrice);
+
+        setEditProductVenta(knownSeriesCosts[cacheKey].salePrice);
+
+      } else if (knownSeriesCosts[newSerieId]) {
+
+        setEditProductCosto(knownSeriesCosts[newSerieId].costPrice);
+
+        setEditProductVenta(knownSeriesCosts[newSerieId].salePrice);
+
+      }
+
+    }
+
+  };
+
+
+
+  const aplicarCurvaInEditProduct = (tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA') => {
+
+    const selectedSerie = series.find(s => s.id === editProductSerieId);
+
+    if (!selectedSerie || !selectedSerie.tallas) return;
+
+    if (tipo === 'NINGUNA') {
+
+      const serieNums = new Set(selectedSerie.tallas.map(t => t.numero));
+
+      setEditProductTallas(prev => prev.map(t => serieNums.has(t.numero) ? { ...t, cantidad: 0 } : t));
+
+      return;
+
+    }
+
+    const docena = getDocenaBaseParaSerie(selectedSerie);
+
+    const curva = tipo === 'DOCENA' ? docena : dividirDocenaEnMediaDocena(docena, tipo, 6);
+
+    setEditProductTallas(selectedSerie.tallas.map(t => ({
+
+      tallaId: t.id,
+
+      numero: t.numero,
+
+      cantidad: curva[t.numero] ?? 0,
+
+    })));
+
+  };
+
+
+
+  const handleAddCustomTallaToEdit = () => {
+
+    setTallaInputError("");
+
+    const num = parseInt(newTallaNumeroInput);
+
+    if (isNaN(num) || num < 10 || num > 60) {
+
+      const msg = "Ingresa un número de talla válido (ej: 38, 39, 44).";
+
+      setTallaInputError(msg);
+
+      setError(msg);
+
+      return;
+
+    }
+
+    if (editProductTallas.some(t => t.numero === num)) {
+
+      const msg = `La talla #${num} ya está en la lista.`;
+
+      setTallaInputError(msg);
+
+      setError(msg);
+
+      return;
+
+    }
+
+    setEditProductTallas(prev => [...prev, { tallaId: "", numero: num, cantidad: 0 }].sort((a, b) => a.numero - b.numero));
+
+    setNewTallaNumeroInput("");
+
+    setTallaInputError("");
+
+    setError("");
+
+  };
+
+
+
+  const handleRemoveTallaFromEdit = (numero: number) => {
+
+    setEditProductTallas(prev => prev.filter(t => t.numero !== numero));
+
+  };
+
+
+
+  const handleEditProductFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+    const f = e.target.files?.[0];
+
+    if (!f) return;
+
+    const reader = new FileReader();
+
+    reader.onloadend = async () => {
+
+      try {
+
+        const compressed = await compressImageToWebP(reader.result as string);
+
+        setEditProductImage(compressed);
+
+        setEditProductImageChanged(true);
+
+      } catch (err) {
+
+        console.error("Error comprimiendo imagen:", err);
+
+      }
+
+    };
+
+    reader.readAsDataURL(f);
+
+  };
+
+
+
+  const handleUpdateProduct = async (e: React.FormEvent) => {
+
+    e.preventDefault();
+
+    if (!editProduct) return;
+
+    setError("");
+
+
+
+    if (!editProductColor.trim()) {
+
+      setError("El color es obligatorio.");
+
+      return;
+
+    }
+
+
+
+    const currentSerieId = (supplierSeriesActiveIds.includes(editProductSerieId) ? editProductSerieId : supplierSeriesActiveIds[0]) || editProductSerieId;
+
+    if (!currentSerieId) {
+
+      setError("Debes activar al menos una serie para esta variante.");
+
+      return;
+
+    }
+
+
+
+    const currentPrices = supplierSeriesPrices[currentSerieId] || { costPrice: editProductCosto, salePrice: editProductVenta };
+
+    const costo = parseDecimalNumber(currentPrices.costPrice);
+
+    const venta = parseDecimalNumber(currentPrices.salePrice);
+
+    if (isNaN(costo) || costo <= 0 || isNaN(venta) || venta <= 0) {
+
+      setError("Debes ingresar un precio de compra y venta válidos (mayores a 0) en la serie activa.");
+
+      return;
+
+    }
+
+
+
+    const selectedTallaIds = supplierSeriesCustomTallas[currentSerieId] || [];
+
+    const activeSerieObj = series.find(s => s.id === currentSerieId);
+
+
+
+    const tallasPayload = (activeSerieObj?.tallas || []).map(t => {
+
+      const count = selectedTallaIds.filter(id => id === t.id).length;
+
+      return {
+
+        tallaId: t.id,
+
+        numero: t.numero,
+
+        cantidad: count,
+
+      };
+
+    });
+
+
+
+    setSaving(true);
+
+    try {
+
+      let finalImageUrl = editProductImage;
+
+      if (editProductImageChanged && editProductImage && online) {
+
+        // Si la imagen cambió, subir a Cloudinary
+
+        if (editProductImage.startsWith("data:")) {
+
+          finalImageUrl = await uploadToCloudinary(editProductImage, 'nexora_modelos');
+
+        }
+
+      }
+
+
+
+      await ApiService.put(`/inventario/productos/${editProduct.id}`, {
+
+        color: editProductColor.trim(),
+
+        imageUrl: editProductImageChanged ? (finalImageUrl || null) : undefined,
+
+        serieId: currentSerieId,
+
+        costPrice: costo,
+
+        salePrice: venta,
+
+        supplierId: editProductSupplierId || null,
+
+        motivoCambioPrecio: editProductMotivo.trim() || undefined,
+
+        tallas: tallasPayload,
+
+      });
+
+
+
+      // Guardar en la memoria de costos de series
+
+      if (currentSerieId) {
+
+        const key = `${currentSerieId}_${editProductSupplierId || 'default'}`;
+
+        setKnownSeriesCosts(prev => ({
+
+          ...prev,
+
+          [key]: { costPrice: String(costo), salePrice: String(venta) },
+
+          [currentSerieId]: { costPrice: String(costo), salePrice: String(venta) },
+
+        }));
+
+      }
+
+
+
+      // Actualizar selección visual del color del modelo si cambió el nombre
+
+      const targetModelId = editProduct.modelId;
+
+      if (targetModelId) {
+
+        setSelectedColorForModel(prev => ({
+
+          ...prev,
+
+          [targetModelId]: editProductColor.trim(),
+
+        }));
+
+        setExpandedModels(prev => ({ ...prev, [targetModelId]: true }));
+
+        lastActiveModelIdRef.current = targetModelId;
+
+      }
+
+
+
+      setSuccess("Variante y series del proveedor actualizadas exitosamente.");
+
+      setShowEditProduct(false);
+
+      setEditProduct(null);
+
+      loadData(true);
+
+      setTimeout(() => setSuccess(""), 4000);
+
+    } catch (err: any) {
+
+      setError(err.message || "Error al actualizar la variante.");
+
+    } finally {
+
+      setSaving(false);
+
+    }
+
+  };
+
+
+
+  // ── Helper: Obtener series, precios y tallas aislados estrictamente por proveedor ──
+
+  const getSeriesConfigForSupplier = (m: ModeloAgrupado, supId: string | null) => {
+
+    const prodsSup = (m.products || []).filter(prod => {
+
+      const prodSupId = prod.supplierId || (prod as any).supplier?.id;
+
+      if (supId) {
+
+        return prodSupId === supId || (!prodSupId && supId === m.supplierId);
+
+      } else {
+
+        return !prodSupId || prodSupId === m.supplierId;
+
+      }
+
+    });
+
+
+
+    const activeSerieIds = Array.from(
+
+      new Set(
+
+        prodsSup
+
+          .filter(prod => prod.activo !== false)
+
+          .map(prod => (prod.serie as any)?.id || (prod as any).serieId)
+
+          .filter(Boolean)
+
+      )
+
+    ) as string[];
+
+
+
+    const prices: Record<string, { costPrice: string; salePrice: string }> = {};
+
+    const customTallas: Record<string, string[]> = {};
+
+
+
+    series.forEach(s => {
+
+      const prodConPrecio = prodsSup.find(prod => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id) && Number(prod.precioCosto) > 0);
+
+      if (prodConPrecio) {
+
+        prices[s.id] = {
+
+          costPrice: String(prodConPrecio.precioCosto || ""),
+
+          salePrice: String(prodConPrecio.precioVenta || ""),
+
+        };
+
+      } else {
+
+        const cacheKey = `${s.id}_${supId || 'default'}`;
+
+        if (knownSeriesCosts[cacheKey]) {
+
+          prices[s.id] = { ...knownSeriesCosts[cacheKey] };
+
+        } else {
+
+          prices[s.id] = { costPrice: "", salePrice: "" };
+
+        }
+
+      }
+
+
+
+      if (s.tallas) {
+
+        const prodConStock = prodsSup.find(prod => ((prod.serie as any)?.id === s.id || (prod as any).serieId === s.id));
+
+        const tallasList = prodConStock?.tallas || (prodConStock as any)?.stockPorTalla || [];
+
+        const tallasConStock = tallasList.filter((t: any) => Number(t.cantidad ?? t.stock ?? 0) > 0);
+
+        if (tallasConStock.length > 0) {
+
+          const ids: string[] = [];
+
+          tallasConStock.forEach((t: any) => {
+
+            const count = Number(t.cantidad ?? t.stock ?? 0);
+
+            const tid = t.tallaId || t.id;
+
+            for (let i = 0; i < count; i++) ids.push(tid);
+
+          });
+
+          customTallas[s.id] = ids;
+
+        } else {
+
+          const docena = getDocenaBaseParaSerie(s);
+
+          customTallas[s.id] = buildTallaIdsFromCurva(s, docena);
+
+        }
+
+      }
+
+    });
+
+
+
+    return { activeSerieIds, prices, customTallas };
+
+  };
+
+
+
+  // ── Abrir modal de edición del modelo base y sus series ──
+
+  const openEditModel = (m: ModeloAgrupado) => {
+
+    lastActiveModelIdRef.current = m.id;
+
+    setEditModel(m);
+
+    setEditModelName(m.name);
+
+    setEditModelBrand(m.brand);
+
+    setEditModelBaseCode(m.baseCode);
+
+    setEditModelMaterial(m.material || "");
+
+    setEditModelSupplierId(m.supplierId || "");
+
+    // El proveedor principal nunca debe estar duplicado en los alternos
+
+    setEditModelAlternateIds((m.alternateSupplierIds || []).filter(id => id && id !== m.supplierId));
+
+
+
+    const cfg = getSeriesConfigForSupplier(m, m.supplierId || null);
+
+    setEditModelSerieIds(cfg.activeSerieIds);
+
+    setEditModelSeriesPrices(cfg.prices);
+
+    setEditModelCustomTallas(cfg.customTallas);
+
+    setError("");
+
+    setShowEditModel(true);
+
+  };
+
+
+
+  const toggleEditModelSerie = (id: string) => {
+
+    setEditModelSerieIds(prev => {
+
+      if (prev.includes(id)) {
+
+        return prev.filter(x => x !== id);
+
+      } else {
+
+        const sObj = series.find(s => s.id === id);
+
+        if (sObj && sObj.tallas && !editModelCustomTallas[id]) {
+
+          const docena = getDocenaBaseParaSerie(sObj);
+
+          const ids = buildTallaIdsFromCurva(sObj, docena);
+
+          setEditModelCustomTallas(ct => ({ ...ct, [id]: ids }));
+
+        }
+
+        if (!editModelSeriesPrices[id]) {
+
+          setEditModelSeriesPrices(sp => ({
+
+            ...sp,
+
+            [id]: { costPrice: "", salePrice: "" }
+
+          }));
+
+        }
+
+        return [...prev, id];
+
+      }
+
+    });
+
+  };
+
+
+
+  const aplicarCurvaEnEditModelSerie = (serieId: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B') => {
+
+    const sObj = series.find(s => s.id === serieId);
+
+    if (!sObj || !sObj.tallas) return;
+
+    const docena = getDocenaBaseParaSerie(sObj);
+
+    const ids = buildTallaIdsFromCurva(sObj, docena);
+
+    setEditModelCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+
+  };
+
+
+
+  const addTallaRepeatInEditModel = (serieId: string, tallaId: string) => {
+
+    setEditModelCustomTallas(prev => {
+
+      const current = prev[serieId] || [];
+
+      return { ...prev, [serieId]: [...current, tallaId] };
+
+    });
+
+  };
+
+
+
+  const removeOneTallaInEditModel = (serieId: string, tallaId: string) => {
+
+    setEditModelCustomTallas(prev => {
+
+      const current = prev[serieId] || [];
+
+      const idx = current.indexOf(tallaId);
+
+      if (idx > -1) {
+
+        const copy = [...current];
+
+        copy.splice(idx, 1);
+
+        return { ...prev, [serieId]: copy };
+
+      }
+
+      return prev;
+
+    });
+
+  };
+
+
+
+  const handleUpdateModel = async (e: React.FormEvent) => {
+
+    e.preventDefault();
+
+    if (!editModel) return;
+
+    setError("");
+
+
+
+    if (!editModelName.trim() || !editModelBrand.trim() || !editModelBaseCode.trim()) {
+
+      setError("Nombre, marca y código base son obligatorios.");
+
+      return;
+
+    }
+
+
+
+    setSaving(true);
+
+    try {
+
+      // El proveedor principal nunca debe duplicarse en los alternos
+
+      const cleanAlternates = editModelAlternateIds.filter(id => id && id !== editModelSupplierId);
+
+
+
+      // Convertir mapa de precios de series a numérico para el backend
+
+      const seriesPricesNumeric: Record<string, { costPrice: number; salePrice: number }> = {};
+
+      for (const sid of editModelSerieIds) {
+
+        const sp = editModelSeriesPrices[sid];
+
+        if (sp) {
+
+          seriesPricesNumeric[sid] = {
+
+            costPrice: parseDecimalNumber(sp.costPrice),
+
+            salePrice: parseDecimalNumber(sp.salePrice),
+
+          };
+
+        }
+
+      }
+
+
+
+      // Propagar series, proveedor y curvas de tallas en una sola llamada atómica a TODOS los colores
+
+      const res = await ApiService.put(`/inventario/modelos/${editModel.id}`, {
+
+        name: editModelName.trim(),
+
+        brand: editModelBrand.trim(),
+
+        baseCode: editModelBaseCode.trim(),
+
+        material: editModelMaterial.trim() || undefined,
+
+        supplierId: editModelSupplierId || null,
+
+        alternateSupplierIds: cleanAlternates,
+
+        serieIds: editModelSerieIds,
+
+        seriesPrices: seriesPricesNumeric,
+
+        customTallas: editModelCustomTallas,
+
+      });
+
+
+
+      lastActiveModelIdRef.current = editModel.id;
+
+      setSuccess(res?.message || "Modelo y series sincronizados exitosamente en todos los colores.");
+
+      setShowEditModel(false);
+
+      setEditModel(null);
+
+      loadData(true);
+
+      setTimeout(() => setSuccess(""), 4000);
+
+    } catch (err: any) {
+
+      setError(err.message || "Error al actualizar el modelo.");
+
+    } finally {
+
+      setSaving(false);
+
+    }
+
+  };
+
+
+
+  const handleToggleModel = (id: string, modelName: string, currentActive: boolean) => {
+
+    lastActiveModelIdRef.current = id;
+
+    if (currentActive) {
+
+      setConfirmModal({
+
+        isOpen: true,
+
+        title: "Deshabilitar Modelo",
+
+        message: `¿Estás seguro de que deseas deshabilitar el modelo "${modelName}"? Esto también deshabilitará todas sus variantes de color y serie.`,
+
+        confirmText: "Sí, deshabilitar",
+
+        danger: true,
+
+        onConfirm: async () => {
+
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
+          setSaving(true);
+
+          try {
+
+            lastActiveModelIdRef.current = id;
+
+            await ApiService.patch(`/inventario/modelos/${id}/toggle`, {});
+
+            setSuccess(`Modelo deshabilitado correctamente.`);
+
+            loadData(true);
+
+            setTimeout(() => setSuccess(""), 4000);
+
+          } catch (err: any) {
+
+            setError(err.message || "Error al cambiar estado del modelo.");
+
+          } finally {
+
+            setSaving(false);
+
+          }
+
+        },
+
+      });
+
+    } else {
+
+      // Habilitar no necesita confirmación
+
+      (async () => {
+
+        setSaving(true);
+
+        try {
+
+          lastActiveModelIdRef.current = id;
+
+          await ApiService.patch(`/inventario/modelos/${id}/toggle`, {});
+
+          setSuccess(`Modelo habilitado correctamente.`);
+
+          loadData(true);
+
+          setTimeout(() => setSuccess(""), 4000);
+
+        } catch (err: any) {
+
+          setError(err.message || "Error al cambiar estado del modelo.");
+
+        } finally {
+
+          setSaving(false);
+
+        }
+
+      })();
+
+    }
+
+  };
+
+
+
+  const handleImportarModeloDirecto = async (model: ModeloRed, variantIds?: string[]) => {
+
+    if (!isAdmin) return;
+
+    setImportingModelId(model.id);
+
+    lastActiveModelIdRef.current = model.id;
+
+    setError("");
+
+    setSuccess("");
+
+    try {
+
+      const res = await ApiService.post("/inventario/modelos/importar-red", {
+
+        sourceModelId: model.id,
+
+        variantIds: variantIds && variantIds.length > 0 ? variantIds : undefined,
+
+      });
+
+      setSuccess(res.message || `Modelo "${model.name}" importado exitosamente con sus variantes y proveedores vinculados.`);
+
+      setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] });
+
+      await loadData(true);
+
+      setTimeout(() => setSuccess(""), 5000);
+
+    } catch (err: any) {
+
+      setError(err.message || "Error al importar el modelo.");
+
+    } finally {
+
+      setImportingModelId(null);
+
+    }
+
+  };
+
+
+
+  const handleSincronizarSeriesModelo = async (m: ModeloAgrupado) => {
+
+    setSyncingModelId(m.id);
+
+    try {
+
+      const res = await ApiService.post(`/inventario/modelos/${m.id}/sincronizar-series`, {});
+
+      setSuccess(res?.message || "Series sincronizadas exitosamente en todos los colores.");
+
+      await loadData(true);
+
+      setTimeout(() => setSuccess(""), 4500);
+
+    } catch (err: any) {
+
+      setError(err?.message || "Error al sincronizar series del modelo.");
+
+    } finally {
+
+      setSyncingModelId(null);
+
+    }
+
+  };
+
+
+
+  const handleDeleteModel = (id: string, modelName: string) => {
+
+    setConfirmModal({
+
+      isOpen: true,
+
+      title: "Eliminar Modelo de esta Sucursal",
+
+      message: `¿Estás seguro de que deseas retirar el modelo "${modelName}" y todas sus variantes de este local comercial?\n\n• Esta acción NO afecta a la matriz ni a las demás sucursales.\n• Los proveedores no utilizados en este local se desvincularán de forma automática.\n• El modelo volverá a estar disponible en la pestaña "Modelos Disponibles en la Red" para cuando desees reincorporarlo.`,
+
+      confirmText: "Retirar de esta sucursal",
+
+      danger: true,
+
+      onConfirm: async () => {
+
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+
+        setSaving(true);
+
+        try {
+
+          await ApiService.delete(`/inventario/modelos/${id}`);
+
+          setSuccess(`Modelo "${modelName}" retirado exitosamente de este local.`);
+
+          await loadData(true);
+
+          setTimeout(() => setSuccess(""), 4000);
+
+        } catch (err: any) {
+
+          setError(err.message || "Error al retirar el modelo.");
+
+        } finally {
+
+          setSaving(false);
+
+        }
+
+      },
+
+    });
+
+  };
+
+
+
+  const handleDeleteProduct = (productId: string, productName: string, color: string, serieNombre?: string, modelId?: string) => {
+
+    setConfirmModal({
+
+      isOpen: true,
+
+      title: "Excluir Variante de esta Sucursal",
+
+      message: `¿Estás seguro de que deseas retirar la variante "${color}${serieNombre ? ` (${serieNombre})` : ''}" del modelo "${productName}" de este local comercial?\n\n• Esta acción NO afecta a la matriz ni a las demás sucursales.\n• Si el proveedor de esta variante no suministra otros productos en este local, se desvinculará automáticamente.\n• La variante volverá a estar disponible en la pestaña "Modelos Disponibles en la Red" para cuando desees reincorporarla.`,
+
+      confirmText: "Retirar de esta sucursal",
+
+      danger: true,
+
+      onConfirm: async () => {
+
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+
+        setSaving(true);
+
+        try {
+
+          if (modelId) {
+
+            lastActiveModelIdRef.current = modelId;
+
+            setExpandedModels(prev => ({ ...prev, [modelId]: true }));
+
+          }
+
+          await ApiService.delete(`/inventario/productos/${productId}`);
+
+          setSuccess(`Variante "${color}" retirada exitosamente de este local comercial.`);
+
+          await loadData(true);
+
+          setTimeout(() => setSuccess(""), 4000);
+
+        } catch (err: any) {
+
+          setError(err.message || "Error al retirar la variante.");
+
+        } finally {
+
+          setSaving(false);
+
+        }
+
+      },
+
+    });
+
+  };
+
+
+
+  const handleToggleProduct = (id: string, code: string, currentActive: boolean, modelId?: string) => {
+
+    if (modelId) {
+
+      lastActiveModelIdRef.current = modelId;
+
+      setExpandedModels(prev => ({ ...prev, [modelId]: true }));
+
+    }
+
+    if (currentActive) {
+
+      setConfirmModal({
+
+        isOpen: true,
+
+        title: "Deshabilitar Variante",
+
+        message: `¿Estás seguro de que deseas deshabilitar la variante con código "${code}"?`,
+
+        confirmText: "Sí, deshabilitar",
+
+        danger: true,
+
+        onConfirm: async () => {
+
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
+          setSaving(true);
+
+          try {
+
+            if (modelId) lastActiveModelIdRef.current = modelId;
+
+            await ApiService.patch(`/inventario/productos/${id}/toggle`, {});
+
+            setSuccess(`Variante deshabilitada correctamente.`);
+
+            loadData(true);
+
+            setTimeout(() => setSuccess(""), 4000);
+
+          } catch (err: any) {
+
+            setError(err.message || "Error al cambiar estado de la variante.");
+
+          } finally {
+
+            setSaving(false);
+
+          }
+
+        },
+
+      });
+
+    } else {
+
+      (async () => {
+
+        setSaving(true);
+
+        try {
+
+          if (modelId) lastActiveModelIdRef.current = modelId;
+
+          await ApiService.patch(`/inventario/productos/${id}/toggle`, {});
+
+          setSuccess(`Variante habilitada correctamente.`);
+
+          loadData(true);
+
+          setTimeout(() => setSuccess(""), 4000);
+
+        } catch (err: any) {
+
+          setError(err.message || "Error al cambiar estado de la variante.");
+
+        } finally {
+
+          setSaving(false);
+
+        }
+
+      })();
+
+    }
+
+  };
+
+
+
+  const toggleExpandModel = (id: string) => {
+
+    setExpandedModels(prev => ({ ...prev, [id]: !prev[id] }));
+
+  };
+
+
+
+  const filteredModelos = modelos.filter(m =>
+
+    m.name.toLowerCase().includes(search.toLowerCase()) ||
+
+    m.baseCode.toLowerCase().includes(search.toLowerCase()) ||
+
+    m.brand.toLowerCase().includes(search.toLowerCase())
+
+  );
+
+
+
+  // Filtrar modelos de la red: solo mostrar los que no están completamente importados (ocultar status 'COMPLETO')
+
+  const modelosRedDisponibles = modelosRed.filter((m) => m.status !== 'COMPLETO');
+
+
+
+  const filteredModelosRed = modelosRedDisponibles.filter((m) => {
+
+    const matchSearch =
+
+      m.name.toLowerCase().includes(search.toLowerCase()) ||
+
+      m.baseCode.toLowerCase().includes(search.toLowerCase()) ||
+
+      m.brand.toLowerCase().includes(search.toLowerCase()) ||
+
+      (m.sucursalOrigenNombre && m.sucursalOrigenNombre.toLowerCase().includes(search.toLowerCase())) ||
+
+      (m.colores && m.colores.some((c: any) => c.color.toLowerCase().includes(search.toLowerCase())));
+
+
+
+    const matchSucursal =
+
+      filterRedSucursal === "TODAS" || m.tenantId === filterRedSucursal;
+
+
+
+    return matchSearch && matchSucursal;
+
+  });
+
+
+
+  return (
+
+    <div className="space-y-6">
+
+      {/* Pestañas de Navegación: Catálogo Local vs. Modelos en la Red Comercial */}
+
+      <div className="flex items-center justify-between border-b border-[var(--border)] pb-2 gap-4 flex-wrap">
+
+        <div className="flex items-center gap-2">
+
+          <button
+
+            type="button"
+
+            onClick={() => setActiveTab('local')}
+
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+
+              activeTab === 'local'
+
+                ? "bg-[#0F172A] text-white shadow-sm"
+
+                : "bg-[var(--card)] text-[var(--muted-foreground)] border border-[var(--border)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/40"
+
+            }`}
+
+          >
+
+            <Boxes size={15} />
+
+            <span>Mi Catálogo Local</span>
+
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+
+              activeTab === 'local' ? "bg-white/20 text-white" : "bg-[var(--muted)] text-[var(--muted-foreground)]"
+
+            }`}>
+
+              {modelos.length}
+
+            </span>
+
+          </button>
+
+
+
+          <button
+
+            type="button"
+
+            onClick={() => setActiveTab('red')}
+
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+
+              activeTab === 'red'
+
+                ? "bg-[#0F172A] text-white shadow-sm"
+
+                : "bg-[var(--card)] text-[var(--muted-foreground)] border border-[var(--border)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/40"
+
+            }`}
+
+          >
+
+            <Building2 size={15} />
+
+            <span>Modelos Disponibles en la Red</span>
+
+            {modelosRedDisponibles.length > 0 && (
+
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500 text-white font-black animate-pulse">
+
+                {modelosRedDisponibles.length}
+
+              </span>
+
+            )}
+
+          </button>
+
+        </div>
+
+
+
+        <div className="flex items-center gap-3">
+
+          <button
+
+            onClick={() => loadData()}
+
+            title="Refrescar catálogo y sincronización con la red"
+
+            className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
+
+          >
+
+            <RefreshCw size={16} />
+
+          </button>
+
+          {online && isAdmin && activeTab === 'local' && (
+
+            <button
+
+              onClick={() => { resetForm(); setShowCreate(true); }}
+
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+
+            >
+
+              <Plus size={16} />
+
+              <span>Nuevo Modelo Propio</span>
+
+            </button>
+
+          )}
+
+        </div>
+
+      </div>
+
+
+
+      {/* Toast Flotante en Primer Plano (z-[9999] por encima de cualquier modal o backdrop) */}
+
+      {(error || success) && (
+
+        <div className="fixed top-5 right-5 z-[9999] max-w-md w-[calc(100vw-40px)] sm:w-auto pointer-events-auto animate-in slide-in-from-top-3 fade-in duration-200">
+
+          {error && (
+
+            <div className="flex items-start justify-between gap-3 p-4 bg-red-950/95 border border-red-500/50 text-red-100 rounded-2xl shadow-2xl backdrop-blur-xl">
+
+              <div className="flex items-start gap-2.5">
+
+                <AlertCircle size={18} className="text-red-400 shrink-0 mt-0.5" />
+
+                <p className="text-xs font-semibold leading-relaxed">{error}</p>
+
+              </div>
+
+              <button
+
+                type="button"
+
+                onClick={() => setError("")}
+
+                className="text-red-400 hover:text-white transition-colors p-1 rounded-lg cursor-pointer"
+
+                title="Cerrar notificación"
+
+              >
+
+                <X size={15} />
+
+              </button>
+
+            </div>
+
+          )}
+
+          {success && (
+
+            <div className="flex items-start justify-between gap-3 p-4 bg-emerald-950/95 border border-emerald-500/50 text-emerald-100 rounded-2xl shadow-2xl backdrop-blur-xl">
+
+              <div className="flex items-start gap-2.5">
+
+                <CheckCircle size={18} className="text-emerald-400 shrink-0 mt-0.5" />
+
+                <p className="text-xs font-semibold leading-relaxed">{success}</p>
+
+              </div>
+
+              <button
+
+                type="button"
+
+                onClick={() => setSuccess("")}
+
+                className="text-emerald-400 hover:text-white transition-colors p-1 rounded-lg cursor-pointer"
+
+                title="Cerrar notificación"
+
+              >
+
+                <X size={15} />
+
+              </button>
+
+            </div>
+
+          )}
+
+        </div>
+
+      )}
+
+
+
+      {success && (
+
+        <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-sm rounded-xl">
+
+          <CheckCircle size={16} /> {success}
+
+        </div>
+
+      )}
+
+
+
+      {error && (
+
+        <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-sm rounded-xl">
+
+          <AlertCircle size={16} /> {error}
+
+        </div>
+
+      )}
+
+
+
+      {/* ═════════════════════════════════════════════════════════ */}
+
+      {/* VISTA 1: MI CATÁLOGO LOCAL                              */}
+
+      {/* ═════════════════════════════════════════════════════════ */}
+
+      {activeTab === 'local' && (
+
+        <div className="space-y-4">
+
+          {/* ── Panel de Valoración Económica del Inventario ── */}
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-3.5 sm:p-4 space-y-1 shadow-xs">
+
+              <div className="flex items-center justify-between">
+
+                <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+
+                  Stock Físico Total
+
+                </span>
+
+                <span className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+
+                  <Boxes size={14} />
+
+                </span>
+
+              </div>
+
+              <div className="text-lg sm:text-xl font-black text-[var(--foreground)] font-mono">
+
+                {resumenInventario.totalPares.toLocaleString('es-EC')} <span className="text-xs font-bold text-[var(--muted-foreground)]">pares</span>
+
+              </div>
+
+              <span className="text-[10px] text-[var(--muted-foreground)] block">
+
+                En {resumenInventario.totalModelosCount} modelos ({sucursalLabel})
+
+              </span>
+
+            </div>
+
+
+
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-3.5 sm:p-4 space-y-1 shadow-xs">
+
+              <div className="flex items-center justify-between">
+
+                <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+
+                  Capital Invertido (Costo)
+
+                </span>
+
+                <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+
+                  <DollarSign size={14} />
+
+                </span>
+
+              </div>
+
+              <div className="text-lg sm:text-xl font-black text-amber-600 dark:text-amber-400 font-mono">
+
+                ${resumenInventario.capitalInvertido.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+              </div>
+
+              <span className="text-[10px] text-[var(--muted-foreground)] block">
+
+                Costo adquisición en bodega
+
+              </span>
+
+            </div>
+
+
+
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-3.5 sm:p-4 space-y-1 shadow-xs">
+
+              <div className="flex items-center justify-between">
+
+                <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+
+                  Valor Comercial Venta
+
+                </span>
+
+                <span className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+
+                  <TrendingUp size={14} />
+
+                </span>
+
+              </div>
+
+              <div className="text-lg sm:text-xl font-black text-indigo-600 dark:text-indigo-400 font-mono">
+
+                ${resumenInventario.valorComercial.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+              </div>
+
+              <span className="text-[10px] text-[var(--muted-foreground)] block">
+
+                Proyección a PVP vigente
+
+              </span>
+
+            </div>
+
+
+
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-3.5 sm:p-4 space-y-1 shadow-xs">
+
+              <div className="flex items-center justify-between">
+
+                <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+
+                  Margen Bruto en Stock
+
+                </span>
+
+                <span className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+
+                  <Sparkles size={14} />
+
+                </span>
+
+              </div>
+
+              <div className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+
+                ${resumenInventario.gananciaBruta.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+              </div>
+
+              <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-bold block">
+
+                {resumenInventario.margenPct}% margen proyectado
+
+              </span>
+
+            </div>
+
+          </div>
+
+          <div className="relative">
+
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" size={16} />
+
+            <input
+
+              type="text"
+
+              placeholder="Buscar por código base, nombre o marca en este local..."
+
+              value={search}
+
+              onChange={e => setSearch(e.target.value)}
+
+              className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
+
+            />
+
+          </div>
+
+
+
+          {loading && modelos.length === 0 ? (
+
+            <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)]">
+
+              <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
+
+              <span className="text-sm">Cargando catálogo local...</span>
+
+            </div>
+
+          ) : filteredModelos.length === 0 ? (
+
+            <div className="flex flex-col items-center justify-center p-16 bg-[var(--card)] border border-[var(--border)] border-dashed rounded-2xl text-[var(--muted-foreground)]">
+
+              <Package size={48} className="mb-4 opacity-30" />
+
+              <p className="font-semibold">Sin modelos registrados en este local</p>
+
+              <p className="text-xs mt-1 text-center max-w-md">
+
+                Haz clic en "Nuevo Modelo Propio" para diseñar desde cero, o explora la pestaña <strong>"Modelos Disponibles en la Red"</strong> para adoptar modelos de otras sucursales.
+
+              </p>
+
+              {modelosRedDisponibles.length > 0 && (
+
+                <button
+
+                  type="button"
+
+                  onClick={() => setActiveTab('red')}
+
+                  className="mt-4 flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+
+                >
+
+                  <Sparkles size={14} />
+
+                  <span>Ver {modelosRedDisponibles.length} Modelos Disponibles en la Red</span>
+
+                </button>
+
+              )}
+
+            </div>
+
+          ) : (
+
+            <div className="space-y-4">
+
+              {filteredModelos.map(m => {
+
+                const products = m.products || [];
+
+
+
+                // Agrupar colores por nombre normalizado y obtener la etiqueta más legible
+
+                const colorGroupMap = new Map<string, Producto[]>();
+
+                for (const p of products) {
+
+                  const key = normalizeColor(p.color);
+
+                  if (!colorGroupMap.has(key)) colorGroupMap.set(key, []);
+
+                  colorGroupMap.get(key)!.push(p);
+
+                }
+
+                const uniqueColors = Array.from(colorGroupMap.keys()).map(key => ({
+
+                  normalized: key,
+
+                  label: bestColorLabel(colorGroupMap.get(key)!),
+
+                }));
+
+
+
+                const selectedNorm = selectedColorForModel[m.id]
+
+                  ? normalizeColor(selectedColorForModel[m.id])
+
+                  : uniqueColors[0]?.normalized || "";
+
+                const activeColorLabel = uniqueColors.find(c => c.normalized === selectedNorm)?.label || uniqueColors[0]?.label || "";
+
+                const activeColorProducts = colorGroupMap.get(selectedNorm) || [];
+
+                const activeProduct = activeColorProducts.find(p => p.fotoUrl) || activeColorProducts[0];
+
+                const isExpanded = expandedModels[m.id];
+
+
+
+                return (
+
+                  <div
+
+                    id={`modelo-card-${m.id}`}
+
+                    data-basecode={m.baseCode}
+
+                    key={m.id}
+
+                    className={`bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all ${
+
+                      !m.active ? "opacity-60 bg-[var(--muted)]/20" : ""
+
+                    }`}
+
+                  >
+
+                    {/* Resumen del Modelo */}
+
+                    <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+
+                      <div className="flex items-start sm:items-center gap-4">
+
+                        <div
+
+                          onClick={(e) => {
+
+                            if (activeProduct?.fotoUrl) {
+
+                              e.stopPropagation();
+
+                              setZoomImage({
+
+                                url: activeProduct.fotoUrl,
+
+                                title: m.name,
+
+                                subtitle: m.baseCode,
+
+                                color: activeColorLabel,
+
+                                brand: m.brand,
+
+                              });
+
+                            }
+
+                          }}
+
+                          className={`w-16 h-16 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl flex items-center justify-center shrink-0 overflow-hidden relative group/img ${
+
+                            activeProduct?.fotoUrl ? "cursor-zoom-in hover:ring-2 hover:ring-emerald-500 hover:shadow-md transition-all" : ""
+
+                          }`}
+
+                          title={activeProduct?.fotoUrl ? "Clic para ampliar foto" : undefined}
+
+                        >
+
+                          {activeProduct?.fotoUrl ? (
+
+                            <>
+
+                              <img src={activeProduct.fotoUrl} alt={m.name} className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-200" />
+
+                              <div className="absolute inset-0 bg-black/35 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity text-white">
+
+                                <ZoomIn size={16} />
+
+                              </div>
+
+                            </>
+
+                          ) : (
+
+                            <ImageIcon size={20} className="text-[var(--muted-foreground)] opacity-40" />
+
+                          )}
+
+                        </div>
+
+                        <div>
+
+                          <div className="flex items-center gap-2 flex-wrap">
+
+                            <h4 className="font-bold text-base">{m.name}</h4>
+
+                            <span className="px-2 py-0.5 bg-slate-900 text-white rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider">{m.baseCode}</span>
+
+                            {m.material && (
+
+                              <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded-lg text-[10px] font-semibold">{m.material}</span>
+
+                            )}
+
+                            {!m.active && (
+
+                              <span className="px-2 py-0.5 bg-red-500/15 text-red-500 rounded-lg text-[10px] font-bold">Deshabilitado</span>
+
+                            )}
+
+                          </div>
+
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+
+                            <p className="text-xs text-[var(--muted-foreground)]">{m.brand} · {uniqueColors.length} colores</p>
+
+                            {m.supplier && (
+
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[10px] font-bold">
+
+                                <Truck size={10} />
+
+                                {m.supplier.razonSocial}
+
+                                {(m.alternateSupplierIds?.length || 0) > 0 && (
+
+                                  <span className="text-[9px] font-normal opacity-70">+{m.alternateSupplierIds!.length}</span>
+
+                                )}
+
+                              </span>
+
+                            )}
+
+                          </div>
+
+                        </div>
+
+                      </div>
+
+
+
+                      {/* Acciones principales */}
+
+                      {(() => {
+
+                        const modelTotalPares = products.reduce((acc, p) => {
+
+                          const tArr = p.tallas || (p as any).stockPorTalla || [];
+
+                          return acc + tArr.reduce((s: number, t: any) => s + (t.cantidad ?? t.disponible ?? 0), 0);
+
+                        }, 0);
+
+                        const modelTotalInvertido = products.reduce((acc, p) => {
+
+                          const tArr = p.tallas || (p as any).stockPorTalla || [];
+
+                          const pPares = tArr.reduce((s: number, t: any) => s + (t.cantidad ?? t.disponible ?? 0), 0);
+
+                          return acc + pPares * Number(p.precioCosto || 0);
+
+                        }, 0);
+
+
+
+                        return (
+
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between md:justify-end gap-3 sm:gap-6 border-t md:border-t-0 pt-3 md:pt-0">
+
+                            <div className="text-left sm:text-right flex sm:block items-center justify-between">
+
+                              <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Stock & Inversión</span>
+
+                              <span className="text-xs font-black text-slate-900 dark:text-white block font-mono">
+
+                                {modelTotalPares} pares • <span className="text-amber-600 dark:text-amber-400">${modelTotalInvertido.toFixed(2)}</span>
+
+                              </span>
+
+                              <span className="text-[10px] text-[var(--muted-foreground)] block">
+
+                                {activeProduct ? `PVP: $${Number(activeProduct.precioVenta).toFixed(2)}` : "—"}
+
+                              </span>
+
+                            </div>
+
+
+
+                            <div className="flex items-center gap-1.5 flex-wrap">
+
+                              {online && isAdmin && (
+
+                                <>
+
+                                  <button
+
+                                    type="button"
+
+                                    onClick={() => openEditModel(m)}
+
+                                    title="Editar nombre, marca, código base o material del modelo"
+
+                                    className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-xl bg-blue-600/10 text-blue-600 border border-blue-600/20 hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+
+                                  >
+
+                                    <Edit2 size={13} />
+
+                                    <span>Editar</span>
+
+                                  </button>
+
+                                  <button
+
+                                    type="button"
+
+                                    onClick={() => openAddColorModal(m)}
+
+                                    title="Añadir un nuevo color a este modelo"
+
+                                    className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+
+                                  >
+
+                                    <Plus size={13} />
+
+                                    <span>Añadir Color</span>
+
+                                  </button>
+
+                                  <button
+
+                                    type="button"
+
+                                    onClick={() => handleToggleModel(m.id, m.name, m.active)}
+
+                                    className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
+
+                                      m.active
+
+                                        ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
+
+                                        : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
+
+                                    }`}
+
+                                  >
+
+                                    {m.active ? "Deshabilitar" : "Habilitar"}
+
+                                  </button>
+
+                                  <button
+
+                                    type="button"
+
+                                    onClick={() => handleDeleteModel(m.id, m.name)}
+
+                                    title="Eliminar modelo de este local comercial"
+
+                                    className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-xl bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+
+                                  >
+
+                                    <Trash2 size={13} />
+
+                                    <span>Eliminar</span>
+
+                                  </button>
+
+                                </>
+
+                              )}
+
+                              <button
+
+                                onClick={() => toggleExpandModel(m.id)}
+
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-[11px] sm:text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+
+                              >
+
+                                {isExpanded ? (
+
+                                  <><span>Ocultar Variantes</span><ChevronUp size={14} /></>
+
+                                ) : (
+
+                                  <><span>Ver Variantes ({products.length})</span><ChevronDown size={14} /></>
+
+                                )}
+
+                              </button>
+
+                            </div>
+
+                          </div>
+
+                        );
+
+                      })()}
+
+                    </div>
+
+
+
+                    {/* Vista Detallada de Variantes (Expandible) */}
+
+                    {isExpanded && (
+
+                      <div className="border-t border-[var(--border)] bg-[var(--muted)]/10 p-4 sm:p-5 space-y-4">
+
+                        {/* Selector de Color */}
+
+                        <div className="flex items-center gap-2 flex-wrap">
+
+                          <span className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider flex items-center gap-1">
+
+                            <Palette size={12}/> Color Activo:
+
+                          </span>
+
+                          {uniqueColors.map(({ normalized, label }) => {
+
+                            const groupProducts = colorGroupMap.get(normalized) || [];
+
+                            const countActive = groupProducts.filter(p => p.activo).length;
+
+                            const countTotal = groupProducts.length;
+
+                            const numSuppliers = new Set(groupProducts.map(p => p.supplierId || 'sin')).size;
+
+
+
+                            return (
+
+                              <button
+
+                                key={normalized}
+
+                                onClick={() => setSelectedColorForModel(prev => ({ ...prev, [m.id]: label }))}
+
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+
+                                  selectedNorm === normalized
+
+                                    ? "bg-slate-900 text-white border-slate-900"
+
+                                    : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-slate-400"
+
+                                }`}
+
+                              >
+
+                                <span>{label}</span>
+
+                                {numSuppliers > 1 && (
+
+                                  <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded text-[9px] font-mono">{numSuppliers} prov.</span>
+
+                                )}
+
+                                {countActive < countTotal && (
+
+                                  <span className="w-1.5 h-1.5 rounded-full bg-red-400" title="Contiene variantes deshabilitadas" />
+
+                                )}
+
+                              </button>
+
+                            );
+
+                          })}
+
+                        </div>
+
+
+
+                        {/* Listado de Series agrupadas por Proveedor para el Color Seleccionado */}
+
+                        {(() => {
+
+                          // Agrupar las variantes del color activo por proveedor
+
+                          const bySupplier = new Map<string, Producto[]>();
+
+                          for (const p of activeColorProducts) {
+
+                            const key = p.supplierId || (p.supplier as any)?.id || 'sin-proveedor';
+
+                            if (!bySupplier.has(key)) bySupplier.set(key, []);
+
+                            bySupplier.get(key)!.push(p);
+
+                          }
+
+                          const supplierGroups = Array.from(bySupplier.entries());
+
+                          const hasMultipleSuppliers = supplierGroups.length > 1;
+
+
+
+                          return supplierGroups.map(([supKey, rawVariants]) => {
+
+                            // Garantizar estrictamente una única tarjeta por serie para este proveedor, priorizando la que tiene stock físico
+
+                            const serieMap = new Map<string, Producto>();
+
+                            for (const v of rawVariants) {
+
+                              const sKey = (v.serie as any)?.id || (v as any).serieId || v.serie?.nombre || v.id;
+
+                              if (!serieMap.has(sKey)) {
+
+                                serieMap.set(sKey, v);
+
+                              } else {
+
+                                const existing = serieMap.get(sKey)!;
+
+                                const stockExisting = (existing.tallas || (existing as any).stockPorTalla || []).reduce((acc: number, t: any) => acc + (t.cantidad ?? t.disponible ?? 0), 0);
+
+                                const stockNew = (v.tallas || (v as any).stockPorTalla || []).reduce((acc: number, t: any) => acc + (t.cantidad ?? t.disponible ?? 0), 0);
+
+                                if (stockNew > stockExisting) {
+
+                                  serieMap.set(sKey, v);
+
+                                }
+
+                              }
+
+                            }
+
+                            const variants = Array.from(serieMap.values());
+
+                            const firstVariant = variants[0];
+
+                            const supplierName = firstVariant.supplier?.razonSocial || 'Sin proveedor';
+
+                            const supplierImage = variants.find(v => v.fotoUrl)?.fotoUrl;
+
+
+
+                            return (
+
+                              <div key={supKey} className="space-y-3">
+
+                                {/* Header de Proveedor con acción de Gestionar/Activar Series */}
+
+                                <div className="flex items-center justify-between gap-3 pt-2 pb-1.5 border-b border-[var(--border)]/50 flex-wrap">
+
+                                  <div className="flex items-center gap-2.5">
+
+                                    {supplierImage && (
+
+                                      <div
+
+                                        className="w-8 h-8 rounded-lg overflow-hidden border border-[var(--border)] shrink-0 cursor-zoom-in"
+
+                                        onClick={() => supplierImage && setZoomImage({ url: supplierImage, title: m.name, subtitle: supplierName, color: activeColorLabel, brand: m.brand })}
+
+                                      >
+
+                                        <img src={supplierImage} alt={supplierName} className="w-full h-full object-cover" />
+
+                                      </div>
+
+                                    )}
+
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-xs font-bold">
+
+                                      <Truck size={12} />
+
+                                      <span>{supplierName}</span>
+
+                                      {firstVariant.supplierSigla && (
+
+                                        <span className="bg-blue-600 text-white px-1 py-0.5 rounded text-[8px] font-mono font-black">{firstVariant.supplierSigla}</span>
+
+                                      )}
+
+                                    </span>
+
+                                    <span className="text-[10px] text-[var(--muted-foreground)]">
+
+                                      {variants.length} {variants.length === 1 ? 'serie activa' : 'series activas'}
+
+                                    </span>
+
+                                  </div>
+
+
+
+                                  {online && isAdmin && (
+
+                                    <button
+
+                                      type="button"
+
+                                      onClick={() => openEditSupplierSeries(firstVariant, m, variants)}
+
+                                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#0F172A] hover:bg-slate-800 text-white dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+
+                                      title="Activar o desactivar series (Adulto, Juvenil, Niño) y definir sus precios para este taller"
+
+                                    >
+
+                                      <Layers size={13} />
+
+                                      <span>Gestionar Series / + Activar Serie</span>
+
+                                    </button>
+
+                                  )}
+
+                                </div>
+
+
+
+                                {/* Cards de variantes (series) de este proveedor */}
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                                  {variants.map(p => {
+
+                                    const isAdulto = ((p.serie?.nombre || '').toUpperCase().includes('ADULTO') || (p.serie?.nombre || '').toUpperCase().includes('CABALLERO') || (p.serie?.nombre || '').toUpperCase().includes('HOMBRE')) && !(p.serie?.nombre || '').toUpperCase().includes('GRANDE');
+                                    const isJuvenil = (p.serie?.nombre || '').toUpperCase().includes('JUVENIL');
+                                    const tallas = (p.tallas || (p as any).stockPorTalla || []).filter((t: any) => {
+                                      const num = Number(t.numero ?? t.nombre);
+                                      const cant = Number(t.cantidad ?? t.stock ?? t.disponible ?? 0);
+                                      if (isAdulto && num === 43 && cant === 0) return false;
+                                      if (isJuvenil && num >= 39 && cant === 0) return false;
+                                      return true;
+                                    });
 
                                     const totalStock = tallas.reduce((acc: number, t: any) => acc + (t.cantidad ?? t.disponible ?? 0), 0);
 
@@ -2326,7 +8528,7 @@ const getCurvaDocena = (
 
                                 <div className="flex flex-wrap gap-2">
 
-                                  {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
+                                  {[...(s.tallas || [])].filter(t => (s.nombre || '').toUpperCase().includes('JUVENIL') ? t.numero <= 38 : true).sort((a, b) => a.numero - b.numero).map(t => {
 
                                     const count = selectedTallaIds.filter(id => id === t.id).length;
 
@@ -3266,7 +9468,7 @@ const getCurvaDocena = (
 
                                 <div className="flex flex-wrap gap-2">
 
-                                  {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
+                                  {[...(s.tallas || [])].filter(t => (s.nombre || '').toUpperCase().includes('JUVENIL') ? t.numero <= 38 : true).sort((a, b) => a.numero - b.numero).map(t => {
 
                                     const count = selectedTallaIds.filter(id => id === t.id).length;
 
@@ -5466,7 +11668,7 @@ const getCurvaDocena = (
 
                                 <div className="flex flex-wrap gap-2">
 
-                                  {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
+                                  {[...(s.tallas || [])].filter(t => (s.nombre || '').toUpperCase().includes('JUVENIL') ? t.numero <= 38 : true).sort((a, b) => a.numero - b.numero).map(t => {
 
                                     const count = selectedTallaIds.filter(id => id === t.id).length;
 
