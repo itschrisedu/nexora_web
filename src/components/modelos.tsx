@@ -3204,30 +3204,77 @@ export default function ModelosComponent({
 
     try {
 
-      const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
+      const isScopedToModel = Boolean(supplierSeriesTargetModel || editModel || showEditProduct);
+      let sUpdated: any = null;
 
-        nombre: editSerieNombre,
+      if (isScopedToModel) {
+        // Se aplica EXCLUSIVAMENTE a este modelo y a este proveedor sin alterar otros calzados del catálogo
+        const cleanBase = editSerieNombre.replace(/\s*\(\d+-\d+\)/g, '').trim();
+        const targetNombre = `${cleanBase} (${desde}-${hasta})`;
+        const res = await ApiService.post("/configuracion/series-completa", {
+          nombre: targetNombre,
+          tallasDesde: desde,
+          tallasHasta: hasta,
+        });
+        sUpdated = res?.serie || res;
 
-        tallasDesde: desde,
+        if (sUpdated?.id) {
+          const newId = sUpdated.id;
+          const oldId = editingSerie.id;
 
-        tallasHasta: hasta,
+          if (showSupplierSeriesModal) {
+            setSupplierSeriesActiveIds(prev => {
+              const next = prev.filter(id => id !== oldId);
+              return next.includes(newId) ? next : [...next, newId];
+            });
+            setSupplierSeriesPrices(prev => ({
+              ...prev,
+              [newId]: prev[oldId] || { costPrice: "", salePrice: "" },
+            }));
+            const docena = getDocenaBaseParaSerie(sUpdated);
+            const ids = buildTallaIdsFromCurva(sUpdated, docena);
+            setSupplierSeriesCustomTallas(prev => ({
+              ...prev,
+              [newId]: ids,
+            }));
+          }
 
-      });
+          if (showEditModel) {
+            setEditModelSerieIds(prev => {
+              const next = prev.filter(id => id !== oldId);
+              return next.includes(newId) ? next : [...next, newId];
+            });
+            setEditModelSeriesPrices(prev => ({
+              ...prev,
+              [newId]: prev[oldId] || { costPrice: "", salePrice: "" },
+            }));
+            const docena = getDocenaBaseParaSerie(sUpdated);
+            const ids = buildTallaIdsFromCurva(sUpdated, docena);
+            setEditModelCustomTallas(prev => ({
+              ...prev,
+              [newId]: ids,
+            }));
+          }
 
-      const sUpdated = updatedSerieRes?.serie || updatedSerieRes;
+          if (showEditProduct) {
+            setEditProductSerieId(newId);
+          }
+        }
+      } else {
+        const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
+          nombre: editSerieNombre,
+          tallasDesde: desde,
+          tallasHasta: hasta,
+        });
+        sUpdated = updatedSerieRes?.serie || updatedSerieRes;
 
-      if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
-
-        const docena = getDocenaBaseParaSerie(sUpdated);
-
-        const ids = buildTallaIdsFromCurva(sUpdated, docena);
-
-        setEditModelCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
-
-        setSupplierSeriesCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
-
-        setNewColorCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
-
+        if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
+          const docena = getDocenaBaseParaSerie(sUpdated);
+          const ids = buildTallaIdsFromCurva(sUpdated, docena);
+          setEditModelCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+          setSupplierSeriesCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+          setNewColorCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+        }
       }
 
       setSuccess(`Serie "${editSerieNombre}" actualizada correctamente.`);
@@ -10252,15 +10299,15 @@ export default function ModelosComponent({
 
               <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
 
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2">
+                <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-700 dark:text-blue-300 text-xs flex items-start gap-2">
 
-                  <span className="text-base shrink-0">⚠️</span>
+                  <span className="text-base shrink-0">ℹ️</span>
 
                   <div>
 
-                    <strong className="block font-bold">Plantilla Maestra Global:</strong>
+                    <strong className="block font-bold">Serie Exclusiva para este Modelo y Proveedor:</strong>
 
-                    <span>Modificar el rango de tallas de esta serie afectará a todos los modelos que utilicen esta misma serie. Si solo deseas una curva de tallas distinta para un calzado en particular, ajusta las cantidades directamente en el modelo con los botones (+) y (−) sin modificar la serie global, o crea una nueva serie independiente (ej: Adulto 38-42).</span>
+                    <span>Al modificar el rango de tallas, esta serie se asignará exclusivamente a este modelo y a este proveedor. Los demás calzados de otros proveedores mantendrán su serie intacta.</span>
 
                   </div>
 
