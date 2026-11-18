@@ -6588,11 +6588,15 @@ export default function ModelosComponent({
 
                           return supplierGroups.map(([supKey, rawVariants]) => {
 
-                            // Garantizar estrictamente una única tarjeta por serie para este proveedor, priorizando la activa y con stock físico
+                            // Garantizar estrictamente una única tarjeta por categoría de serie para este proveedor, priorizando la activa y con stock físico
                             const serieMap = new Map<string, Producto>();
 
                             for (const v of rawVariants) {
-                              const catKey = formatearNombreSerie(v.serie?.nombre).toUpperCase() || (v as any).serieId || v.id;
+                              // Extraer la categoría limpia (ej: "ADULTO", "JUVENIL", "NINO") sin sufijos de rango (38-42) ni códigos de modelo
+                              const catKey = (formatearNombreSerie(v.serie?.nombre)
+                                .toUpperCase()
+                                .replace(/\s*\(\d+-\d+\)/g, '')
+                                .trim()) || (v as any).serieId || v.id;
 
                               if (!serieMap.has(catKey)) {
                                 serieMap.set(catKey, v);
@@ -6604,14 +6608,19 @@ export default function ModelosComponent({
                                 const existingActive = existing.activo !== false;
                                 const newActive = v.activo !== false;
 
+                                // 1. Prioridad absoluta: variante activa sobre deshabilitada
                                 if (!existingActive && newActive) {
                                   serieMap.set(catKey, v);
                                 } else if (existingActive && !newActive) {
                                   // Mantener existing activa
                                 } else if (stockNew > stockExisting) {
+                                  // 2. Si ambas tienen igual estado, la que tenga más stock físico
                                   serieMap.set(catKey, v);
-                                } else if (stockNew === stockExisting && /-\d{3}$/.test(existing.codigo) && !/-\d{3}$/.test(v.codigo)) {
-                                  serieMap.set(catKey, v);
+                                } else if (stockNew === stockExisting) {
+                                  // 3. Si ambas tienen igual stock, preferir código limpio original sin sufijo (-002)
+                                  if (/-\d{3}$/.test(existing.codigo) && !/-\d{3}$/.test(v.codigo)) {
+                                    serieMap.set(catKey, v);
+                                  }
                                 }
                               }
                             }
