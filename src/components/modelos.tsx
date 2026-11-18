@@ -478,37 +478,105 @@ const getNombreSerie = (s: SerieConfig | string | null | undefined, seriesList?:
 
 };
 
-const SERIES_CANONICAS = ["ADULTO", "JUVENIL", "NINO", "NINO_PEQUENO_A", "BEBE", "TALLA_GRANDE"];
+interface CanonicalSpec {
+  key: string;
+  label: string;
+  desde: number;
+  hasta: number;
+}
 
-// Filtra las series relevantes para un modelo específico, aislando series exclusivas
+const CANONICAS_BASE: CanonicalSpec[] = [
+  { key: "ADULTO", label: "Adulto", desde: 38, hasta: 42 },
+  { key: "JUVENIL", label: "Juvenil", desde: 34, hasta: 38 },
+  { key: "NINO", label: "Niño", desde: 27, hasta: 32 },
+  { key: "NINO_PEQUENO_A", label: "Niño Pequeño", desde: 21, hasta: 26 },
+  { key: "BEBE", label: "Bebé", desde: 18, hasta: 20 },
+  { key: "TALLA_GRANDE", label: "Talla Grande", desde: 43, hasta: 45 },
+];
+
+const SERIES_CANONICAS = CANONICAS_BASE.map(c => c.key);
+
+const normalizarClaveSerie = (nombre: string): string => {
+  if (!nombre) return "";
+  const n = nombre.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s\-_]+/g, '_');
+  if (n.startsWith("ADULTO")) return "ADULTO";
+  if (n.startsWith("JUVENIL") || n.startsWith("JUNIOR")) return "JUVENIL";
+  if (n.startsWith("NINO_PEQUENO") || n.startsWith("PEQUENO")) return "NINO_PEQUENO_A";
+  if (n.startsWith("NINO")) return "NINO";
+  if (n.startsWith("BEBE")) return "BEBE";
+  if (n.startsWith("TALLA_GRANDE") || n.startsWith("GRANDE")) return "TALLA_GRANDE";
+  return n;
+};
+
+// Filtra las series relevantes para un modelo específico, garantizando que siempre existan las 6 series base
 const getSeriesParaModelo = (modelId: string | undefined | null, allSeries: SerieConfig[]): SerieConfig[] => {
-  if (!allSeries || allSeries.length === 0) return [];
-  if (!modelId) {
-    return allSeries.filter(s => !s.nombre.includes('_M_'));
+  const seriesList = allSeries || [];
+
+  const candidatas = seriesList.filter(s => {
+    if (s.nombre && s.nombre.includes('_M_')) {
+      return modelId ? (s.nombre.endsWith(`_M_${modelId}`) || s.nombre.includes(`_M_${modelId}`)) : false;
+    }
+    return true;
+  });
+
+  const mapPorCategoria = new Map<string, SerieConfig>();
+
+  // 1. Para cada una de las 6 categorías canónicas, garantizar que SIEMPRE exista una serie
+  for (const c of CANONICAS_BASE) {
+    // A) Buscar si este modelo tiene una versión exclusiva de esta categoría
+    const exclusiva = candidatas.find(s =>
+      s.nombre &&
+      s.nombre.includes('_M_') &&
+      normalizarClaveSerie(s.nombre) === c.key
+    );
+
+    if (exclusiva) {
+      mapPorCategoria.set(c.key, exclusiva);
+      continue;
+    }
+
+    // B) Buscar la serie canónica base general en la lista
+    const base = candidatas.find(s =>
+      s.nombre &&
+      !s.nombre.includes('_M_') &&
+      normalizarClaveSerie(s.nombre) === c.key
+    );
+
+    if (base) {
+      mapPorCategoria.set(c.key, base);
+      continue;
+    }
+
+    // C) RESCATE Y GARANTÍA ABSOLUTA: Si no existe en la lista en memoria,
+    // proveer la serie canónica base virtual con sus tallas completas para que NUNCA desaparezca
+    const fallbackId = `canonical-${c.key.toLowerCase()}`;
+    const virtualTallas = Array.from({ length: c.hasta - c.desde + 1 }, (_, i) => ({
+      id: `fallback-talla-${c.key}-${c.desde + i}`,
+      numero: c.desde + i,
+      serieId: fallbackId,
+    }));
+    mapPorCategoria.set(c.key, {
+      id: fallbackId,
+      nombre: c.key,
+      tallas: virtualTallas,
+    } as SerieConfig);
   }
 
-  const candidatas = allSeries.filter(s => {
-    if (s.nombre.includes('_M_')) {
-      return s.nombre.endsWith(`_M_${modelId}`) || s.nombre.includes(`_M_${modelId}`);
-    }
-    return true;
+  // 2. Agregar series personalizadas adicionales creadas por el usuario (que no pertenezcan a las 6 canónicas)
+  const personalizadas = candidatas.filter(s => {
+    const key = normalizarClaveSerie(s.nombre);
+    const esCanonica = CANONICAS_BASE.some(c => c.key === key);
+    return !esCanonica && !s.nombre.includes('_M_');
   });
 
-  const categoriasExclusivas = new Set<string>();
-  candidatas.forEach(s => {
-    if (s.nombre.includes(`_M_${modelId}`)) {
-      const cat = formatearNombreSerie(s.nombre).toUpperCase();
-      categoriasExclusivas.add(cat);
-    }
-  });
+  const resultado: SerieConfig[] = [];
+  for (const c of CANONICAS_BASE) {
+    const s = mapPorCategoria.get(c.key);
+    if (s) resultado.push(s);
+  }
+  resultado.push(...personalizadas);
 
-  return candidatas.filter(s => {
-    const cat = formatearNombreSerie(s.nombre).toUpperCase();
-    if (SERIES_CANONICAS.includes(s.nombre) && categoriasExclusivas.has(cat)) {
-      return false;
-    }
-    return true;
-  });
+  return resultado;
 };
 
 
@@ -3152,7 +3220,9 @@ export default function ModelosComponent({
         }
       }
 
-      await loadData();
+      if (!showEditModel && !showEditProduct && !showSupplierSeriesModal && !showAddColorModal) {
+        await loadData();
+      }
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
       setError(err.message || "Error al crear la serie.");
@@ -3240,12 +3310,14 @@ export default function ModelosComponent({
 
           // Actualizar lista local de series en memoria para visualización y activación inmediata
           setSeries(prev => {
-            const filtered = prev.filter(s => s.id !== sUpdated.id && s.id !== editingSerie.id);
-            return [...filtered, sUpdated].sort((a: any, b: any) => {
-              const idxA = SERIES_ORDEN.indexOf(a.nombre);
-              const idxB = SERIES_ORDEN.indexOf(b.nombre);
-              return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+            const filtered = prev.filter(s => {
+              if (s.id === sUpdated.id) return false;
+              // Solo removemos editingSerie si era una versión exclusiva previa de este mismo modelo.
+              // La serie canónica base compartida DEBE permanecer intacta para todos los demás modelos.
+              if (s.id === editingSerie.id && editingSerie.nombre.includes(`_M_${targetModelId}`)) return false;
+              return true;
             });
+            return [...filtered, sUpdated];
           });
         }
       } else {
@@ -3269,7 +3341,9 @@ export default function ModelosComponent({
       setEditingSerie(null);
       // No llamar a loadData() si estamos editando el modelo para no sobreescribir el estado en pantalla
       if (!targetModelId) {
+        if (!showEditModel && !showEditProduct && !showSupplierSeriesModal && !showAddColorModal) {
         await loadData();
+      }
       }
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
@@ -3300,7 +3374,9 @@ export default function ModelosComponent({
         try {
           await ApiService.delete(`/configuracion/series/${s.id}`);
           setSuccess(`Serie "${s.nombre}" eliminada correctamente.`);
-          await loadData();
+          if (!showEditModel && !showEditProduct && !showSupplierSeriesModal && !showAddColorModal) {
+        await loadData();
+      }
           setTimeout(() => setSuccess(""), 4000);
         } catch (err: any) {
           setError(err.message || "Error al eliminar la serie.");
