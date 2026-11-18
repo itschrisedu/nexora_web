@@ -2337,11 +2337,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         ? a.notas.replace(/\[REC-[A-Z0-9]+\]\s*/i, '').replace(/\[PRONTO PAGO.*?\]\s*/i, '').trim()
         : '';
 
-      const match = gruposList.find((g) => {
+      const match = gruposList.find((g: any) => {
         if (recTag && g.reciboRef && recTag === g.reciboRef) return true;
-        const diff = Math.abs(aTime - g.createdAtMs);
-        if (diff <= 180000 && a.metodo === g.metodo) {
-          if (recTag && g.reciboRef && recTag !== g.reciboRef) return false;
+        const diff = Math.abs(aTime - (g.lastItemTimeMs || g.createdAtMs));
+        if (diff <= 900000) {
+          if (recTag && g.reciboRef && recTag !== g.reciboRef && diff > 180000) return false;
           return true;
         }
         return false;
@@ -2349,6 +2349,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       if (match) {
         match.montoTotal = Math.round((match.montoTotal + a.monto) * 100) / 100;
+        (match as any).lastItemTimeMs = aTime;
+        if (a.metodo && match.metodo && !match.metodo.includes(a.metodo)) {
+          match.metodo = `${match.metodo} / ${a.metodo}`;
+        }
         if (!match.reciboRef && recTag) match.reciboRef = recTag;
         if (!match.notas && notasLimpias) match.notas = notasLimpias;
       } else {
@@ -2358,12 +2362,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
           metodo: a.metodo,
           createdAt: a.createdAt,
           createdAtMs: aTime,
+          lastItemTimeMs: aTime,
           notas: notasLimpias,
           reciboRef: recTag,
           usuarioNombre: a.usuarioNombre,
           usuarioSucursal: a.usuarioSucursal,
           esCobroOtraSucursal: a.esCobroOtraSucursal,
-        });
+        } as any);
       }
     });
 
@@ -3616,10 +3621,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     abonos.forEach((ab) => {
       const matchRec = ab.numeroComprobante ? String(ab.numeroComprobante).replace(/\D/g, '') : '';
       const tAb = new Date(ab.fechaRaw || ab.fecha).getTime();
-      const match = abonosConsolidados.find((ex) => {
+      const match = abonosConsolidados.find((ex: any) => {
         if (matchRec && ex.numeroComprobante && String(ex.numeroComprobante).includes(matchRec)) return true;
-        const tEx = new Date(ex.fechaRaw || ex.fecha).getTime();
-        if (Math.abs(tAb - tEx) <= 180000 && ab.formaPago === ex.formaPago) {
+        const tEx = new Date(ex.lastItemTimeRaw || ex.fechaRaw || ex.fecha).getTime();
+        if (Math.abs(tAb - tEx) <= 900000) {
           return true;
         }
         return false;
@@ -3627,10 +3632,14 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       if (match) {
         match.monto = Math.round((match.monto + ab.monto) * 100) / 100;
+        match.lastItemTimeRaw = ab.fechaRaw || ab.fecha;
+        if (ab.formaPago && match.formaPago && !match.formaPago.includes(ab.formaPago)) {
+          match.formaPago = `${match.formaPago} / ${ab.formaPago}`;
+        }
         if (!match.numeroComprobante && ab.numeroComprobante) match.numeroComprobante = ab.numeroComprobante;
         if (!match.referencia && ab.referencia) match.referencia = ab.referencia;
       } else {
-        abonosConsolidados.push({ ...ab });
+        abonosConsolidados.push({ ...ab, lastItemTimeRaw: ab.fechaRaw || ab.fecha });
       }
     });
 
