@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { ApiService } from "@/services/api.service";
 import {
   FileText,
@@ -24,6 +24,9 @@ import {
   X,
   Smartphone,
   Check,
+  TrendingUp,
+  Calendar,
+  DollarSign,
 } from "lucide-react";
 
 import { useToast } from "./ui/toast";
@@ -39,6 +42,63 @@ interface FacturaSRI {
   createdAt: string;
   xmlUrl?: string;
   pdfUrl?: string;
+  ambiente?: string; // "1": Pruebas, "2": Producción
+  total?: number;
+}
+
+/**
+ * Determina si la factura electrónica fue emitida en ambiente de PRODUCCIÓN (Oficial).
+ * En la clave de acceso oficial de 49 dígitos del SRI ecuatoriano:
+ * - El dígito 24 (índice 23) es '1' para Pruebas y '2' para Producción.
+ */
+function esFacturaProduccion(factura: FacturaSRI): boolean {
+  if (factura.ambiente === "2") return true;
+  if (factura.claveAcceso && factura.claveAcceso.length >= 24) {
+    return factura.claveAcceso.charAt(23) === "2";
+  }
+  if (factura.xmlUrl && typeof factura.xmlUrl === "string" && factura.xmlUrl.includes("<")) {
+    try {
+      const match = factura.xmlUrl.match(/<ambiente>([^<]+)<\/ambiente>/);
+      if (match && match[1]) {
+        return match[1].trim() === "2";
+      }
+    } catch (_) {}
+  }
+  return false;
+}
+
+/**
+ * Obtiene el monto total facturado de la factura electrónica.
+ */
+function obtenerTotalFactura(factura: FacturaSRI): number {
+  if (factura.total !== undefined && Number(factura.total) > 0) {
+    return Number(factura.total);
+  }
+  if (factura.xmlUrl && typeof factura.xmlUrl === "string" && factura.xmlUrl.includes("<")) {
+    try {
+      const match = factura.xmlUrl.match(/<importeTotal>([^<]+)<\/importeTotal>/);
+      if (match && match[1]) {
+        return parseFloat(match[1]) || 0;
+      }
+    } catch (_) {}
+  }
+  return 0;
+}
+
+/**
+ * Obtiene el año de emisión de la factura electrónica para el acumulador anual.
+ */
+function obtenerAnioFactura(factura: FacturaSRI): number {
+  if (factura.createdAt) {
+    const d = new Date(factura.createdAt);
+    if (!isNaN(d.getTime())) return d.getFullYear();
+  }
+  if (factura.claveAcceso && factura.claveAcceso.length >= 8) {
+    const anioStr = factura.claveAcceso.substring(4, 8);
+    const a = parseInt(anioStr);
+    if (!isNaN(a) && a >= 2020 && a <= 2050) return a;
+  }
+  return new Date().getFullYear();
 }
 
 
@@ -251,6 +311,38 @@ export default function SriComponent() {
   // Listado de Facturas
   const [facturas, setFacturas] = useState<FacturaSRI[]>([]);
   const [loadingFacturas, setLoadingFacturas] = useState(false);
+
+  // Acumulador Anual SRI (Ambiente de Producción)
+  const anioActual = new Date().getFullYear();
+  const [anioFiltro, setAnioFiltro] = useState<number>(anioActual);
+
+  const aniosDisponibles = useMemo(() => {
+    const setAnios = new Set<number>([anioActual]);
+    facturas.forEach((f) => {
+      setAnios.add(obtenerAnioFactura(f));
+    });
+    return Array.from(setAnios).sort((a, b) => b - a);
+  }, [facturas, anioActual]);
+
+  // Facturas autorizadas en PRODUCCIÓN
+  const facturasProduccionAutorizadas = useMemo(() => {
+    return facturas.filter((f) => esFacturaProduccion(f) && f.estadoSri === "AUTORIZADO");
+  }, [facturas]);
+
+  // Facturas de producción del año seleccionado
+  const facturasProduccionDelAnio = useMemo(() => {
+    return facturasProduccionAutorizadas.filter((f) => obtenerAnioFactura(f) === anioFiltro);
+  }, [facturasProduccionAutorizadas, anioFiltro]);
+
+  // Monto acumulado facturado en producción en el año
+  const totalFacturadoProduccionAnio = useMemo(() => {
+    return facturasProduccionDelAnio.reduce((sum, f) => sum + obtenerTotalFactura(f), 0);
+  }, [facturasProduccionDelAnio]);
+
+  // Facturas de pruebas (no computables para el acumulador oficial)
+  const facturasPruebas = useMemo(() => {
+    return facturas.filter((f) => !esFacturaProduccion(f));
+  }, [facturas]);
 
   // Estados de Previsualización y Compartición de Factura PDF
   const [modalPreviewFactura, setModalPreviewFactura] = useState(false);
@@ -854,98 +946,270 @@ export default function SriComponent() {
 
       {/* Tab 2: Comprobantes Emitidos */}
       {activeTab === "facturas" && (
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden">
-          <div className="p-4 bg-[var(--muted)]/40 border-b border-[var(--border)] flex justify-between items-center">
-            <h3 className="font-semibold text-[var(--card-foreground)]">Historial de Facturas SRI</h3>
-            <button
-              onClick={loadFacturas}
-              className="px-3 py-1.5 bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] text-xs rounded-lg flex items-center gap-1.5 transition-all border border-[var(--border)]"
-            >
-              <RefreshCw size={14} className={loadingFacturas ? "animate-spin" : ""} />
-              Actualizar Listado
-            </button>
+        <div className="space-y-4">
+          {/* ── BANNER ACUMULADOR ANUAL DE FACTURACIÓN EN PRODUCCIÓN ── */}
+          <div className="bg-gradient-to-br from-[#0F172A] to-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 text-white shadow-xl relative overflow-hidden">
+            {/* Resplandor decorativo */}
+            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-1/3 -mb-16 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-2xl text-emerald-400 shrink-0">
+                  <TrendingUp size={24} />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-extrabold text-white">Acumulador Anual de Facturación SRI</h3>
+                    <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      Solo Producción
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Monto total facturado legalmente ante el SRI en ambiente oficial durante el año fiscal {anioFiltro}.
+                  </p>
+                </div>
+              </div>
+
+              {/* Selector de Año Fiscal */}
+              <div className="flex items-center gap-2 shrink-0">
+                <label className="text-xs text-slate-300 font-semibold flex items-center gap-1">
+                  <Calendar size={13} /> Año Fiscal:
+                </label>
+                <select
+                  value={anioFiltro}
+                  onChange={(e) => setAnioFiltro(Number(e.target.value))}
+                  className="bg-white/10 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                >
+                  {aniosDisponibles.map((a) => (
+                    <option key={a} value={a} className="bg-slate-900 text-white">
+                      {a === anioActual ? `${a} (Año en Curso)` : a}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Cuadrícula de Métricas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 relative z-10">
+              {/* Card 1: Monto Facturado en Producción */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                  <span>Total Facturado en Producción</span>
+                  <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md font-bold">Oficial SRI</span>
+                </div>
+                <div className="mt-2">
+                  <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono tracking-tight">
+                    ${totalFacturadoProduccionAnio.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="mt-2 text-[11px] text-slate-400 flex items-center gap-1">
+                  <CheckCircle size={12} className="text-emerald-400 shrink-0" />
+                  <span>{facturasProduccionDelAnio.length} comprobante(s) autorizados en {anioFiltro}</span>
+                </div>
+              </div>
+
+              {/* Card 2: Régimen y Tope Anual (si aplica RIMPE) */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                  <span>Régimen Tributario SRI</span>
+                  <span className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md font-bold">
+                    {config.sriRegimen === "RIMPE_POPULAR"
+                      ? "RIMPE Negocio Popular"
+                      : config.sriRegimen === "RIMPE_EMPRENDEDOR"
+                      ? "RIMPE Emprendedor"
+                      : "Régimen General"}
+                  </span>
+                </div>
+                {config.sriRegimen === "RIMPE_POPULAR" ? (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-slate-300 font-medium">Tope Anual: $20,000.00</span>
+                      <span className="text-emerald-400 font-bold font-mono">
+                        {((totalFacturadoProduccionAnio / 20000) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(100, (totalFacturadoProduccionAnio / 20000) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-400 block mt-1.5">
+                      Disponible para facturar en {anioFiltro}: ${Math.max(0, 20000 - totalFacturadoProduccionAnio).toFixed(2)}
+                    </span>
+                  </div>
+                ) : config.sriRegimen === "RIMPE_EMPRENDEDOR" ? (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-slate-300 font-medium">Tope Anual: $300,000.00</span>
+                      <span className="text-blue-400 font-bold font-mono">
+                        {((totalFacturadoProduccionAnio / 300000) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(100, (totalFacturadoProduccionAnio / 300000) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-400 block mt-1.5">
+                      Disponible para facturar en {anioFiltro}: ${Math.max(0, 300000 - totalFacturadoProduccionAnio).toFixed(2)}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <span className="text-sm font-bold text-slate-200">Facturación Libre de Tope</span>
+                    <span className="text-[10px] text-slate-400 block mt-1">
+                      Tarifa general de IVA según normativa del Régimen General.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Card 3: Control de Pruebas y Reseteo Anual */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col justify-between sm:col-span-2 lg:col-span-1">
+                <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                  <span>Control de Ambiente & Reseteo</span>
+                  <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-bold">Automático</span>
+                </div>
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs text-amber-300 font-semibold">
+                    <ShieldCheck size={14} className="shrink-0 text-amber-400" />
+                    <span>{facturasPruebas.length} factura(s) de prueba excluidas</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-tight">
+                    Los comprobantes en Ambiente 1 (Pruebas) no suman a este acumulador fiscal.
+                  </p>
+                </div>
+                <div className="mt-2 pt-2 border-t border-white/10 text-[10px] text-slate-400 flex items-center gap-1">
+                  <Clock size={11} className="shrink-0 text-slate-400" />
+                  <span>Se resetea automáticamente cada 1 de enero.</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-[var(--foreground)]">
-              <thead className="bg-[var(--muted)]/50 text-[var(--muted-foreground)] uppercase text-xs">
-                <tr>
-                  <th className="p-4">N° Comprobante</th>
-                  <th className="p-4">Clave de Acceso (49 dígitos)</th>
-                  <th className="p-4">Fecha Emisión</th>
-                  <th className="p-4">Estado SRI</th>
-                  <th className="p-4 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {facturas.length === 0 ? (
+          {/* ── TABLA DE COMPROBANTES EMITIDOS ── */}
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-4 bg-[var(--muted)]/40 border-b border-[var(--border)] flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-[var(--card-foreground)]">Historial de Facturas SRI</h3>
+                <span className="text-xs text-[var(--muted-foreground)]">
+                  ({facturas.length} comprobantes en total)
+                </span>
+              </div>
+              <button
+                onClick={loadFacturas}
+                className="px-3 py-1.5 bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] text-xs rounded-lg flex items-center gap-1.5 transition-all border border-[var(--border)] cursor-pointer"
+              >
+                <RefreshCw size={14} className={loadingFacturas ? "animate-spin" : ""} />
+                Actualizar Listado
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-[var(--foreground)]">
+                <thead className="bg-[var(--muted)]/50 text-[var(--muted-foreground)] uppercase text-xs">
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-[var(--muted-foreground)]">
-                      No se han emitido facturas electrónicas aún.
-                    </td>
+                    <th className="p-4">N° Comprobante</th>
+                    <th className="p-4">Ambiente</th>
+                    <th className="p-4">Clave de Acceso (49 dígitos)</th>
+                    <th className="p-4">Fecha Emisión</th>
+                    <th className="p-4">Total</th>
+                    <th className="p-4">Estado SRI</th>
+                    <th className="p-4 text-right">Acciones</th>
                   </tr>
-                ) : (
-                  facturas.map((factura) => (
-                    <tr key={factura.id} className="hover:bg-[var(--muted)]/30 transition-colors">
-                      <td className="p-4 font-mono font-medium text-[var(--card-foreground)]">
-                        {factura.numeroComprobante}
-                      </td>
-                      <td className="p-4 font-mono text-xs text-[var(--muted-foreground)]">
-                        {factura.claveAcceso || <span className="italic">No generada</span>}
-                      </td>
-                      <td className="p-4 text-xs text-[var(--muted-foreground)]">
-                        {new Date(factura.createdAt).toLocaleString("es-EC")}
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            factura.estadoSri === "AUTORIZADO"
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                              : factura.estadoSri === "PENDIENTE"
-                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                              : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-                          }`}
-                        >
-                          {factura.estadoSri === "AUTORIZADO" && <CheckCircle size={14} />}
-                          {factura.estadoSri === "PENDIENTE" && <Clock size={14} />}
-                          {factura.estadoSri === "RECHAZADO" && <XCircle size={14} />}
-                          {factura.estadoSri}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right space-x-2 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => handleAbrirPreviewFactura(factura)}
-                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg inline-flex items-center gap-1 font-medium shadow-sm transition-all cursor-pointer"
-                          title="Previsualizar PDF oficial, descargar y reenviar por WhatsApp o Correo"
-                        >
-                          <Eye size={13} /> Ver PDF
-                        </button>
-                        {factura.estadoSri !== "AUTORIZADO" && (
-                          <button
-                            onClick={() => handleConsultarEstado(factura.id)}
-                            className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-xs rounded-lg transition-all"
-                            title="Consultar autorización en SRI"
-                          >
-                            Reconsultar
-                          </button>
-                        )}
-                        {factura.xmlUrl && (
-                          <button
-                            type="button"
-                            onClick={() => handleDescargarXml(factura)}
-                            className="px-2.5 py-1 bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] text-xs rounded-lg inline-flex items-center gap-1 border border-[var(--border)] cursor-pointer transition-all"
-                            title="Descargar archivo XML firmado y autorizado por el SRI"
-                          >
-                            <Download size={12} /> XML
-                          </button>
-                        )}
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {facturas.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-[var(--muted-foreground)]">
+                        No se han emitido facturas electrónicas aún.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    facturas.map((factura) => {
+                      const esProd = esFacturaProduccion(factura);
+                      const totalMonto = obtenerTotalFactura(factura);
+
+                      return (
+                        <tr key={factura.id} className="hover:bg-[var(--muted)]/30 transition-colors">
+                          <td className="p-4 font-mono font-medium text-[var(--card-foreground)]">
+                            {factura.numeroComprobante}
+                          </td>
+                          <td className="p-4">
+                            {esProd ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                Producción
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                Pruebas
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4 font-mono text-xs text-[var(--muted-foreground)]">
+                            {factura.claveAcceso || <span className="italic">No generada</span>}
+                          </td>
+                          <td className="p-4 text-xs text-[var(--muted-foreground)]">
+                            {new Date(factura.createdAt).toLocaleString("es-EC")}
+                          </td>
+                          <td className="p-4 font-mono font-bold text-sm text-[var(--card-foreground)]">
+                            ${totalMonto.toFixed(2)}
+                          </td>
+                          <td className="p-4">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                factura.estadoSri === "AUTORIZADO"
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                                  : factura.estadoSri === "PENDIENTE"
+                                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                              }`}
+                            >
+                              {factura.estadoSri === "AUTORIZADO" && <CheckCircle size={14} />}
+                              {factura.estadoSri === "PENDIENTE" && <Clock size={14} />}
+                              {factura.estadoSri === "RECHAZADO" && <XCircle size={14} />}
+                              {factura.estadoSri}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right space-x-2 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => handleAbrirPreviewFactura(factura)}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg inline-flex items-center gap-1 font-medium shadow-sm transition-all cursor-pointer"
+                              title="Previsualizar PDF oficial, descargar y reenviar por WhatsApp o Correo"
+                            >
+                              <Eye size={13} /> Ver PDF
+                            </button>
+                            {factura.estadoSri !== "AUTORIZADO" && (
+                              <button
+                                onClick={() => handleConsultarEstado(factura.id)}
+                                className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-xs rounded-lg transition-all"
+                                title="Consultar autorización en SRI"
+                              >
+                                Reconsultar
+                              </button>
+                            )}
+                            {factura.xmlUrl && (
+                              <button
+                                type="button"
+                                onClick={() => handleDescargarXml(factura)}
+                                className="px-2.5 py-1 bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] text-xs rounded-lg inline-flex items-center gap-1 border border-[var(--border)] cursor-pointer transition-all"
+                                title="Descargar archivo XML firmado y autorizado por el SRI"
+                              >
+                                <Download size={12} /> XML
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
