@@ -2950,20 +2950,6 @@ export default function ModelosComponent({
 
 
 
-  const restablecerDocenaEstandarEnEditModel = (serieId: string) => {
-
-    const sObj = series.find(s => s.id === serieId);
-
-    if (!sObj || !sObj.tallas) return;
-
-    const docena = getDocenaBaseParaSerie(sObj);
-
-    const ids = buildTallaIdsFromCurva(sObj, docena);
-
-    setEditModelCustomTallas(ct => ({ ...ct, [serieId]: ids }));
-
-  };
-
 
 
   const restablecerDocenaEstandarEnNuevoColor = (serieId: string) => {
@@ -5036,37 +5022,8 @@ export default function ModelosComponent({
 
 
       if (s.tallas) {
-
-        const prodConStock = prodsSup.find(prod => ((prod.serie as any)?.id === s.id || (prod as any).serieId === s.id));
-
-        const tallasList = prodConStock?.tallas || (prodConStock as any)?.stockPorTalla || [];
-
-        const tallasConStock = tallasList.filter((t: any) => Number(t.cantidad ?? t.stock ?? 0) > 0);
-
-        if (tallasConStock.length > 0) {
-
-          const ids: string[] = [];
-
-          tallasConStock.forEach((t: any) => {
-
-            const count = Number(t.cantidad ?? t.stock ?? 0);
-
-            const tid = t.tallaId || t.id;
-
-            for (let i = 0; i < count; i++) ids.push(tid);
-
-          });
-
-          customTallas[s.id] = ids;
-
-        } else {
-
-          const docena = getDocenaBaseParaSerie(s);
-
-          customTallas[s.id] = buildTallaIdsFromCurva(s, docena);
-
-        }
-
+        const docena = getDocenaBaseParaSerie(s);
+        customTallas[s.id] = buildTallaIdsFromCurva(s, docena);
       }
 
     });
@@ -5130,91 +5087,49 @@ export default function ModelosComponent({
       } else {
 
         const sObj = series.find(s => s.id === id);
-
-        if (sObj && sObj.tallas && !editModelCustomTallas[id]) {
-
+        if (sObj && sObj.tallas && (!editModelCustomTallas[id] || editModelCustomTallas[id].length === 0)) {
           const docena = getDocenaBaseParaSerie(sObj);
-
           const ids = buildTallaIdsFromCurva(sObj, docena);
-
           setEditModelCustomTallas(ct => ({ ...ct, [id]: ids }));
-
         }
 
         if (!editModelSeriesPrices[id]) {
-
           setEditModelSeriesPrices(sp => ({
-
             ...sp,
-
             [id]: { costPrice: "", salePrice: "" }
-
           }));
-
         }
-
         return [...prev, id];
-
       }
-
     });
-
   };
 
-
-
-  const aplicarCurvaEnEditModelSerie = (serieId: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B') => {
-
+  const restablecerDocenaEstandarEnEditModel = (serieId: string) => {
     const sObj = series.find(s => s.id === serieId);
-
     if (!sObj || !sObj.tallas) return;
-
     const docena = getDocenaBaseParaSerie(sObj);
-
     const ids = buildTallaIdsFromCurva(sObj, docena);
-
     setEditModelCustomTallas(ct => ({ ...ct, [serieId]: ids }));
-
   };
-
-
 
   const addTallaRepeatInEditModel = (serieId: string, tallaId: string) => {
-
     setEditModelCustomTallas(prev => {
-
       const current = prev[serieId] || [];
-
       return { ...prev, [serieId]: [...current, tallaId] };
-
     });
-
   };
 
-
-
   const removeOneTallaInEditModel = (serieId: string, tallaId: string) => {
-
     setEditModelCustomTallas(prev => {
-
       const current = prev[serieId] || [];
-
       const idx = current.indexOf(tallaId);
-
       if (idx > -1) {
-
         const copy = [...current];
-
         copy.splice(idx, 1);
-
         return { ...prev, [serieId]: copy };
-
       }
-
       return prev;
-
     });
-
   };
 
 
@@ -11713,114 +11628,60 @@ export default function ModelosComponent({
 
 
 
-                              {/* Componente de Curva de Tallas con Steppers */}
-
+                              {/* Distribución de pares por número para la serie */}
                               <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
-
                                 <div className="flex items-center justify-between">
-
                                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-
                                     Serie: {getNombreSerie(s, series).toUpperCase()}
-
                                   </span>
-
                                   <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
-
                                     = {selectedTallaIds.length} pares total
-
                                   </span>
-
                                 </div>
 
-
-
-                                {/* Steppers por talla */}
-
+                                {/* Steppers: pares que vienen por cada talla */}
                                 <div className="flex flex-wrap gap-2">
-
                                   {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
-
                                     const count = selectedTallaIds.filter(id => id === t.id).length;
-
                                     return (
-
                                       <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
-
                                         <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
-
                                         <button type="button"
-
                                           onClick={() => removeOneTallaInEditModel(s.id, t.id)}
-
-                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors"
-
+                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors cursor-pointer"
                                         >−</button>
-
                                         <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
-
                                         <button type="button"
-
                                           onClick={() => addTallaRepeatInEditModel(s.id, t.id)}
-
-                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors"
-
+                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors cursor-pointer"
                                         >+</button>
-
                                       </div>
-
                                     );
-
                                   })}
-
                                 </div>
 
-
-
-                                {/* Total de pares y botón para restablecer docena estándar */}
-
+                                {/* Total de pares y restablecer docena estándar */}
                                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/30">
-
                                   <div className="flex items-center gap-2">
-
                                     <span className="text-[11px] font-bold text-[var(--foreground)] font-mono">
-
                                       = {selectedTallaIds.length} pares total ({getDocenaLabelExt(selectedTallaIds.length)})
-
                                     </span>
-
                                     {selectedTallaIds.length !== 12 && (
-
                                       <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
-
                                         Una docena estándar suma 12 pares
-
                                       </span>
-
                                     )}
-
                                   </div>
-
                                   <button
-
                                     type="button"
-
                                     onClick={() => restablecerDocenaEstandarEnEditModel(s.id)}
-
                                     className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-
                                     title={`Restablecer curva base de 12 pares según las tallas de la serie ${getNombreSerie(s, series)}`}
-
                                   >
-
                                     <RefreshCw size={11} />
-
                                     <span>Restablecer docena estándar</span>
-
                                   </button>
-
                                 </div>
-
                               </div>
 
                             </div>
