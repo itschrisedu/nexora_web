@@ -463,17 +463,11 @@ const getNombreSerie = (s: SerieConfig | string | null | undefined, seriesList?:
 
 
   if (target && target.tallas && target.tallas.length > 0) {
-
     const sorted = [...target.tallas].sort((a, b) => a.numero - b.numero);
-
     const min = sorted[0].numero;
-
     const max = sorted[sorted.length - 1].numero;
-
-    const nombreClean = formatearNombreSerie(target.nombre);
-
-    return `${nombreClean} (${min}-${max})`;
-
+    const baseClean = formatearNombreSerie(target.nombre).replace(/\s*\(\d+-\d+\)/g, "").trim();
+    return `${baseClean} (${min}-${max})`;
   }
 
 
@@ -3159,96 +3153,33 @@ export default function ModelosComponent({
     setError("");
 
     try {
-      if (showEditModel && editModel) {
-        // ÁMBITO EXCLUSIVO DEL MODELO Y PROVEEDOR
-        // 1. Buscar si ya existe una serie en el catálogo con este rango exacto
-        let targetSerie = series.find(s => {
-          const sorted = (s.tallas || []).map(t => t.numero).sort((a, b) => a - b);
-          return sorted.length > 0 && sorted[0] === desde && sorted[sorted.length - 1] === hasta;
-        });
+      // MODIFICAR DIRECTAMENTE LA SERIE EXISTENTE (NUNCA CREAR OTRA SERIE)
+      const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
+        nombre: editingSerie.nombre,
+        tallasDesde: desde,
+        tallasHasta: hasta,
+      });
+      const sUpdated = updatedSerieRes?.serie || updatedSerieRes;
 
-        // 2. Si no existe, crear la serie específica con nombre limpio y rango (ej. "ADULTO (37-45)")
-        if (!targetSerie) {
-          const baseName = editingSerie.nombre.replace(/\s*\(\d+-\d+\)/g, "").trim();
-          const targetName = `${baseName} (${desde}-${hasta})`;
-          const createdRes = await ApiService.post('/configuracion/series-completa', {
-            nombre: targetName,
-            tallasDesde: desde,
-            tallasHasta: hasta,
-          });
-          targetSerie = createdRes?.serie || createdRes;
-        }
+      if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
+        const docena = getDocenaBaseParaSerie(sUpdated);
+        const ids = buildTallaIdsFromCurva(sUpdated, docena);
 
-        if (targetSerie && targetSerie.id) {
-          const finalTarget = targetSerie;
-          setSeries(prev => {
-            const exists = prev.some(s => s.id === finalTarget.id);
-            if (exists) return prev.map(s => s.id === finalTarget.id ? finalTarget : s);
-            return [...prev, finalTarget].sort((a: any, b: any) => {
-              const idxA = SERIES_ORDEN.indexOf(a.nombre);
-              const idxB = SERIES_ORDEN.indexOf(b.nombre);
-              return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
-            });
-          });
-
-          // Reemplazar la serie en las series activas de este modelo
-          setEditModelSerieIds(prev => {
-            const filtered = prev.filter(x => x !== editingSerie.id);
-            return filtered.includes(finalTarget.id) ? filtered : [...filtered, finalTarget.id];
-          });
-
-          // Inicializar tallas: 2 pares por cada número o docena si corresponde
-          if (finalTarget.tallas && finalTarget.tallas.length > 0) {
-            const docena = getDocenaBaseParaSerie(finalTarget);
-            const ids = buildTallaIdsFromCurva(finalTarget, docena);
-            setEditModelCustomTallas(prev => ({ ...prev, [finalTarget.id]: ids }));
-          }
-
-          // Mantener o transferir precios
-          if (editModelSeriesPrices[editingSerie.id]) {
-            setEditModelSeriesPrices(prev => ({
-              ...prev,
-              [finalTarget.id]: prev[editingSerie.id]
-            }));
-          }
-
-          setSuccess(`Serie con rango ${desde}-${hasta} asignada al modelo "${editModel.name}".`);
-        }
-
-        setShowEditSeriesModal(false);
-        setEditingSerie(null);
-        await loadData();
-        setTimeout(() => setSuccess(""), 4000);
-        return;
-      }
-
-      // Si se edita fuera del modelo y no es canónica:
-      if (!SERIES_CANONICAS.includes(editingSerie.nombre)) {
-        const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
-          nombre: editSerieNombre,
-          tallasDesde: desde,
-          tallasHasta: hasta,
-        });
-        const sUpdated = updatedSerieRes?.serie || updatedSerieRes;
-
-        if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
-          const docena = getDocenaBaseParaSerie(sUpdated);
-          const ids = buildTallaIdsFromCurva(sUpdated, docena);
+        if (showEditModel) {
+          setEditModelSerieIds(prev => (prev.includes(editingSerie.id) ? prev : [...prev, editingSerie.id]));
           setEditModelCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
-          setSupplierSeriesCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
-          setNewColorCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
-          setSeries(prev => prev.map(s => s.id === sUpdated.id ? sUpdated : s));
         }
 
-        setSuccess(`Serie "${editSerieNombre}" actualizada correctamente.`);
-        setShowEditSeriesModal(false);
-        setEditingSerie(null);
-        await loadData();
-        setTimeout(() => setSuccess(""), 4000);
-        return;
+        setSupplierSeriesCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+        setNewColorCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+        setSeries(prev => prev.map(s => s.id === sUpdated.id ? sUpdated : s));
       }
 
-      setError(`Para modificar el rango de la serie "${editingSerie.nombre}", edítala directamente dentro del modelo donde deseas aplicarla.`);
+      setSuccess(`Serie actualizada correctamente.`);
+      setShowEditSeriesModal(false);
+      setEditingSerie(null);
+      await loadData();
+      setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
       setError(err.message || "Error al actualizar la serie.");
     } finally {
