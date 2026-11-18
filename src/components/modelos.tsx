@@ -1123,7 +1123,7 @@ export default function ModelosComponent({
 
     message: "",
 
-    onConfirm: () => {},
+    onConfirm: () => { },
 
   });
 
@@ -1859,7 +1859,7 @@ export default function ModelosComponent({
 
           }
 
-        } catch {}
+        } catch { }
 
       }
 
@@ -2677,7 +2677,7 @@ export default function ModelosComponent({
 
     setNewColorSerieIds(preselectedSerieIds);
 
-    
+
 
     const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
 
@@ -5728,15 +5728,13 @@ export default function ModelosComponent({
 
             onClick={() => setActiveTab('local')}
 
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'local'
 
-              activeTab === 'local'
+              ? "bg-[#0F172A] text-white shadow-sm"
 
-                ? "bg-[#0F172A] text-white shadow-sm"
+              : "bg-[var(--card)] text-[var(--muted-foreground)] border border-[var(--border)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/40"
 
-                : "bg-[var(--card)] text-[var(--muted-foreground)] border border-[var(--border)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/40"
-
-            }`}
+              }`}
 
           >
 
@@ -5744,11 +5742,9 @@ export default function ModelosComponent({
 
             <span>Mi Catálogo Local</span>
 
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${activeTab === 'local' ? "bg-white/20 text-white" : "bg-[var(--muted)] text-[var(--muted-foreground)]"
 
-              activeTab === 'local' ? "bg-white/20 text-white" : "bg-[var(--muted)] text-[var(--muted-foreground)]"
-
-            }`}>
+              }`}>
 
               {modelos.length}
 
@@ -5764,15 +5760,13 @@ export default function ModelosComponent({
 
             onClick={() => setActiveTab('red')}
 
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'red'
 
-              activeTab === 'red'
+              ? "bg-[#0F172A] text-white shadow-sm"
 
-                ? "bg-[#0F172A] text-white shadow-sm"
+              : "bg-[var(--card)] text-[var(--muted-foreground)] border border-[var(--border)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/40"
 
-                : "bg-[var(--card)] text-[var(--muted-foreground)] border border-[var(--border)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/40"
-
-            }`}
+              }`}
 
           >
 
@@ -6214,11 +6208,9 @@ export default function ModelosComponent({
 
                     key={m.id}
 
-                    className={`bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all ${
+                    className={`bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all ${!m.active ? "opacity-60 bg-[var(--muted)]/20" : ""
 
-                      !m.active ? "opacity-60 bg-[var(--muted)]/20" : ""
-
-                    }`}
+                      }`}
 
                   >
 
@@ -6254,11 +6246,9 @@ export default function ModelosComponent({
 
                           }}
 
-                          className={`w-16 h-16 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl flex items-center justify-center shrink-0 overflow-hidden relative group/img ${
+                          className={`w-16 h-16 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl flex items-center justify-center shrink-0 overflow-hidden relative group/img ${activeProduct?.fotoUrl ? "cursor-zoom-in hover:ring-2 hover:ring-emerald-500 hover:shadow-md transition-all" : ""
 
-                            activeProduct?.fotoUrl ? "cursor-zoom-in hover:ring-2 hover:ring-emerald-500 hover:shadow-md transition-all" : ""
-
-                          }`}
+                            }`}
 
                           title={activeProduct?.fotoUrl ? "Clic para ampliar foto" : undefined}
 
@@ -6434,15 +6424,13 @@ export default function ModelosComponent({
 
                                     onClick={() => handleToggleModel(m.id, m.name, m.active)}
 
-                                    className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
+                                    className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${m.active
 
-                                      m.active
+                                      ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
 
-                                        ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
+                                      : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
 
-                                        : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
-
-                                    }`}
+                                      }`}
 
                                   >
 
@@ -6516,7 +6504,7 @@ export default function ModelosComponent({
 
                           <span className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider flex items-center gap-1">
 
-                            <Palette size={12}/> Color Activo:
+                            <Palette size={12} /> Color Activo:
 
                           </span>
 
@@ -6540,15 +6528,13 @@ export default function ModelosComponent({
 
                                 onClick={() => setSelectedColorForModel(prev => ({ ...prev, [m.id]: label }))}
 
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${selectedNorm === normalized
 
-                                  selectedNorm === normalized
+                                  ? "bg-slate-900 text-white border-slate-900"
 
-                                    ? "bg-slate-900 text-white border-slate-900"
+                                  : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-slate-400"
 
-                                    : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-slate-400"
-
-                                }`}
+                                  }`}
 
                               >
 
@@ -6756,11 +6742,9 @@ export default function ModelosComponent({
 
                                         key={p.id}
 
-                                        className={`bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm transition-all ${
+                                        className={`bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm transition-all ${!p.activo ? "opacity-60 bg-[var(--muted)]/10 border-dashed" : ""
 
-                                          !p.activo ? "opacity-60 bg-[var(--muted)]/10 border-dashed" : ""
-
-                                        }`}
+                                          }`}
 
                                       >
 
@@ -6808,57 +6792,57 @@ export default function ModelosComponent({
 
                                         {!hasMultipleSuppliers && (
 
-                                        <div className="flex items-center justify-between text-[11px] px-1">
+                                          <div className="flex items-center justify-between text-[11px] px-1">
 
-                                          <div className="flex items-center gap-1.5">
+                                            <div className="flex items-center gap-1.5">
 
-                                            <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">Proveedor:</span>
+                                              <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">Proveedor:</span>
 
-                                            {p.supplier ? (
+                                              {p.supplier ? (
 
-                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded text-[10px] font-bold">
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded text-[10px] font-bold">
 
-                                                <Truck size={10} />
+                                                  <Truck size={10} />
 
-                                                <span>{p.supplier.razonSocial}</span>
+                                                  <span>{p.supplier.razonSocial}</span>
 
-                                                {p.supplierSigla && (
+                                                  {p.supplierSigla && (
 
-                                                  <span className="bg-blue-600 text-white px-1 py-0.2 rounded text-[8px] font-mono font-black">{p.supplierSigla}</span>
+                                                    <span className="bg-blue-600 text-white px-1 py-0.2 rounded text-[8px] font-mono font-black">{p.supplierSigla}</span>
 
-                                                )}
+                                                  )}
 
-                                              </span>
+                                                </span>
 
-                                            ) : (
+                                              ) : (
 
-                                              <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin proveedor asignado</span>
+                                                <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin proveedor asignado</span>
 
-                                            )}
+                                              )}
+
+                                            </div>
+
+                                            <div className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">
+
+                                              Costo: <strong className="text-slate-900 dark:text-emerald-400 font-mono font-black">${Number(p.precioCosto).toFixed(2)}</strong>
+
+                                            </div>
 
                                           </div>
-
-                                          <div className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">
-
-                                            Costo: <strong className="text-slate-900 dark:text-emerald-400 font-mono font-black">${Number(p.precioCosto).toFixed(2)}</strong>
-
-                                          </div>
-
-                                        </div>
 
                                         )}
 
                                         {hasMultipleSuppliers && (
 
-                                        <div className="flex items-center justify-end text-[11px] px-1">
+                                          <div className="flex items-center justify-end text-[11px] px-1">
 
-                                          <div className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">
+                                            <div className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">
 
-                                            Costo: <strong className="text-slate-900 dark:text-emerald-400 font-mono font-black">${Number(p.precioCosto).toFixed(2)}</strong>
+                                              Costo: <strong className="text-slate-900 dark:text-emerald-400 font-mono font-black">${Number(p.precioCosto).toFixed(2)}</strong>
+
+                                            </div>
 
                                           </div>
-
-                                        </div>
 
                                         )}
 
@@ -6880,13 +6864,11 @@ export default function ModelosComponent({
 
                                                 title={`Stock: ${t.cantidad} pares`}
 
-                                                className={`px-2 py-1 rounded-md text-[10px] font-bold border ${
-
-                                                  t.cantidad === 0 ? "bg-red-500/10 text-red-500 border-red-500/20"
+                                                className={`px-2 py-1 rounded-md text-[10px] font-bold border ${t.cantidad === 0 ? "bg-red-500/10 text-red-500 border-red-500/20"
 
                                                   : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
 
-                                                }`}
+                                                  }`}
 
                                               >
 
@@ -6936,15 +6918,13 @@ export default function ModelosComponent({
 
                                               onClick={() => handleToggleProduct(p.id, p.codigo, p.activo, m.id)}
 
-                                              className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
+                                              className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${p.activo
 
-                                                p.activo
+                                                ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
 
-                                                  ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
+                                                : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
 
-                                                  : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
-
-                                              }`}
+                                                }`}
 
                                             >
 
@@ -7154,11 +7134,9 @@ export default function ModelosComponent({
 
                     key={m.id}
 
-                    className={`bg-[var(--card)] border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all space-y-4 ${
+                    className={`bg-[var(--card)] border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all space-y-4 ${isParcial ? "border-amber-500/30 bg-amber-500/[0.02]" : "border-[var(--border)]"
 
-                      isParcial ? "border-amber-500/30 bg-amber-500/[0.02]" : "border-[var(--border)]"
-
-                    }`}
+                      }`}
 
                   >
 
@@ -7190,11 +7168,9 @@ export default function ModelosComponent({
 
                           }}
 
-                          className={`w-20 h-20 bg-white border border-[var(--border)] rounded-2xl flex items-center justify-center shrink-0 overflow-hidden shadow-xs relative group/img ${
+                          className={`w-20 h-20 bg-white border border-[var(--border)] rounded-2xl flex items-center justify-center shrink-0 overflow-hidden shadow-xs relative group/img ${m.fotoPrincipal ? "cursor-zoom-in hover:ring-2 hover:ring-emerald-500 transition-all" : ""
 
-                            m.fotoPrincipal ? "cursor-zoom-in hover:ring-2 hover:ring-emerald-500 transition-all" : ""
-
-                          }`}
+                            }`}
 
                           title={m.fotoPrincipal ? "Clic para ampliar foto" : undefined}
 
@@ -7686,15 +7662,13 @@ export default function ModelosComponent({
 
                       key={v.id}
 
-                      className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                      className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${isChecked
 
-                        isChecked
+                        ? "bg-emerald-500/5 border-emerald-500/40 shadow-2xs"
 
-                          ? "bg-emerald-500/5 border-emerald-500/40 shadow-2xs"
+                        : "bg-[var(--card)] border-[var(--border)] opacity-60 hover:opacity-100"
 
-                          : "bg-[var(--card)] border-[var(--border)] opacity-60 hover:opacity-100"
-
-                      }`}
+                        }`}
 
                     >
 
@@ -7908,857 +7882,77 @@ export default function ModelosComponent({
 
               <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
 
-              
 
-              {/* Opción para Sucursales: Adoptar Modelo Base de la Matriz */}
 
-              {!isMatrizTenant && modelosMatrizDisponibles.length > 0 && (
+                {/* Opción para Sucursales: Adoptar Modelo Base de la Matriz */}
 
-                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2.5">
+                {!isMatrizTenant && modelosMatrizDisponibles.length > 0 && (
 
-                  <div className="flex items-center justify-between">
+                  <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2.5">
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between">
 
-                      <Sparkles size={16} className="text-emerald-500 shrink-0" />
+                      <div className="flex items-center gap-2">
 
-                      <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                        <Sparkles size={16} className="text-emerald-500 shrink-0" />
 
-                        Adoptar Modelo de la Matriz ({matrizNombre})
+                        <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+
+                          Adoptar Modelo de la Matriz ({matrizNombre})
+
+                        </span>
+
+                      </div>
+
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full">
+
+                        Opcional
 
                       </span>
 
                     </div>
 
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full">
+                    <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
 
-                      Opcional
+                      Si este modelo ya existe en la matriz, selecciónalo aquí para auto-completar sus datos y reutilizar sus fotografías (ahorrando espacio de almacenamiento). Podrás asignarle tu propio proveedor local y ajustar los precios de tu sucursal.
 
-                    </span>
+                    </p>
 
-                  </div>
+                    <div>
 
-                  <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
+                      <select
 
-                    Si este modelo ya existe en la matriz, selecciónalo aquí para auto-completar sus datos y reutilizar sus fotografías (ahorrando espacio de almacenamiento). Podrás asignarle tu propio proveedor local y ajustar los precios de tu sucursal.
+                        value={selectedMatrizModelId}
 
-                  </p>
+                        onChange={(e) => handleSelectMatrizModel(e.target.value)}
 
-                  <div>
+                        className="w-full px-3 py-2 bg-[var(--card)] border border-emerald-500/40 rounded-xl text-xs text-[var(--foreground)] font-medium focus:outline-none focus:border-emerald-500 transition-colors"
 
-                    <select
+                      >
 
-                      value={selectedMatrizModelId}
+                        <option value="">-- Crear modelo nuevo desde cero --</option>
 
-                      onChange={(e) => handleSelectMatrizModel(e.target.value)}
+                        {modelosMatrizDisponibles.map((mm) => (
 
-                      className="w-full px-3 py-2 bg-[var(--card)] border border-emerald-500/40 rounded-xl text-xs text-[var(--foreground)] font-medium focus:outline-none focus:border-emerald-500 transition-colors"
+                          <option key={mm.id} value={mm.id}>
 
-                    >
+                            {mm.name} ({mm.brand}) — {mm.colores.length} colores {mm.yaImportado ? '✓ (Ya registrado en esta sucursal)' : ''}
 
-                      <option value="">-- Crear modelo nuevo desde cero --</option>
+                          </option>
 
-                      {modelosMatrizDisponibles.map((mm) => (
+                        ))}
 
-                        <option key={mm.id} value={mm.id}>
-
-                          {mm.name} ({mm.brand}) — {mm.colores.length} colores {mm.yaImportado ? '✓ (Ya registrado en esta sucursal)' : ''}
-
-                        </option>
-
-                      ))}
-
-                    </select>
-
-                  </div>
-
-                  {selectedMatrizModelId && (
-
-                    <div className="flex items-center gap-2 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/15 p-2 rounded-lg">
-
-                      <CheckCircle size={13} className="shrink-0" />
-
-                      <span>Datos y fotografías importados desde la Matriz. Puedes modificar el proveedor local, precios o colores libremente sin afectar a la Matriz.</span>
+                      </select>
 
                     </div>
 
-                  )}
+                    {selectedMatrizModelId && (
 
-                </div>
+                      <div className="flex items-center gap-2 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/15 p-2 rounded-lg">
 
-              )}
+                        <CheckCircle size={13} className="shrink-0" />
 
-
-
-              {/* Sección 1: Datos Base */}
-
-              <div className="space-y-4">
-
-                <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">1. Información del Modelo</h5>
-
-                
-
-                <div className="grid grid-cols-2 gap-4">
-
-                  <div>
-
-                    <Lbl t="Nombre del calzado" req />
-
-                    <input
-
-                      type="text"
-
-                      value={name}
-
-                      onChange={(e) => handleNameChange(e.target.value)}
-
-                      placeholder="Ej. Botín Hombre Londres"
-
-                      className={INPUT}
-
-                    />
-
-                  </div>
-
-                  <div>
-
-                    <div className="flex items-center justify-between mb-1">
-
-                      <Lbl t="Código Base" req />
-
-                    </div>
-
-                    <input
-
-                      type="text"
-
-                      value={baseCode}
-
-                      readOnly
-
-                      disabled
-
-                      placeholder="Ej. VHL-01 (Automático)"
-
-                      className={`${INPUT} bg-[var(--muted)]/40 text-[var(--muted-foreground)] cursor-not-allowed select-none font-mono font-bold`}
-
-                    />
-
-                  </div>
-
-                </div>
-
-
-
-                <div className="grid grid-cols-2 gap-4">
-
-                  <div><Lbl t="Marca" req /><input type="text" value={brand} onChange={e => setBrand(e.target.value)} placeholder="Ej. Nike" className={INPUT} /></div>
-
-                  <div><Lbl t="Material" /><input type="text" value={material} onChange={e => setMaterial(e.target.value)} placeholder="Ej. Cuero sintético y malla" className={INPUT} /></div>
-
-                </div>
-
-
-
-                <div>
-
-                  <Lbl t="Proveedor Principal (Órdenes de Compra Automáticas)" />
-
-                  <div className="flex gap-2">
-
-                    <select value={supplierId} onChange={e => setSupplierId(e.target.value)} className={`${INPUT} flex-1`}>
-
-                      <option value="">-- Sin Proveedor Asignado --</option>
-
-                      {listaProveedores.map(p => (
-
-                        <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
-
-                      ))}
-
-                    </select>
-
-                    <button type="button" onClick={() => { setQsContext('create'); setShowQuickSupplier(true); }}
-
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-xl flex items-center gap-1 shrink-0 transition-colors">
-
-                      <Plus size={12} /><span>Nuevo</span>
-
-                    </button>
-
-                  </div>
-
-                </div>
-
-
-
-                {/* Proveedores Alternos */}
-
-                <div>
-
-                  <Lbl t="Proveedores Alternos (Suplencia / Alta Demanda)" />
-
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-
-                    {createAlternateIds.map(altId => {
-
-                      const prov = listaProveedores.find(p => p.id === altId);
-
-                      return prov ? (
-
-                        <span key={altId} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[10px] font-bold">
-
-                          <Truck size={10} />{prov.razonSocial}
-
-                          <button type="button" onClick={() => setCreateAlternateIds(prev => prev.filter(x => x !== altId))}
-
-                            className="text-rose-500 hover:text-rose-700 ml-0.5"><X size={10} /></button>
-
-                        </span>
-
-                      ) : null;
-
-                    })}
-
-                  </div>
-
-                  <select value="" onChange={e => {
-
-                    const val = e.target.value;
-
-                    if (val && !createAlternateIds.includes(val) && val !== supplierId) {
-
-                      setCreateAlternateIds(prev => [...prev, val]);
-
-                    }
-
-                  }} className={INPUT}>
-
-                    <option value="">-- Agregar proveedor alterno --</option>
-
-                    {listaProveedores.filter(p => p.id !== supplierId && !createAlternateIds.includes(p.id)).map(p => (
-
-                      <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
-
-                    ))}
-
-                  </select>
-
-                </div>
-
-              </div>
-
-
-
-              {/* Sección 2: Variantes de Color */}
-
-              <div className="space-y-4">
-
-                <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
-
-                  <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest">2. Colores y Fotografías</h5>
-
-                  <button type="button" onClick={addColorField}
-
-                    className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A] hover:opacity-80 transition-opacity">
-
-                    <Plus size={12} /><span>Añadir Color</span>
-
-                  </button>
-
-                </div>
-
-
-
-                <div className="space-y-3">
-
-                  {colors.map((cInput, idx) => (
-
-                    <div key={idx} className="flex gap-4 items-start bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-3 relative">
-
-                      <div className="w-16 h-16 bg-[var(--muted)]/40 border-2 border-dashed border-[var(--border)] rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
-
-                        {cInput.foto ? <img src={cInput.foto} className="w-full h-full object-cover" alt="preview" />
-
-                          : <ImageIcon size={18} className="text-[var(--muted-foreground)] opacity-40" />}
-
-                      </div>
-
-                      <div className="flex-1 space-y-2">
-
-                        <div className="flex items-center justify-between">
-
-                          <Lbl t={`Nombre de Color #${idx + 1}`} req />
-
-                          {colors.length > 1 && (
-
-                            <button type="button" onClick={() => removeColorField(idx)}
-
-                              className="text-[10px] font-bold text-red-500 hover:opacity-80 transition-opacity">
-
-                              Eliminar
-
-                            </button>
-
-                          )}
-
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-
-                          <input type="text" value={cInput.color} onChange={e => setColors(prev => {
-
-                            const copy = [...prev];
-
-                            copy[idx].color = e.target.value;
-
-                            return copy;
-
-                          })} placeholder="Ej. Blanco / Negro-Rojo" className="w-full px-2 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs focus:outline-none focus:border-[#0F172A]" />
-
-                          
-
-                          <input type="file" accept="image/*" onChange={e => handleFoto(idx, e)}
-
-                            className="w-full text-[10px] text-[var(--muted-foreground)] file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-slate-900 file:text-white file:text-[9px] file:font-semibold hover:file:opacity-90 cursor-pointer" />
-
-                        </div>
-
-                        {/* Selector opcional de taller para este color */}
-
-                        {listaProveedores.length > 0 && (
-
-                          <div className="pt-1">
-
-                            <select
-
-                              value={cInput.supplierId || ""}
-
-                              onChange={e => setColors(prev => {
-
-                                const copy = [...prev];
-
-                                copy[idx].supplierId = e.target.value;
-
-                                return copy;
-
-                              })}
-
-                              className="w-full px-2 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-[11px] text-[var(--foreground)]"
-
-                            >
-
-                              <option value="">-- Proveedor Principal del Modelo --</option>
-
-                              {listaProveedores.map(p => (
-
-                                <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
-
-                              ))}
-
-                            </select>
-
-                          </div>
-
-                        )}
-
-                      </div>
-
-                    </div>
-
-                  ))}
-
-                </div>
-
-              </div>
-
-
-
-              {/* Sección 3: Series y Precios */}
-
-              <div className="space-y-4">
-
-                <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
-
-                  <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest">3. Series y Precios</h5>
-
-                  <button type="button" onClick={() => { setNewSerieNombre(""); setNewSerieTallasDesde("38"); setNewSerieTallasHasta("43"); setError(""); setShowCreateSeriesModal(true); }}
-
-                    className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A] hover:underline">
-
-                    <Plus size={13} /> <span>Crear Nueva Serie</span>
-
-                  </button>
-
-                </div>
-
-                <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">Activa las series que deseas generar, personaliza sus tallas y define precios.</p>
-
-
-
-                <div className="space-y-3">
-
-                  {getSeriesParaModelo(undefined, series).map(s => {
-
-                    const isActive = serieIds.includes(s.id);
-
-                    const prices = seriesPrices[s.id] || { costPrice: "", salePrice: "" };
-
-                    const selectedTallaIds = customTallas[s.id] || [];
-
-
-
-                    return (
-
-                      <div key={s.id} className={`rounded-xl border transition-all overflow-hidden ${
-
-                        isActive
-
-                          ? "border-[#0F172A] bg-[#0F172A]/5 shadow-sm"
-
-                          : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
-
-                      }`}>
-
-                        {/* Toggle Header */}
-
-                        <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
-
-                          <div className="flex items-center gap-3 cursor-pointer" onClick={() => toggleSerie(s.id)}>
-
-                            <div className={`w-10 h-5 rounded-full relative transition-colors ${
-
-                              isActive ? "bg-[#0F172A]" : "bg-[var(--border)]"
-
-                            }`}>
-
-                              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-
-                                isActive ? "translate-x-5" : "translate-x-0.5"
-
-                              }`} />
-
-                            </div>
-
-                            <span className={`text-sm font-bold ${
-
-                              isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
-
-                            }`}>{getNombreSerie(s, series)}</span>
-
-                          </div>
-
-
-
-                          <div className="flex items-center gap-2">
-
-                            <button type="button" onClick={() => openEditSeriesModal(s)}
-
-                              className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)]/50 transition-colors flex items-center gap-1 text-[11px] font-semibold"
-
-                              title="Editar rango o nombre de esta serie">
-
-                              <Edit2 size={13} />
-
-                              <span>Editar</span>
-
-                            </button>
-
-                            {!SERIES_CANONICAS.includes(s.nombre) && (
-
-                              <button type="button" onClick={(ev) => { ev.stopPropagation(); handleDeleteSeries(s); }}
-
-                                className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-500/10 transition-colors flex items-center gap-1 text-[11px] font-semibold"
-
-                                title={`Eliminar serie duplicada "${s.nombre}"`}>
-
-                                <Trash2 size={13} />
-
-                                <span>Eliminar</span>
-
-                              </button>
-
-                            )}
-
-                            {isActive && (
-
-                              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">ACTIVA</span>
-
-                            )}
-
-                          </div>
-
-                        </div>
-
-
-
-                        {/* Detalle si la serie está activa */}
-
-                        {isActive && (() => {
-
-                          const costVal = parseDecimalNumber(prices.costPrice);
-
-                          const saleVal = parseDecimalNumber(prices.salePrice);
-
-                          const hasCost = !isNaN(costVal) && costVal > 0;
-
-                          const hasSale = !isNaN(saleVal) && saleVal > 0;
-
-                          const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
-
-                          const isLoss = hasCost && hasSale && saleVal < costVal;
-
-                          const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
-
-                          const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
-
-                          const suggestedProfit = hasCost && suggestedSale ? (parseFloat(suggestedSale) - costVal).toFixed(2) : "0.00";
-
-
-
-                          return (
-
-                            <div className="px-4 pb-4 pt-3 space-y-3">
-
-                              {/* Inputs de Precio */}
-
-                              <div className="grid grid-cols-2 gap-3">
-
-                                <div>
-
-                                  <Lbl t="Precio de Compra ($)" req />
-
-                                  <input type="text" inputMode="decimal"
-
-                                    value={prices.costPrice}
-
-                                    onChange={e => {
-
-                                      const val = normalizeDecimalInput(e.target.value);
-
-                                      setSeriesPrices(prev => ({
-
-                                        ...prev,
-
-                                        [s.id]: { ...prev[s.id], costPrice: val }
-
-                                      }));
-
-                                    }}
-
-                                    placeholder="0.00" className={INPUT} />
-
-                                </div>
-
-                                <div>
-
-                                  <Lbl t="Precio de Venta ($)" req />
-
-                                  <input type="text" inputMode="decimal"
-
-                                    value={prices.salePrice}
-
-                                    onChange={e => {
-
-                                      const val = normalizeDecimalInput(e.target.value);
-
-                                      setSeriesPrices(prev => ({
-
-                                        ...prev,
-
-                                        [s.id]: { ...prev[s.id], salePrice: val }
-
-                                      }));
-
-                                    }}
-
-                                    placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
-
-                                    className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
-
-                                </div>
-
-                              </div>
-
-
-
-                              {/* Indicador de Margen Configurable */}
-
-                              {hasCost && (
-
-                                <div className="text-[11px] font-semibold">
-
-                                  {hasSale ? (
-
-                                    isLoss ? (
-
-                                      <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
-
-                                        <AlertCircle size={14} className="shrink-0 animate-bounce" />
-
-                                        <span>Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
-
-                                      </div>
-
-                                    ) : (
-
-                                      <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
-
-                                        <CheckCircle size={14} className="shrink-0" />
-
-                                        <span>Margen de ganancia: <strong className="font-extrabold">{marginPercent.toFixed(1)}%</strong> (+${profitAmount.toFixed(2)} de utilidad por par)</span>
-
-                                      </div>
-
-                                    )
-
-                                  ) : (
-
-                                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
-
-                                      <DollarSign size={14} className="shrink-0" />
-
-                                      <span>Precio sugerido ({marginPct}% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${suggestedProfit}/par)</span>
-
-                                    </div>
-
-                                  )}
-
-                                </div>
-
-                              )}
-
-
-
-                              {/* Componente de Curva de Tallas con Steppers */}
-
-                              <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
-
-                                <div className="flex items-center justify-between">
-
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-
-                                    Serie: {getNombreSerie(s, series).toUpperCase()}
-
-                                  </span>
-
-                                  <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
-
-                                    = {selectedTallaIds.length} pares total
-
-                                  </span>
-
-                                </div>
-
-
-
-                                {/* Steppers por talla */}
-
-                                <div className="flex flex-wrap gap-2">
-
-                                  {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
-
-                                    const count = selectedTallaIds.filter(id => id === t.id).length;
-
-                                    return (
-
-                                      <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
-
-                                        <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
-
-                                        <button type="button"
-
-                                          onClick={() => removeOneTallaInSerie(s.id, t.id)}
-
-                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors"
-
-                                        >−</button>
-
-                                        <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
-
-                                        <button type="button"
-
-                                          onClick={() => addTallaRepeatInSerie(s.id, t.id)}
-
-                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors"
-
-                                        >+</button>
-
-                                      </div>
-
-                                    );
-
-                                  })}
-
-                                </div>
-
-
-
-                                {/* Total de pares y botón para restablecer docena estándar */}
-
-                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/30">
-
-                                  <div className="flex items-center gap-2">
-
-                                    <span className="text-[11px] font-bold text-[var(--foreground)] font-mono">
-
-                                      = {selectedTallaIds.length} pares total ({getDocenaLabelExt(selectedTallaIds.length)})
-
-                                    </span>
-
-                                    {selectedTallaIds.length !== 12 && (
-
-                                      <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
-
-                                        Una docena estándar suma 12 pares
-
-                                      </span>
-
-                                    )}
-
-                                  </div>
-
-                                  <button
-
-                                    type="button"
-
-                                    onClick={() => restablecerDocenaEstandarEnCreacion(s.id)}
-
-                                    className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-
-                                    title="Restablecer curva base estándar (38 al 42 con 39 y 40 repetidos = 12 pares)"
-
-                                  >
-
-                                    <RefreshCw size={11} />
-
-                                    <span>Restablecer estándar (38-42)</span>
-
-                                  </button>
-
-                                </div>
-
-
-
-                                {/* Selección de Stock Inicial para Bodega */}
-
-                                <div className="space-y-1.5 pt-2 border-t border-[var(--border)]/40">
-
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
-
-                                    Stock Inicial en Bodega para este modelo:
-
-                                  </span>
-
-                                  <div className="flex flex-wrap gap-2">
-
-                                    <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'DOCENA')}
-
-                                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-
-                                        (stockOptionCreacion[s.id] || 'DOCENA') === 'DOCENA'
-
-                                          ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
-
-                                          : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
-
-                                      }`}
-
-                                    >
-
-                                      {(stockOptionCreacion[s.id] || 'DOCENA') === 'DOCENA' && <Check size={13} />}
-
-                                      1 Docena en Bodega (12 pares según serie de arriba)
-
-                                    </button>
-
-                                    <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'NINGUNA')}
-
-                                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-
-                                        stockOptionCreacion[s.id] === 'NINGUNA'
-
-                                          ? "border-slate-600 bg-slate-700 text-white shadow-xs"
-
-                                          : "border-slate-300 dark:border-slate-700 bg-[var(--card)] hover:bg-rose-500/10 text-rose-600"
-
-                                      }`}
-
-                                    >
-
-                                      {stockOptionCreacion[s.id] === 'NINGUNA' && <Check size={13} />}
-
-                                      Sin Stock Inicial (0 pares, solo catálogo para pedidos)
-
-                                    </button>
-
-                                  </div>
-
-                                </div>
-
-                              </div>
-
-                            </div>
-
-                          );
-
-                        })()}
-
-                      </div>
-
-                    );
-
-                  })}
-
-                </div>
-
-
-
-                <div className="bg-[var(--muted)]/20 border border-[var(--border)] p-3.5 sm:p-4 rounded-2xl space-y-3">
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)]/40 pb-2.5">
-
-                    <div className="flex items-center gap-2">
-
-                      <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
-
-                        <PackageCheck size={18} />
-
-                      </div>
-
-                      <div>
-
-                        <h6 className="text-xs font-black text-[var(--foreground)] uppercase tracking-wider">
-
-                          Stock Inicial por Talla y Curva
-
-                        </h6>
-
-                        <p className="text-[10px] text-[var(--muted-foreground)]">
-
-                          Selecciona el tipo de curva deseada para cada serie o aplica a todas
-
-                        </p>
-
-                      </div>
-
-                    </div>
-
-
-
-                    {serieIds.length > 0 && (
-
-                      <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
-
-                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] mr-1">Aplicar a todas:</span>
-
-                        <button type="button" onClick={() => aplicarCurvaATodasEnCreacion('MEDIA_A')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 cursor-pointer">Media A (6)</button>
-
-                        <button type="button" onClick={() => aplicarCurvaATodasEnCreacion('MEDIA_B')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 cursor-pointer">Media B (6)</button>
-
-                        <button type="button" onClick={() => aplicarCurvaATodasEnCreacion('DOCENA')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 cursor-pointer">1 Docena (12)</button>
-
-                        <button type="button" onClick={() => aplicarCurvaATodasEnCreacion('NINGUNA')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-slate-500/30 bg-slate-500/10 text-slate-700 hover:bg-slate-500/20 cursor-pointer">Sin Stock (0)</button>
+                        <span>Datos y fotografías importados desde la Matriz. Puedes modificar el proveedor local, precios o colores libremente sin afectar a la Matriz.</span>
 
                       </div>
 
@@ -8766,67 +7960,835 @@ export default function ModelosComponent({
 
                   </div>
 
+                )}
 
 
-                  {(() => {
 
-                    const totalParesLote = Object.values(customTallas).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+                {/* Sección 1: Datos Base */}
 
-                    return (
+                <div className="space-y-4">
 
-                      <div className="flex items-center gap-2.5 p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl">
+                  <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">1. Información del Modelo</h5>
 
-                        {totalParesLote > 0 ? (
 
-                          <>
 
-                            <CheckCircle size={16} className="text-emerald-500 shrink-0" />
+                  <div className="grid grid-cols-2 gap-4">
 
-                            <div className="text-xs text-[var(--foreground)] leading-relaxed">
+                    <div>
 
-                              Se creará un stock inicial de <strong className="font-extrabold text-emerald-600">{totalParesLote} pares</strong> <span className="font-semibold text-[var(--muted-foreground)]">({getDocenaLabelExt(totalParesLote)})</span> por cada color generado.
+                      <Lbl t="Nombre del calzado" req />
 
-                            </div>
+                      <input
 
-                          </>
+                        type="text"
 
-                        ) : (
+                        value={name}
 
-                          <>
+                        onChange={(e) => handleNameChange(e.target.value)}
 
-                            <Info size={16} className="text-slate-400 shrink-0" />
+                        placeholder="Ej. Botín Hombre Londres"
 
-                            <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                        className={INPUT}
 
-                              <strong className="font-bold text-[var(--foreground)]">Sin stock inicial (0 pares):</strong> Se registrarán las variantes en el catálogo sin unidades físicas.
+                      />
 
-                            </div>
+                    </div>
 
-                          </>
+                    <div>
 
-                        )}
+                      <div className="flex items-center justify-between mb-1">
+
+                        <Lbl t="Código Base" req />
 
                       </div>
 
-                    );
+                      <input
 
-                  })()}
+                        type="text"
+
+                        value={baseCode}
+
+                        readOnly
+
+                        disabled
+
+                        placeholder="Ej. VHL-01 (Automático)"
+
+                        className={`${INPUT} bg-[var(--muted)]/40 text-[var(--muted-foreground)] cursor-not-allowed select-none font-mono font-bold`}
+
+                      />
+
+                    </div>
+
+                  </div>
+
+
+
+                  <div className="grid grid-cols-2 gap-4">
+
+                    <div><Lbl t="Marca" req /><input type="text" value={brand} onChange={e => setBrand(e.target.value)} placeholder="Ej. Nike" className={INPUT} /></div>
+
+                    <div><Lbl t="Material" /><input type="text" value={material} onChange={e => setMaterial(e.target.value)} placeholder="Ej. Cuero sintético y malla" className={INPUT} /></div>
+
+                  </div>
+
+
+
+                  <div>
+
+                    <Lbl t="Proveedor Principal (Órdenes de Compra Automáticas)" />
+
+                    <div className="flex gap-2">
+
+                      <select value={supplierId} onChange={e => setSupplierId(e.target.value)} className={`${INPUT} flex-1`}>
+
+                        <option value="">-- Sin Proveedor Asignado --</option>
+
+                        {listaProveedores.map(p => (
+
+                          <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
+
+                        ))}
+
+                      </select>
+
+                      <button type="button" onClick={() => { setQsContext('create'); setShowQuickSupplier(true); }}
+
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-xl flex items-center gap-1 shrink-0 transition-colors">
+
+                        <Plus size={12} /><span>Nuevo</span>
+
+                      </button>
+
+                    </div>
+
+                  </div>
+
+
+
+                  {/* Proveedores Alternos */}
+
+                  <div>
+
+                    <Lbl t="Proveedores Alternos (Suplencia / Alta Demanda)" />
+
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+
+                      {createAlternateIds.map(altId => {
+
+                        const prov = listaProveedores.find(p => p.id === altId);
+
+                        return prov ? (
+
+                          <span key={altId} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[10px] font-bold">
+
+                            <Truck size={10} />{prov.razonSocial}
+
+                            <button type="button" onClick={() => setCreateAlternateIds(prev => prev.filter(x => x !== altId))}
+
+                              className="text-rose-500 hover:text-rose-700 ml-0.5"><X size={10} /></button>
+
+                          </span>
+
+                        ) : null;
+
+                      })}
+
+                    </div>
+
+                    <select value="" onChange={e => {
+
+                      const val = e.target.value;
+
+                      if (val && !createAlternateIds.includes(val) && val !== supplierId) {
+
+                        setCreateAlternateIds(prev => [...prev, val]);
+
+                      }
+
+                    }} className={INPUT}>
+
+                      <option value="">-- Agregar proveedor alterno --</option>
+
+                      {listaProveedores.filter(p => p.id !== supplierId && !createAlternateIds.includes(p.id)).map(p => (
+
+                        <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
+
+                      ))}
+
+                    </select>
+
+                  </div>
 
                 </div>
 
-              </div>
+
+
+                {/* Sección 2: Variantes de Color */}
+
+                <div className="space-y-4">
+
+                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+
+                    <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest">2. Colores y Fotografías</h5>
+
+                    <button type="button" onClick={addColorField}
+
+                      className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A] hover:opacity-80 transition-opacity">
+
+                      <Plus size={12} /><span>Añadir Color</span>
+
+                    </button>
+
+                  </div>
 
 
 
-              {error && (
+                  <div className="space-y-3">
 
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                    {colors.map((cInput, idx) => (
 
-                  <AlertCircle size={14} /> {error}
+                      <div key={idx} className="flex gap-4 items-start bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-3 relative">
+
+                        <div className="w-16 h-16 bg-[var(--muted)]/40 border-2 border-dashed border-[var(--border)] rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+
+                          {cInput.foto ? <img src={cInput.foto} className="w-full h-full object-cover" alt="preview" />
+
+                            : <ImageIcon size={18} className="text-[var(--muted-foreground)] opacity-40" />}
+
+                        </div>
+
+                        <div className="flex-1 space-y-2">
+
+                          <div className="flex items-center justify-between">
+
+                            <Lbl t={`Nombre de Color #${idx + 1}`} req />
+
+                            {colors.length > 1 && (
+
+                              <button type="button" onClick={() => removeColorField(idx)}
+
+                                className="text-[10px] font-bold text-red-500 hover:opacity-80 transition-opacity">
+
+                                Eliminar
+
+                              </button>
+
+                            )}
+
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+
+                            <input type="text" value={cInput.color} onChange={e => setColors(prev => {
+
+                              const copy = [...prev];
+
+                              copy[idx].color = e.target.value;
+
+                              return copy;
+
+                            })} placeholder="Ej. Blanco / Negro-Rojo" className="w-full px-2 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs focus:outline-none focus:border-[#0F172A]" />
+
+
+
+                            <input type="file" accept="image/*" onChange={e => handleFoto(idx, e)}
+
+                              className="w-full text-[10px] text-[var(--muted-foreground)] file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-slate-900 file:text-white file:text-[9px] file:font-semibold hover:file:opacity-90 cursor-pointer" />
+
+                          </div>
+
+                          {/* Selector opcional de taller para este color */}
+
+                          {listaProveedores.length > 0 && (
+
+                            <div className="pt-1">
+
+                              <select
+
+                                value={cInput.supplierId || ""}
+
+                                onChange={e => setColors(prev => {
+
+                                  const copy = [...prev];
+
+                                  copy[idx].supplierId = e.target.value;
+
+                                  return copy;
+
+                                })}
+
+                                className="w-full px-2 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-[11px] text-[var(--foreground)]"
+
+                              >
+
+                                <option value="">-- Proveedor Principal del Modelo --</option>
+
+                                {listaProveedores.map(p => (
+
+                                  <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
+
+                                ))}
+
+                              </select>
+
+                            </div>
+
+                          )}
+
+                        </div>
+
+                      </div>
+
+                    ))}
+
+                  </div>
 
                 </div>
 
-              )}
+
+
+                {/* Sección 3: Series y Precios */}
+
+                <div className="space-y-4">
+
+                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+
+                    <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest">3. Series y Precios</h5>
+
+                    <button type="button" onClick={() => { setNewSerieNombre(""); setNewSerieTallasDesde("38"); setNewSerieTallasHasta("43"); setError(""); setShowCreateSeriesModal(true); }}
+
+                      className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A] hover:underline">
+
+                      <Plus size={13} /> <span>Crear Nueva Serie</span>
+
+                    </button>
+
+                  </div>
+
+                  <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">Activa las series que deseas generar, personaliza sus tallas y define precios.</p>
+
+
+
+                  <div className="space-y-3">
+
+                    {getSeriesParaModelo(undefined, series).map(s => {
+
+                      const isActive = serieIds.includes(s.id);
+
+                      const prices = seriesPrices[s.id] || { costPrice: "", salePrice: "" };
+
+                      const selectedTallaIds = customTallas[s.id] || [];
+
+
+
+                      return (
+
+                        <div key={s.id} className={`rounded-xl border transition-all overflow-hidden ${isActive
+
+                          ? "border-[#0F172A] bg-[#0F172A]/5 shadow-sm"
+
+                          : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
+
+                          }`}>
+
+                          {/* Toggle Header */}
+
+                          <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
+
+                            <div className="flex items-center gap-3 cursor-pointer" onClick={() => toggleSerie(s.id)}>
+
+                              <div className={`w-10 h-5 rounded-full relative transition-colors ${isActive ? "bg-[#0F172A]" : "bg-[var(--border)]"
+
+                                }`}>
+
+                                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isActive ? "translate-x-5" : "translate-x-0.5"
+
+                                  }`} />
+
+                              </div>
+
+                              <span className={`text-sm font-bold ${isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
+
+                                }`}>{getNombreSerie(s, series)}</span>
+
+                            </div>
+
+
+
+                            <div className="flex items-center gap-2">
+
+                              <button type="button" onClick={() => openEditSeriesModal(s)}
+
+                                className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)]/50 transition-colors flex items-center gap-1 text-[11px] font-semibold"
+
+                                title="Editar rango o nombre de esta serie">
+
+                                <Edit2 size={13} />
+
+                                <span>Editar</span>
+
+                              </button>
+
+                              {!SERIES_CANONICAS.includes(s.nombre) && (
+
+                                <button type="button" onClick={(ev) => { ev.stopPropagation(); handleDeleteSeries(s); }}
+
+                                  className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-500/10 transition-colors flex items-center gap-1 text-[11px] font-semibold"
+
+                                  title={`Eliminar serie duplicada "${s.nombre}"`}>
+
+                                  <Trash2 size={13} />
+
+                                  <span>Eliminar</span>
+
+                                </button>
+
+                              )}
+
+                              {isActive && (
+
+                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">ACTIVA</span>
+
+                              )}
+
+                            </div>
+
+                          </div>
+
+
+
+                          {/* Detalle si la serie está activa */}
+
+                          {isActive && (() => {
+
+                            const costVal = parseDecimalNumber(prices.costPrice);
+
+                            const saleVal = parseDecimalNumber(prices.salePrice);
+
+                            const hasCost = !isNaN(costVal) && costVal > 0;
+
+                            const hasSale = !isNaN(saleVal) && saleVal > 0;
+
+                            const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
+
+                            const isLoss = hasCost && hasSale && saleVal < costVal;
+
+                            const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
+
+                            const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
+
+                            const suggestedProfit = hasCost && suggestedSale ? (parseFloat(suggestedSale) - costVal).toFixed(2) : "0.00";
+
+
+
+                            return (
+
+                              <div className="px-4 pb-4 pt-3 space-y-3">
+
+                                {/* Inputs de Precio */}
+
+                                <div className="grid grid-cols-2 gap-3">
+
+                                  <div>
+
+                                    <Lbl t="Precio de Compra ($)" req />
+
+                                    <input type="text" inputMode="decimal"
+
+                                      value={prices.costPrice}
+
+                                      onChange={e => {
+
+                                        const val = normalizeDecimalInput(e.target.value);
+
+                                        setSeriesPrices(prev => ({
+
+                                          ...prev,
+
+                                          [s.id]: { ...prev[s.id], costPrice: val }
+
+                                        }));
+
+                                      }}
+
+                                      placeholder="0.00" className={INPUT} />
+
+                                  </div>
+
+                                  <div>
+
+                                    <Lbl t="Precio de Venta ($)" req />
+
+                                    <input type="text" inputMode="decimal"
+
+                                      value={prices.salePrice}
+
+                                      onChange={e => {
+
+                                        const val = normalizeDecimalInput(e.target.value);
+
+                                        setSeriesPrices(prev => ({
+
+                                          ...prev,
+
+                                          [s.id]: { ...prev[s.id], salePrice: val }
+
+                                        }));
+
+                                      }}
+
+                                      placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
+
+                                      className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
+
+                                  </div>
+
+                                </div>
+
+
+
+                                {/* Indicador de Margen Configurable */}
+
+                                {hasCost && (
+
+                                  <div className="text-[11px] font-semibold">
+
+                                    {hasSale ? (
+
+                                      isLoss ? (
+
+                                        <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
+
+                                          <AlertCircle size={14} className="shrink-0 animate-bounce" />
+
+                                          <span>Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+
+                                        </div>
+
+                                      ) : (
+
+                                        <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
+
+                                          <CheckCircle size={14} className="shrink-0" />
+
+                                          <span>Margen de ganancia: <strong className="font-extrabold">{marginPercent.toFixed(1)}%</strong> (+${profitAmount.toFixed(2)} de utilidad por par)</span>
+
+                                        </div>
+
+                                      )
+
+                                    ) : (
+
+                                      <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
+
+                                        <DollarSign size={14} className="shrink-0" />
+
+                                        <span>Precio sugerido ({marginPct}% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${suggestedProfit}/par)</span>
+
+                                      </div>
+
+                                    )}
+
+                                  </div>
+
+                                )}
+
+
+
+                                {/* Componente de Curva de Tallas con Steppers */}
+
+                                <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
+
+                                  <div className="flex items-center justify-between">
+
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+
+                                      Serie: {getNombreSerie(s, series).toUpperCase()}
+
+                                    </span>
+
+                                    <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
+
+                                      = {selectedTallaIds.length} pares total
+
+                                    </span>
+
+                                  </div>
+
+
+
+                                  {/* Steppers por talla */}
+
+                                  <div className="flex flex-wrap gap-2">
+
+                                    {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
+
+                                      const count = selectedTallaIds.filter(id => id === t.id).length;
+
+                                      return (
+
+                                        <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
+
+                                          <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
+
+                                          <button type="button"
+
+                                            onClick={() => removeOneTallaInSerie(s.id, t.id)}
+
+                                            className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors"
+
+                                          >−</button>
+
+                                          <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
+
+                                          <button type="button"
+
+                                            onClick={() => addTallaRepeatInSerie(s.id, t.id)}
+
+                                            className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors"
+
+                                          >+</button>
+
+                                        </div>
+
+                                      );
+
+                                    })}
+
+                                  </div>
+
+
+
+                                  {/* Total de pares y botón para restablecer docena estándar */}
+
+                                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/30">
+
+                                    <div className="flex items-center gap-2">
+
+                                      <span className="text-[11px] font-bold text-[var(--foreground)] font-mono">
+
+                                        = {selectedTallaIds.length} pares total ({getDocenaLabelExt(selectedTallaIds.length)})
+
+                                      </span>
+
+                                      {selectedTallaIds.length !== 12 && (
+
+                                        <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
+
+                                          Una docena estándar suma 12 pares
+
+                                        </span>
+
+                                      )}
+
+                                    </div>
+
+                                    <button
+
+                                      type="button"
+
+                                      onClick={() => restablecerDocenaEstandarEnCreacion(s.id)}
+
+                                      className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+
+                                      title="Restablecer curva base estándar (38 al 42 con 39 y 40 repetidos = 12 pares)"
+
+                                    >
+
+                                      <RefreshCw size={11} />
+
+                                      <span>Restablecer estándar (38-42)</span>
+
+                                    </button>
+
+                                  </div>
+
+
+
+                                  {/* Selección de Stock Inicial para Bodega */}
+
+                                  <div className="space-y-1.5 pt-2 border-t border-[var(--border)]/40">
+
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+
+                                      Stock Inicial en Bodega para este modelo:
+
+                                    </span>
+
+                                    <div className="flex flex-wrap gap-2">
+
+                                      <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'DOCENA')}
+
+                                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${(stockOptionCreacion[s.id] || 'DOCENA') === 'DOCENA'
+
+                                          ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
+
+                                          : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
+
+                                          }`}
+
+                                      >
+
+                                        {(stockOptionCreacion[s.id] || 'DOCENA') === 'DOCENA' && <Check size={13} />}
+
+                                        1 Docena en Bodega (12 pares según serie de arriba)
+
+                                      </button>
+
+                                      <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'NINGUNA')}
+
+                                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${stockOptionCreacion[s.id] === 'NINGUNA'
+
+                                          ? "border-slate-600 bg-slate-700 text-white shadow-xs"
+
+                                          : "border-slate-300 dark:border-slate-700 bg-[var(--card)] hover:bg-rose-500/10 text-rose-600"
+
+                                          }`}
+
+                                      >
+
+                                        {stockOptionCreacion[s.id] === 'NINGUNA' && <Check size={13} />}
+
+                                        Sin Stock Inicial (0 pares, solo catálogo para pedidos)
+
+                                      </button>
+
+                                    </div>
+
+                                  </div>
+
+                                </div>
+
+                              </div>
+
+                            );
+
+                          })()}
+
+                        </div>
+
+                      );
+
+                    })}
+
+                  </div>
+
+
+
+                  <div className="bg-[var(--muted)]/20 border border-[var(--border)] p-3.5 sm:p-4 rounded-2xl space-y-3">
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)]/40 pb-2.5">
+
+                      <div className="flex items-center gap-2">
+
+                        <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+
+                          <PackageCheck size={18} />
+
+                        </div>
+
+                        <div>
+
+                          <h6 className="text-xs font-black text-[var(--foreground)] uppercase tracking-wider">
+
+                            Stock Inicial por Talla y Curva
+
+                          </h6>
+
+                          <p className="text-[10px] text-[var(--muted-foreground)]">
+
+                            Selecciona el tipo de curva deseada para cada serie o aplica a todas
+
+                          </p>
+
+                        </div>
+
+                      </div>
+
+
+
+                      {serieIds.length > 0 && (
+
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
+
+                          <span className="text-[10px] font-bold text-[var(--muted-foreground)] mr-1">Aplicar a todas:</span>
+
+                          <button type="button" onClick={() => aplicarCurvaATodasEnCreacion('MEDIA_A')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 cursor-pointer">Media A (6)</button>
+
+                          <button type="button" onClick={() => aplicarCurvaATodasEnCreacion('MEDIA_B')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 cursor-pointer">Media B (6)</button>
+
+                          <button type="button" onClick={() => aplicarCurvaATodasEnCreacion('DOCENA')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 cursor-pointer">1 Docena (12)</button>
+
+                          <button type="button" onClick={() => aplicarCurvaATodasEnCreacion('NINGUNA')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-slate-500/30 bg-slate-500/10 text-slate-700 hover:bg-slate-500/20 cursor-pointer">Sin Stock (0)</button>
+
+                        </div>
+
+                      )}
+
+                    </div>
+
+
+
+                    {(() => {
+
+                      const totalParesLote = Object.values(customTallas).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+
+                      return (
+
+                        <div className="flex items-center gap-2.5 p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl">
+
+                          {totalParesLote > 0 ? (
+
+                            <>
+
+                              <CheckCircle size={16} className="text-emerald-500 shrink-0" />
+
+                              <div className="text-xs text-[var(--foreground)] leading-relaxed">
+
+                                Se creará un stock inicial de <strong className="font-extrabold text-emerald-600">{totalParesLote} pares</strong> <span className="font-semibold text-[var(--muted-foreground)]">({getDocenaLabelExt(totalParesLote)})</span> por cada color generado.
+
+                              </div>
+
+                            </>
+
+                          ) : (
+
+                            <>
+
+                              <Info size={16} className="text-slate-400 shrink-0" />
+
+                              <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+
+                                <strong className="font-bold text-[var(--foreground)]">Sin stock inicial (0 pares):</strong> Se registrarán las variantes en el catálogo sin unidades físicas.
+
+                              </div>
+
+                            </>
+
+                          )}
+
+                        </div>
+
+                      );
+
+                    })()}
+
+                  </div>
+
+                </div>
+
+
+
+                {error && (
+
+                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+
+                    <AlertCircle size={14} /> {error}
+
+                  </div>
+
+                )}
 
               </div>
 
@@ -8948,161 +8910,789 @@ export default function ModelosComponent({
 
               <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
 
-              {/* Sección 1: Detalle del Color */}
+                {/* Sección 1: Detalle del Color */}
 
-              <div className="space-y-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-4">
+                <div className="space-y-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-4">
 
-                <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">
+                  <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">
 
-                  1. Detalle del Nuevo Color
+                    1. Detalle del Nuevo Color
 
-                </h5>
+                  </h5>
 
-                <div className="flex gap-4 items-start">
+                  <div className="flex gap-4 items-start">
 
-                  <div className="w-16 h-16 bg-[var(--muted)]/40 border-2 border-dashed border-[var(--border)] rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                    <div className="w-16 h-16 bg-[var(--muted)]/40 border-2 border-dashed border-[var(--border)] rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
 
-                    {newColorFoto ? (
+                      {newColorFoto ? (
 
-                      <img src={newColorFoto} className="w-full h-full object-cover" alt="preview" />
+                        <img src={newColorFoto} className="w-full h-full object-cover" alt="preview" />
 
-                    ) : (
+                      ) : (
 
-                      <ImageIcon size={18} className="text-[var(--muted-foreground)] opacity-40" />
+                        <ImageIcon size={18} className="text-[var(--muted-foreground)] opacity-40" />
 
-                    )}
-
-                  </div>
-
-                  <div className="flex-1 space-y-2">
-
-                    <Lbl t="Nombre del Color" req />
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-
-                      <input
-
-                        type="text"
-
-                        list="model-existing-colors-datalist"
-
-                        value={newColorName}
-
-                        onChange={e => setNewColorName(e.target.value)}
-
-                        onBlur={() => setNewColorName(prev => formatearColorEstandar(prev))}
-
-                        placeholder="Ej. Azul Marino / Blanco"
-
-                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-
-                      />
-
-                      <input
-
-                        type="file"
-
-                        accept="image/*"
-
-                        onChange={handleNewColorFoto}
-
-                        className="w-full text-[10px] text-[var(--muted-foreground)] file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-slate-900 file:text-white file:text-[9px] file:font-semibold hover:file:opacity-90 cursor-pointer"
-
-                      />
+                      )}
 
                     </div>
 
-                    {(() => {
+                    <div className="flex-1 space-y-2">
 
-                      const existingColorLabels = Array.from(
+                      <Lbl t="Nombre del Color" req />
 
-                        new Set(
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
 
-                          (selectedModelForColor.products || [])
+                        <input
 
-                            .map(p => formatearColorEstandar(p.color))
+                          type="text"
 
-                            .filter(Boolean)
+                          list="model-existing-colors-datalist"
 
-                        )
+                          value={newColorName}
 
-                      );
+                          onChange={e => setNewColorName(e.target.value)}
 
-                      if (existingColorLabels.length === 0) return null;
+                          onBlur={() => setNewColorName(prev => formatearColorEstandar(prev))}
+
+                          placeholder="Ej. Azul Marino / Blanco"
+
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+
+                        />
+
+                        <input
+
+                          type="file"
+
+                          accept="image/*"
+
+                          onChange={handleNewColorFoto}
+
+                          className="w-full text-[10px] text-[var(--muted-foreground)] file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-slate-900 file:text-white file:text-[9px] file:font-semibold hover:file:opacity-90 cursor-pointer"
+
+                        />
+
+                      </div>
+
+                      {(() => {
+
+                        const existingColorLabels = Array.from(
+
+                          new Set(
+
+                            (selectedModelForColor.products || [])
+
+                              .map(p => formatearColorEstandar(p.color))
+
+                              .filter(Boolean)
+
+                          )
+
+                        );
+
+                        if (existingColorLabels.length === 0) return null;
 
 
 
-                      // Filtrar chips si el usuario ya escribió algo
+                        // Filtrar chips si el usuario ya escribió algo
 
-                      const searchTrim = newColorName.trim().toLowerCase();
+                        const searchTrim = newColorName.trim().toLowerCase();
 
-                      const filteredChips = searchTrim
+                        const filteredChips = searchTrim
 
-                        ? existingColorLabels.filter(c => c.toLowerCase().includes(searchTrim))
+                          ? existingColorLabels.filter(c => c.toLowerCase().includes(searchTrim))
 
-                        : existingColorLabels;
+                          : existingColorLabels;
 
 
 
-                      return (
+                        return (
 
-                        <>
+                          <>
 
-                          <datalist id="model-existing-colors-datalist">
+                            <datalist id="model-existing-colors-datalist">
 
-                            {existingColorLabels.map(col => (
+                              {existingColorLabels.map(col => (
 
-                              <option key={col} value={col} />
+                                <option key={col} value={col} />
 
-                            ))}
+                              ))}
 
-                          </datalist>
+                            </datalist>
 
-                          {filteredChips.length > 0 && (
+                            {filteredChips.length > 0 && (
 
-                            <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                              <div className="flex items-center gap-1.5 flex-wrap pt-1">
 
-                              <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
+                                <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
 
-                                {searchTrim ? 'Sugerencias:' : 'Colores ya existentes:'}
+                                  {searchTrim ? 'Sugerencias:' : 'Colores ya existentes:'}
 
-                              </span>
+                                </span>
 
-                              {filteredChips.map(col => (
+                                {filteredChips.map(col => (
 
-                                <button
+                                  <button
 
-                                  type="button"
+                                    type="button"
 
-                                  key={col}
+                                    key={col}
 
-                                  onClick={() => setNewColorName(col)}
+                                    onClick={() => setNewColorName(col)}
 
-                                  title={`Seleccionar color existente "${col}" para añadir este nuevo proveedor`}
+                                    title={`Seleccionar color existente "${col}" para añadir este nuevo proveedor`}
 
-                                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
-
-                                    normalizeColor(newColorName) === normalizeColor(col)
+                                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${normalizeColor(newColorName) === normalizeColor(col)
 
                                       ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
 
                                       : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-slate-400'
 
-                                  }`}
+                                      }`}
 
-                                >
+                                  >
 
-                                  {col}
+                                    {col}
 
-                                </button>
+                                  </button>
 
-                              ))}
+                                ))}
+
+                              </div>
+
+                            )}
+
+                          </>
+
+                        );
+
+                      })()}
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+
+
+                {/* Sección 2: Proveedor Fabricante de esta Variante */}
+
+                <div className="space-y-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-4">
+
+                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+
+                    <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest flex items-center gap-1.5">
+
+                      <Truck size={14} className="text-emerald-600" />
+
+                      <span>2. Proveedor Fabricante</span>
+
+                    </h5>
+
+                  </div>
+
+                  <p className="text-[10px] text-[var(--muted-foreground)] -mt-1">
+
+                    Selecciona el proveedor que suministra esta variante. El precio de costo que ingreses abajo corresponderá al valor entregado por este proveedor.
+
+                  </p>
+
+                  <div className="space-y-2">
+
+                    <Lbl t="Proveedor Asignado a esta Variante" />
+
+                    <div className="flex gap-2">
+
+                      <select
+
+                        value={newColorSupplierId}
+
+                        onChange={e => handleSupplierChangeInAddColor(e.target.value)}
+
+                        className={`${INPUT} flex-1 font-medium`}
+
+                      >
+
+                        <option value="">-- Sin proveedor específico (Heredar del modelo) --</option>
+
+                        {listaProveedores.map(p => {
+
+                          const isPrimary = p.id === selectedModelForColor.supplierId;
+
+                          const isAlternate = (selectedModelForColor.alternateSupplierIds || []).includes(p.id);
+
+                          return (
+
+                            <option key={p.id} value={p.id}>
+
+                              {p.razonSocial} {p.ruc ? `(${p.ruc})` : ''} {isPrimary ? '[Principal del Modelo]' : isAlternate ? '[Alterno del Modelo]' : ''}
+
+                            </option>
+
+                          );
+
+                        })}
+
+                      </select>
+
+                      <button
+
+                        type="button"
+
+                        onClick={() => { setQsContext('addColor'); setShowQuickSupplier(true); }}
+
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl flex items-center gap-1 shrink-0 transition-colors shadow-xs cursor-pointer"
+
+                        title="Registrar nuevo proveedor al vuelo"
+
+                      >
+
+                        <Plus size={13} />
+
+                        <span>Nuevo</span>
+
+                      </button>
+
+                    </div>
+
+
+
+                    {newColorSupplierId && (
+
+                      <div className="flex items-center gap-2 pt-1 text-[11px] text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg">
+
+                        <CheckCircle size={13} className="shrink-0" />
+
+                        <span>
+
+                          Variante vinculada a: <strong>{listaProveedores.find(p => p.id === newColorSupplierId)?.razonSocial || 'Proveedor seleccionado'}</strong>
+
+                        </span>
+
+                      </div>
+
+                    )}
+
+                  </div>
+
+                </div>
+
+
+
+                {/* Sección 3: Series y Precios para este Color */}
+
+                <div className="space-y-4">
+
+                  <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">
+
+                    3. Series y Precios de Entrega (Costo) y Venta
+
+                  </h5>
+
+                  <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">
+
+                    Activa las series que deseas generar para este nuevo color y asigna el precio de entrega del proveedor y el precio de venta al público.
+
+                  </p>
+
+
+
+                  <div className="space-y-3">
+
+                    {getSeriesParaModelo(selectedModelForColor?.id, series).map(s => {
+
+                      const isActive = newColorSerieIds.includes(s.id);
+
+                      const prices = newColorSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
+
+                      const selectedTallaIds = newColorCustomTallas[s.id] || [];
+
+
+
+                      return (
+
+                        <div key={s.id} className={`rounded-xl border transition-all overflow-hidden ${isActive
+
+                          ? "border-[#0F172A] bg-[#0F172A]/5 shadow-sm"
+
+                          : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
+
+                          }`}>
+
+                          {/* Toggle Header */}
+
+                          <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
+
+                            <div className="flex items-center gap-3 cursor-pointer" onClick={() => toggleNewColorSerie(s.id)}>
+
+                              <div className={`w-10 h-5 rounded-full relative transition-colors ${isActive ? "bg-[#0F172A]" : "bg-[var(--border)]"
+
+                                }`}>
+
+                                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isActive ? "translate-x-5" : "translate-x-0.5"
+
+                                  }`} />
+
+                              </div>
+
+                              <span className={`text-sm font-bold ${isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
+
+                                }`}>{getNombreSerie(s, series)}</span>
 
                             </div>
 
+
+
+                            {isActive && (
+
+                              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">ACTIVA</span>
+
+                            )}
+
+                          </div>
+
+
+
+                          {/* Inputs de Precio */}
+
+                          {isActive && (() => {
+
+                            const costVal = parseDecimalNumber(prices.costPrice);
+
+                            const saleVal = parseDecimalNumber(prices.salePrice);
+
+                            const hasCost = !isNaN(costVal) && costVal > 0;
+
+                            const hasSale = !isNaN(saleVal) && saleVal > 0;
+
+                            const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
+
+                            const isLoss = hasCost && hasSale && saleVal < costVal;
+
+                            const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
+
+                            const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
+
+                            const suggestedProfit = hasCost && suggestedSale ? (parseFloat(suggestedSale) - costVal).toFixed(2) : "0.00";
+
+
+
+                            return (
+
+                              <div className="px-4 pb-4 pt-3 space-y-3">
+
+                                <div className="grid grid-cols-2 gap-3">
+
+                                  <div>
+
+                                    <Lbl t="Precio Entrega Proveedor ($)" req />
+
+                                    <input type="text" inputMode="decimal"
+
+                                      value={prices.costPrice}
+
+                                      onChange={e => {
+
+                                        const val = normalizeDecimalInput(e.target.value);
+
+                                        setNewColorSeriesPrices(prev => ({
+
+                                          ...prev,
+
+                                          [s.id]: { ...prev[s.id], costPrice: val }
+
+                                        }));
+
+                                      }}
+
+                                      placeholder="0.00" className={INPUT} />
+
+                                  </div>
+
+                                  <div>
+
+                                    <div className="flex items-center justify-between">
+
+                                      <Lbl t="Precio de Venta ($)" req />
+
+                                      {hasCost && suggestedSale && (
+
+                                        <button
+
+                                          type="button"
+
+                                          onClick={() => setNewColorSeriesPrices(prev => ({
+
+                                            ...prev,
+
+                                            [s.id]: { ...prev[s.id], salePrice: suggestedSale }
+
+                                          }))}
+
+                                          className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
+
+                                          title="Auto-asignar precio sugerido con margen de ganancia"
+
+                                        >
+
+                                          Auto: ${suggestedSale}
+
+                                        </button>
+
+                                      )}
+
+                                    </div>
+
+                                    <input type="text" inputMode="decimal"
+
+                                      value={prices.salePrice}
+
+                                      onChange={e => {
+
+                                        const val = normalizeDecimalInput(e.target.value);
+
+                                        setNewColorSeriesPrices(prev => ({
+
+                                          ...prev,
+
+                                          [s.id]: { ...prev[s.id], salePrice: val }
+
+                                        }));
+
+                                      }}
+
+                                      placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
+
+                                      className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
+
+                                  </div>
+
+                                </div>
+
+
+
+                                {/* Indicadores de Ganancia */}
+
+                                {hasCost && (
+
+                                  <div className="text-[11px] font-semibold pt-1">
+
+                                    {hasSale ? (
+
+                                      isLoss ? (
+
+                                        <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
+
+                                          <AlertCircle size={14} className="shrink-0 animate-bounce" />
+
+                                          <span>Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+
+                                        </div>
+
+                                      ) : (
+
+                                        <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
+
+                                          <CheckCircle size={14} className="shrink-0" />
+
+                                          <span>Margen de ganancia: <strong className="font-extrabold">{marginPercent.toFixed(1)}%</strong> (+${profitAmount.toFixed(2)} de utilidad por par)</span>
+
+                                        </div>
+
+                                      )
+
+                                    ) : (
+
+                                      <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
+
+                                        <DollarSign size={14} className="shrink-0" />
+
+                                        <span>Precio sugerido ({marginPct}% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${suggestedProfit}/par)</span>
+
+                                      </div>
+
+                                    )}
+
+                                  </div>
+
+                                )}
+
+
+
+                                {/* Componente de Curva de Tallas con Steppers */}
+
+                                <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
+
+                                  <div className="flex items-center justify-between">
+
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+
+                                      Serie: {getNombreSerie(s, series).toUpperCase()}
+
+                                    </span>
+
+                                    <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
+
+                                      = {selectedTallaIds.length} pares total
+
+                                    </span>
+
+                                  </div>
+
+
+
+                                  {/* Steppers por talla */}
+
+                                  <div className="flex flex-wrap gap-2">
+
+                                    {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
+
+                                      const count = selectedTallaIds.filter(id => id === t.id).length;
+
+                                      return (
+
+                                        <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
+
+                                          <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
+
+                                          <button type="button"
+
+                                            onClick={() => removeOneTallaInNewColorSerie(s.id, t.id)}
+
+                                            className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors"
+
+                                          >−</button>
+
+                                          <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
+
+                                          <button type="button"
+
+                                            onClick={() => addTallaRepeatInNewColorSerie(s.id, t.id)}
+
+                                            className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors"
+
+                                          >+</button>
+
+                                        </div>
+
+                                      );
+
+                                    })}
+
+                                  </div>
+
+
+
+                                  {/* Total de pares y botón para restablecer docena estándar */}
+
+                                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/30">
+
+                                    <div className="flex items-center gap-2">
+
+                                      <span className="text-[11px] font-bold text-[var(--foreground)] font-mono">
+
+                                        = {selectedTallaIds.length} pares total ({getDocenaLabelExt(selectedTallaIds.length)})
+
+                                      </span>
+
+                                      {selectedTallaIds.length !== 12 && (
+
+                                        <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
+
+                                          Una docena estándar suma 12 pares
+
+                                        </span>
+
+                                      )}
+
+                                    </div>
+
+                                    <button
+
+                                      type="button"
+
+                                      onClick={() => restablecerDocenaEstandarEnNuevoColor(s.id)}
+
+                                      className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+
+                                      title="Restablecer curva base estándar (38 al 42 con 39 y 40 repetidos = 12 pares)"
+
+                                    >
+
+                                      <RefreshCw size={11} />
+
+                                      <span>Restablecer estándar (38-42)</span>
+
+                                    </button>
+
+                                  </div>
+
+
+
+                                  {/* Selección de Stock Inicial para Bodega */}
+
+                                  <div className="space-y-1.5 pt-2 border-t border-[var(--border)]/40">
+
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+
+                                      Stock Inicial en Bodega para esta variante:
+
+                                    </span>
+
+                                    <div className="flex flex-wrap gap-2">
+
+                                      <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'DOCENA')}
+
+                                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${(newColorStockOption[s.id] || 'DOCENA') === 'DOCENA'
+
+                                          ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
+
+                                          : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
+
+                                          }`}
+
+                                      >
+
+                                        {(newColorStockOption[s.id] || 'DOCENA') === 'DOCENA' && <Check size={13} />}
+
+                                        1 Docena en Bodega (12 pares según serie de arriba)
+
+                                      </button>
+
+                                      <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'NINGUNA')}
+
+                                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${newColorStockOption[s.id] === 'NINGUNA'
+
+                                          ? "border-slate-600 bg-slate-700 text-white shadow-xs"
+
+                                          : "border-slate-300 dark:border-slate-700 bg-[var(--card)] hover:bg-rose-500/10 text-rose-600"
+
+                                          }`}
+
+                                      >
+
+                                        {newColorStockOption[s.id] === 'NINGUNA' && <Check size={13} />}
+
+                                        Sin Stock Inicial (0 pares, solo catálogo para pedidos)
+
+                                      </button>
+
+                                    </div>
+
+                                  </div>
+
+                                </div>
+
+                              </div>
+
+                            );
+
+                          })()}
+
+                        </div>
+
+                      );
+
+                    })}
+
+                  </div>
+
+
+
+                  <div className="bg-[var(--muted)]/20 border border-[var(--border)] p-3.5 sm:p-4 rounded-2xl space-y-3">
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)]/40 pb-2.5">
+
+                      <div className="flex items-center gap-2">
+
+                        <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+
+                          <PackageCheck size={18} />
+
+                        </div>
+
+                        <div>
+
+                          <h6 className="text-xs font-black text-[var(--foreground)] uppercase tracking-wider">
+
+                            Stock Inicial por Talla y Curva
+
+                          </h6>
+
+                          <p className="text-[10px] text-[var(--muted-foreground)]">
+
+                            Selecciona el tipo de curva deseada para cada serie o aplica a todas
+
+                          </p>
+
+                        </div>
+
+                      </div>
+
+
+
+                      {newColorSerieIds.length > 0 && (
+
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
+
+                          <span className="text-[10px] font-bold text-[var(--muted-foreground)] mr-1">Aplicar a todas:</span>
+
+                          <button type="button" onClick={() => aplicarCurvaATodasEnNuevoColor('MEDIA_A')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 cursor-pointer">Media A (6)</button>
+
+                          <button type="button" onClick={() => aplicarCurvaATodasEnNuevoColor('MEDIA_B')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 cursor-pointer">Media B (6)</button>
+
+                          <button type="button" onClick={() => aplicarCurvaATodasEnNuevoColor('DOCENA')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 cursor-pointer">1 Docena (12)</button>
+
+                          <button type="button" onClick={() => aplicarCurvaATodasEnNuevoColor('NINGUNA')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-slate-500/30 bg-slate-500/10 text-slate-700 hover:bg-slate-500/20 cursor-pointer">Sin Stock (0)</button>
+
+                        </div>
+
+                      )}
+
+                    </div>
+
+
+
+                    {(() => {
+
+                      const totalParesLote = Object.values(newColorCustomTallas).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+
+                      return (
+
+                        <div className="flex items-center gap-2.5 p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl">
+
+                          {totalParesLote > 0 ? (
+
+                            <>
+
+                              <CheckCircle size={16} className="text-emerald-500 shrink-0" />
+
+                              <div className="text-xs text-[var(--foreground)] leading-relaxed">
+
+                                Se creará un stock inicial de <strong className="font-extrabold text-emerald-600">{totalParesLote} pares</strong> <span className="font-semibold text-[var(--muted-foreground)]">({getDocenaLabelExt(totalParesLote)})</span> para este nuevo color.
+
+                              </div>
+
+                            </>
+
+                          ) : (
+
+                            <>
+
+                              <Info size={16} className="text-slate-400 shrink-0" />
+
+                              <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+
+                                <strong className="font-bold text-[var(--foreground)]">Sin stock inicial (0 pares):</strong> Se registrará la variante en el catálogo sin unidades físicas.
+
+                              </div>
+
+                            </>
+
                           )}
 
-                        </>
+                        </div>
 
                       );
 
@@ -9112,659 +9702,17 @@ export default function ModelosComponent({
 
                 </div>
 
-              </div>
 
 
+                {error && (
 
-              {/* Sección 2: Proveedor Fabricante de esta Variante */}
+                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
 
-              <div className="space-y-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-4">
-
-                <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
-
-                  <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest flex items-center gap-1.5">
-
-                    <Truck size={14} className="text-emerald-600" />
-
-                    <span>2. Proveedor Fabricante</span>
-
-                  </h5>
-
-                </div>
-
-                <p className="text-[10px] text-[var(--muted-foreground)] -mt-1">
-
-                  Selecciona el proveedor que suministra esta variante. El precio de costo que ingreses abajo corresponderá al valor entregado por este proveedor.
-
-                </p>
-
-                <div className="space-y-2">
-
-                  <Lbl t="Proveedor Asignado a esta Variante" />
-
-                  <div className="flex gap-2">
-
-                    <select
-
-                      value={newColorSupplierId}
-
-                      onChange={e => handleSupplierChangeInAddColor(e.target.value)}
-
-                      className={`${INPUT} flex-1 font-medium`}
-
-                    >
-
-                      <option value="">-- Sin proveedor específico (Heredar del modelo) --</option>
-
-                      {listaProveedores.map(p => {
-
-                        const isPrimary = p.id === selectedModelForColor.supplierId;
-
-                        const isAlternate = (selectedModelForColor.alternateSupplierIds || []).includes(p.id);
-
-                        return (
-
-                          <option key={p.id} value={p.id}>
-
-                            {p.razonSocial} {p.ruc ? `(${p.ruc})` : ''} {isPrimary ? '[Principal del Modelo]' : isAlternate ? '[Alterno del Modelo]' : ''}
-
-                          </option>
-
-                        );
-
-                      })}
-
-                    </select>
-
-                    <button
-
-                      type="button"
-
-                      onClick={() => { setQsContext('addColor'); setShowQuickSupplier(true); }}
-
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl flex items-center gap-1 shrink-0 transition-colors shadow-xs cursor-pointer"
-
-                      title="Registrar nuevo proveedor al vuelo"
-
-                    >
-
-                      <Plus size={13} />
-
-                      <span>Nuevo</span>
-
-                    </button>
+                    <AlertCircle size={14} /> {error}
 
                   </div>
 
-
-
-                  {newColorSupplierId && (
-
-                    <div className="flex items-center gap-2 pt-1 text-[11px] text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg">
-
-                      <CheckCircle size={13} className="shrink-0" />
-
-                      <span>
-
-                        Variante vinculada a: <strong>{listaProveedores.find(p => p.id === newColorSupplierId)?.razonSocial || 'Proveedor seleccionado'}</strong>
-
-                      </span>
-
-                    </div>
-
-                  )}
-
-                </div>
-
-              </div>
-
-
-
-              {/* Sección 3: Series y Precios para este Color */}
-
-              <div className="space-y-4">
-
-                <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">
-
-                  3. Series y Precios de Entrega (Costo) y Venta
-
-                </h5>
-
-                <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">
-
-                  Activa las series que deseas generar para este nuevo color y asigna el precio de entrega del proveedor y el precio de venta al público.
-
-                </p>
-
-
-
-                <div className="space-y-3">
-
-                  {getSeriesParaModelo(selectedModelForColor?.id, series).map(s => {
-
-                    const isActive = newColorSerieIds.includes(s.id);
-
-                    const prices = newColorSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
-
-                    const selectedTallaIds = newColorCustomTallas[s.id] || [];
-
-
-
-                    return (
-
-                      <div key={s.id} className={`rounded-xl border transition-all overflow-hidden ${
-
-                        isActive
-
-                          ? "border-[#0F172A] bg-[#0F172A]/5 shadow-sm"
-
-                          : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
-
-                      }`}>
-
-                        {/* Toggle Header */}
-
-                        <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
-
-                          <div className="flex items-center gap-3 cursor-pointer" onClick={() => toggleNewColorSerie(s.id)}>
-
-                            <div className={`w-10 h-5 rounded-full relative transition-colors ${
-
-                              isActive ? "bg-[#0F172A]" : "bg-[var(--border)]"
-
-                            }`}>
-
-                              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-
-                                isActive ? "translate-x-5" : "translate-x-0.5"
-
-                              }`} />
-
-                            </div>
-
-                            <span className={`text-sm font-bold ${
-
-                              isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
-
-                            }`}>{getNombreSerie(s, series)}</span>
-
-                          </div>
-
-
-
-                          {isActive && (
-
-                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">ACTIVA</span>
-
-                          )}
-
-                        </div>
-
-
-
-                        {/* Inputs de Precio */}
-
-                        {isActive && (() => {
-
-                          const costVal = parseDecimalNumber(prices.costPrice);
-
-                          const saleVal = parseDecimalNumber(prices.salePrice);
-
-                          const hasCost = !isNaN(costVal) && costVal > 0;
-
-                          const hasSale = !isNaN(saleVal) && saleVal > 0;
-
-                          const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
-
-                          const isLoss = hasCost && hasSale && saleVal < costVal;
-
-                          const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
-
-                          const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
-
-                          const suggestedProfit = hasCost && suggestedSale ? (parseFloat(suggestedSale) - costVal).toFixed(2) : "0.00";
-
-
-
-                          return (
-
-                            <div className="px-4 pb-4 pt-3 space-y-3">
-
-                              <div className="grid grid-cols-2 gap-3">
-
-                                <div>
-
-                                  <Lbl t="Precio Entrega Proveedor ($)" req />
-
-                                  <input type="text" inputMode="decimal"
-
-                                    value={prices.costPrice}
-
-                                    onChange={e => {
-
-                                      const val = normalizeDecimalInput(e.target.value);
-
-                                      setNewColorSeriesPrices(prev => ({
-
-                                        ...prev,
-
-                                        [s.id]: { ...prev[s.id], costPrice: val }
-
-                                      }));
-
-                                    }}
-
-                                    placeholder="0.00" className={INPUT} />
-
-                                </div>
-
-                                <div>
-
-                                  <div className="flex items-center justify-between">
-
-                                    <Lbl t="Precio de Venta ($)" req />
-
-                                    {hasCost && suggestedSale && (
-
-                                      <button
-
-                                        type="button"
-
-                                        onClick={() => setNewColorSeriesPrices(prev => ({
-
-                                          ...prev,
-
-                                          [s.id]: { ...prev[s.id], salePrice: suggestedSale }
-
-                                        }))}
-
-                                        className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
-
-                                        title="Auto-asignar precio sugerido con margen de ganancia"
-
-                                      >
-
-                                        Auto: ${suggestedSale}
-
-                                      </button>
-
-                                    )}
-
-                                  </div>
-
-                                  <input type="text" inputMode="decimal"
-
-                                    value={prices.salePrice}
-
-                                    onChange={e => {
-
-                                      const val = normalizeDecimalInput(e.target.value);
-
-                                      setNewColorSeriesPrices(prev => ({
-
-                                        ...prev,
-
-                                        [s.id]: { ...prev[s.id], salePrice: val }
-
-                                      }));
-
-                                    }}
-
-                                    placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
-
-                                    className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
-
-                                </div>
-
-                              </div>
-
-
-
-                              {/* Indicadores de Ganancia */}
-
-                              {hasCost && (
-
-                                <div className="text-[11px] font-semibold pt-1">
-
-                                  {hasSale ? (
-
-                                    isLoss ? (
-
-                                      <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
-
-                                        <AlertCircle size={14} className="shrink-0 animate-bounce" />
-
-                                        <span>Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
-
-                                      </div>
-
-                                    ) : (
-
-                                      <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
-
-                                        <CheckCircle size={14} className="shrink-0" />
-
-                                        <span>Margen de ganancia: <strong className="font-extrabold">{marginPercent.toFixed(1)}%</strong> (+${profitAmount.toFixed(2)} de utilidad por par)</span>
-
-                                      </div>
-
-                                    )
-
-                                  ) : (
-
-                                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
-
-                                      <DollarSign size={14} className="shrink-0" />
-
-                                      <span>Precio sugerido ({marginPct}% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${suggestedProfit}/par)</span>
-
-                                    </div>
-
-                                  )}
-
-                                </div>
-
-                              )}
-
-
-
-                              {/* Componente de Curva de Tallas con Steppers */}
-
-                              <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
-
-                                <div className="flex items-center justify-between">
-
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-
-                                    Serie: {getNombreSerie(s, series).toUpperCase()}
-
-                                  </span>
-
-                                  <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
-
-                                    = {selectedTallaIds.length} pares total
-
-                                  </span>
-
-                                </div>
-
-
-
-                                {/* Steppers por talla */}
-
-                                <div className="flex flex-wrap gap-2">
-
-                                  {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
-
-                                    const count = selectedTallaIds.filter(id => id === t.id).length;
-
-                                    return (
-
-                                      <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
-
-                                        <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
-
-                                        <button type="button"
-
-                                          onClick={() => removeOneTallaInNewColorSerie(s.id, t.id)}
-
-                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors"
-
-                                        >−</button>
-
-                                        <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
-
-                                        <button type="button"
-
-                                          onClick={() => addTallaRepeatInNewColorSerie(s.id, t.id)}
-
-                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors"
-
-                                        >+</button>
-
-                                      </div>
-
-                                    );
-
-                                  })}
-
-                                </div>
-
-
-
-                                {/* Total de pares y botón para restablecer docena estándar */}
-
-                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/30">
-
-                                  <div className="flex items-center gap-2">
-
-                                    <span className="text-[11px] font-bold text-[var(--foreground)] font-mono">
-
-                                      = {selectedTallaIds.length} pares total ({getDocenaLabelExt(selectedTallaIds.length)})
-
-                                    </span>
-
-                                    {selectedTallaIds.length !== 12 && (
-
-                                      <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
-
-                                        Una docena estándar suma 12 pares
-
-                                      </span>
-
-                                    )}
-
-                                  </div>
-
-                                  <button
-
-                                    type="button"
-
-                                    onClick={() => restablecerDocenaEstandarEnNuevoColor(s.id)}
-
-                                    className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-
-                                    title="Restablecer curva base estándar (38 al 42 con 39 y 40 repetidos = 12 pares)"
-
-                                  >
-
-                                    <RefreshCw size={11} />
-
-                                    <span>Restablecer estándar (38-42)</span>
-
-                                  </button>
-
-                                </div>
-
-
-
-                                {/* Selección de Stock Inicial para Bodega */}
-
-                                <div className="space-y-1.5 pt-2 border-t border-[var(--border)]/40">
-
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
-
-                                    Stock Inicial en Bodega para esta variante:
-
-                                  </span>
-
-                                  <div className="flex flex-wrap gap-2">
-
-                                    <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'DOCENA')}
-
-                                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-
-                                        (newColorStockOption[s.id] || 'DOCENA') === 'DOCENA'
-
-                                          ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
-
-                                          : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
-
-                                      }`}
-
-                                    >
-
-                                      {(newColorStockOption[s.id] || 'DOCENA') === 'DOCENA' && <Check size={13} />}
-
-                                      1 Docena en Bodega (12 pares según serie de arriba)
-
-                                    </button>
-
-                                    <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'NINGUNA')}
-
-                                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-
-                                        newColorStockOption[s.id] === 'NINGUNA'
-
-                                          ? "border-slate-600 bg-slate-700 text-white shadow-xs"
-
-                                          : "border-slate-300 dark:border-slate-700 bg-[var(--card)] hover:bg-rose-500/10 text-rose-600"
-
-                                      }`}
-
-                                    >
-
-                                      {newColorStockOption[s.id] === 'NINGUNA' && <Check size={13} />}
-
-                                      Sin Stock Inicial (0 pares, solo catálogo para pedidos)
-
-                                    </button>
-
-                                  </div>
-
-                                </div>
-
-                              </div>
-
-                            </div>
-
-                          );
-
-                        })()}
-
-                      </div>
-
-                    );
-
-                  })}
-
-                </div>
-
-
-
-                <div className="bg-[var(--muted)]/20 border border-[var(--border)] p-3.5 sm:p-4 rounded-2xl space-y-3">
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)]/40 pb-2.5">
-
-                    <div className="flex items-center gap-2">
-
-                      <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
-
-                        <PackageCheck size={18} />
-
-                      </div>
-
-                      <div>
-
-                        <h6 className="text-xs font-black text-[var(--foreground)] uppercase tracking-wider">
-
-                          Stock Inicial por Talla y Curva
-
-                        </h6>
-
-                        <p className="text-[10px] text-[var(--muted-foreground)]">
-
-                          Selecciona el tipo de curva deseada para cada serie o aplica a todas
-
-                        </p>
-
-                      </div>
-
-                    </div>
-
-
-
-                    {newColorSerieIds.length > 0 && (
-
-                      <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
-
-                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] mr-1">Aplicar a todas:</span>
-
-                        <button type="button" onClick={() => aplicarCurvaATodasEnNuevoColor('MEDIA_A')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 cursor-pointer">Media A (6)</button>
-
-                        <button type="button" onClick={() => aplicarCurvaATodasEnNuevoColor('MEDIA_B')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 cursor-pointer">Media B (6)</button>
-
-                        <button type="button" onClick={() => aplicarCurvaATodasEnNuevoColor('DOCENA')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 cursor-pointer">1 Docena (12)</button>
-
-                        <button type="button" onClick={() => aplicarCurvaATodasEnNuevoColor('NINGUNA')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-slate-500/30 bg-slate-500/10 text-slate-700 hover:bg-slate-500/20 cursor-pointer">Sin Stock (0)</button>
-
-                      </div>
-
-                    )}
-
-                  </div>
-
-
-
-                  {(() => {
-
-                    const totalParesLote = Object.values(newColorCustomTallas).reduce((sum, arr) => sum + (arr?.length || 0), 0);
-
-                    return (
-
-                      <div className="flex items-center gap-2.5 p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl">
-
-                        {totalParesLote > 0 ? (
-
-                          <>
-
-                            <CheckCircle size={16} className="text-emerald-500 shrink-0" />
-
-                            <div className="text-xs text-[var(--foreground)] leading-relaxed">
-
-                              Se creará un stock inicial de <strong className="font-extrabold text-emerald-600">{totalParesLote} pares</strong> <span className="font-semibold text-[var(--muted-foreground)]">({getDocenaLabelExt(totalParesLote)})</span> para este nuevo color.
-
-                            </div>
-
-                          </>
-
-                        ) : (
-
-                          <>
-
-                            <Info size={16} className="text-slate-400 shrink-0" />
-
-                            <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-
-                              <strong className="font-bold text-[var(--foreground)]">Sin stock inicial (0 pares):</strong> Se registrará la variante en el catálogo sin unidades físicas.
-
-                            </div>
-
-                          </>
-
-                        )}
-
-                      </div>
-
-                    );
-
-                  })()}
-
-                </div>
-
-              </div>
-
-
-
-              {error && (
-
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
-
-                  <AlertCircle size={14} /> {error}
-
-                </div>
-
-              )}
+                )}
 
               </div>
 
@@ -9954,19 +9902,17 @@ export default function ModelosComponent({
 
                       {c > 0 && (
 
-                        <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
+                        <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${esPerdida
 
-                          esPerdida
+                          ? "bg-rose-500/10 border-rose-500/30 text-rose-500 animate-pulse font-bold"
 
-                            ? "bg-rose-500/10 border-rose-500/30 text-rose-500 animate-pulse font-bold"
-
-                            : parseFloat(pct) >= 20
+                          : parseFloat(pct) >= 20
 
                             ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500 font-semibold"
 
                             : "bg-amber-500/10 border-amber-500/20 text-amber-500 font-semibold"
 
-                        }`}>
+                          }`}>
 
                           <div>
 
@@ -10438,71 +10384,219 @@ export default function ModelosComponent({
 
               <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
 
-              {error && (
+                {error && (
 
-                <div className="flex items-start justify-between gap-2.5 p-3.5 bg-red-500/10 border border-red-500/30 text-red-500 dark:text-red-400 text-xs rounded-2xl font-bold animate-in fade-in duration-150">
+                  <div className="flex items-start justify-between gap-2.5 p-3.5 bg-red-500/10 border border-red-500/30 text-red-500 dark:text-red-400 text-xs rounded-2xl font-bold animate-in fade-in duration-150">
 
-                  <div className="flex items-start gap-2">
+                    <div className="flex items-start gap-2">
 
-                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                      <AlertCircle size={16} className="shrink-0 mt-0.5" />
 
-                    <span>{error}</span>
+                      <span>{error}</span>
+
+                    </div>
+
+                    <button type="button" onClick={() => setError("")} className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer">
+
+                      <X size={14} />
+
+                    </button>
 
                   </div>
 
-                  <button type="button" onClick={() => setError("")} className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer">
+                )}
 
-                    <X size={14} />
 
-                  </button>
+
+                {/* Imagen */}
+
+                <div>
+
+                  <Lbl t="Imagen del Producto" />
+
+                  <div className="flex items-center gap-4">
+
+                    <div className="w-20 h-20 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+
+                      {editProductImage ? (
+
+                        <img src={editProductImage} alt="Preview" className="w-full h-full object-cover" />
+
+                      ) : (
+
+                        <ImageIcon size={24} className="text-[var(--muted-foreground)] opacity-40" />
+
+                      )}
+
+                    </div>
+
+                    <div className="flex-1 space-y-2">
+
+                      <label className="flex items-center gap-2 px-3 py-2 bg-blue-600/10 text-blue-600 border border-blue-600/20 rounded-xl text-xs font-bold cursor-pointer hover:bg-blue-600/20 transition-colors">
+
+                        <ImageIcon size={14} />
+
+                        <span>Cambiar Imagen</span>
+
+                        <input type="file" accept="image/*" onChange={handleEditProductFoto} className="hidden" />
+
+                      </label>
+
+                      {editProductImage && (
+
+                        <button type="button" onClick={() => { setEditProductImage(null); setEditProductImageChanged(true); }}
+
+                          className="text-xs text-red-500 hover:underline">
+
+                          Quitar imagen
+
+                        </button>
+
+                      )}
+
+                    </div>
+
+                  </div>
 
                 </div>
 
-              )}
+
+
+                {/* Color */}
+
+                <div>
+
+                  <Lbl t="Color" req />
+
+                  <input type="text" value={editProductColor} onChange={e => setEditProductColor(e.target.value)}
+
+                    className={INPUT} required placeholder="Ej: Negro, Café, Miel..." />
+
+                </div>
 
 
 
-              {/* Imagen */}
+                {/* Proveedor Fabricante de la Variante */}
 
-              <div>
+                <div className="space-y-2 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-3.5">
 
-                <Lbl t="Imagen del Producto" />
+                  <div className="flex items-center justify-between">
 
-                <div className="flex items-center gap-4">
+                    <Lbl t="Proveedor Fabricante" />
 
-                  <div className="w-20 h-20 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl flex items-center justify-center overflow-hidden shrink-0">
-
-                    {editProductImage ? (
-
-                      <img src={editProductImage} alt="Preview" className="w-full h-full object-cover" />
-
-                    ) : (
-
-                      <ImageIcon size={24} className="text-[var(--muted-foreground)] opacity-40" />
-
-                    )}
+                    <span className="text-[10px] text-[var(--muted-foreground)]">Asignación por variante</span>
 
                   </div>
 
-                  <div className="flex-1 space-y-2">
+                  <select
 
-                    <label className="flex items-center gap-2 px-3 py-2 bg-blue-600/10 text-blue-600 border border-blue-600/20 rounded-xl text-xs font-bold cursor-pointer hover:bg-blue-600/20 transition-colors">
+                    value={editProductSupplierId}
 
-                      <ImageIcon size={14} />
+                    onChange={(e) => handleSupplierChangeInEditProduct(e.target.value)}
 
-                      <span>Cambiar Imagen</span>
+                    className={INPUT}
 
-                      <input type="file" accept="image/*" onChange={handleEditProductFoto} className="hidden" />
+                  >
 
-                    </label>
+                    <option value="">-- Proveedor por defecto del modelo --</option>
 
-                    {editProductImage && (
+                    {listaProveedores.map((prov) => {
 
-                      <button type="button" onClick={() => { setEditProductImage(null); setEditProductImageChanged(true); }}
+                      const sigla = generarSiglaProveedor(prov.razonSocial);
 
-                        className="text-xs text-red-500 hover:underline">
+                      return (
 
-                        Quitar imagen
+                        <option key={prov.id} value={prov.id}>
+
+                          {prov.razonSocial} {sigla ? `[${sigla}]` : ''} {prov.contacto ? `· Contacto: ${prov.contacto}` : ''}
+
+                        </option>
+
+                      );
+
+                    })}
+
+                  </select>
+
+                  {editProductSupplierId && (() => {
+
+                    const selSup = listaProveedores.find(p => p.id === editProductSupplierId);
+
+                    const sigla = selSup ? generarSiglaProveedor(selSup.razonSocial) : '';
+
+                    return (
+
+                      <div className="flex items-center gap-1.5 text-[11px] text-blue-700 dark:text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg">
+
+                        <Truck size={12} className="shrink-0" />
+
+                        <span>Proveedor: <strong>{selSup?.razonSocial}</strong></span>
+
+                        {sigla && <span className="bg-blue-600 text-white px-1.5 py-0.2 rounded text-[9px] font-mono font-black">{sigla}</span>}
+
+                      </div>
+
+                    );
+
+                  })()}
+
+                </div>
+
+
+
+                {/* Sección 3: Serie y Precios de esta Variante */}
+
+                <div className="space-y-4">
+
+                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+
+                    <h5 className="text-xs font-bold text-[#0F172A] dark:text-white uppercase tracking-widest">
+
+                      3. Serie, Precios y Stock de esta Variante
+
+                    </h5>
+
+                  </div>
+
+
+
+                  {/* Banner informativo para gestionar otras series */}
+
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-between gap-3 text-xs text-blue-700 dark:text-blue-300">
+
+                    <div className="flex items-center gap-2">
+
+                      <Info size={15} className="shrink-0" />
+
+                      <span className="text-[11px] leading-snug">
+
+                        Esta ventana edita únicamente esta variante. Para activar o agregar otras series (Adulto, Juvenil, etc.) para este taller, usa el Gestor de Series.
+
+                      </span>
+
+                    </div>
+
+                    {supplierSeriesTargetModel && editProduct && (
+
+                      <button
+
+                        type="button"
+
+                        onClick={() => {
+
+                          setShowEditProduct(false);
+
+                          openEditSupplierSeries(editProduct, supplierSeriesTargetModel);
+
+                        }}
+
+                        className="px-2.5 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white dark:bg-blue-600 dark:hover:bg-blue-500 text-[11px] font-bold rounded-lg transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+
+                      >
+
+                        <Layers size={12} />
+
+                        <span>Gestionar Series</span>
 
                       </button>
 
@@ -10510,615 +10604,465 @@ export default function ModelosComponent({
 
                   </div>
 
-                </div>
 
-              </div>
 
+                  <div className="space-y-3">
 
+                    {(() => {
 
-              {/* Color */}
+                      const currentVariantSerie = series.find(s => s.id === editProductSerieId) || (series.length > 0 ? series[0] : null);
 
-              <div>
+                      const displaySeries = currentVariantSerie ? [currentVariantSerie] : series;
 
-                <Lbl t="Color" req />
 
-                <input type="text" value={editProductColor} onChange={e => setEditProductColor(e.target.value)}
 
-                  className={INPUT} required placeholder="Ej: Negro, Café, Miel..." />
+                      return displaySeries.map(s => {
 
-              </div>
+                        const isActive = true;
 
+                        const prices = supplierSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
 
+                        const selectedTallaIds = supplierSeriesCustomTallas[s.id] || [];
 
-              {/* Proveedor Fabricante de la Variante */}
 
-              <div className="space-y-2 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-3.5">
 
-                <div className="flex items-center justify-between">
+                        return (
 
-                  <Lbl t="Proveedor Fabricante" />
+                          <div
 
-                  <span className="text-[10px] text-[var(--muted-foreground)]">Asignación por variante</span>
+                            key={s.id}
 
-                </div>
+                            className="rounded-xl border border-[#0F172A] bg-[#0F172A]/5 dark:border-white/20 dark:bg-white/5 shadow-sm overflow-hidden"
 
-                <select
+                          >
 
-                  value={editProductSupplierId}
+                            {/* Header de la Serie Actual */}
 
-                  onChange={(e) => handleSupplierChangeInEditProduct(e.target.value)}
+                            <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
 
-                  className={INPUT}
+                              <div className="flex items-center gap-2">
 
-                >
+                                <span className="text-sm font-extrabold text-[var(--foreground)]">
 
-                  <option value="">-- Proveedor por defecto del modelo --</option>
+                                  {getNombreSerie(s, series)}
 
-                  {listaProveedores.map((prov) => {
+                                </span>
 
-                    const sigla = generarSiglaProveedor(prov.razonSocial);
+                              </div>
 
-                    return (
+                              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">
 
-                      <option key={prov.id} value={prov.id}>
-
-                        {prov.razonSocial} {sigla ? `[${sigla}]` : ''} {prov.contacto ? `· Contacto: ${prov.contacto}` : ''}
-
-                      </option>
-
-                    );
-
-                  })}
-
-                </select>
-
-                {editProductSupplierId && (() => {
-
-                  const selSup = listaProveedores.find(p => p.id === editProductSupplierId);
-
-                  const sigla = selSup ? generarSiglaProveedor(selSup.razonSocial) : '';
-
-                  return (
-
-                    <div className="flex items-center gap-1.5 text-[11px] text-blue-700 dark:text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg">
-
-                      <Truck size={12} className="shrink-0" />
-
-                      <span>Proveedor: <strong>{selSup?.razonSocial}</strong></span>
-
-                      {sigla && <span className="bg-blue-600 text-white px-1.5 py-0.2 rounded text-[9px] font-mono font-black">{sigla}</span>}
-
-                    </div>
-
-                  );
-
-                })()}
-
-              </div>
-
-
-
-                {/* Sección 3: Serie y Precios de esta Variante */}
-
-              <div className="space-y-4">
-
-                <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
-
-                  <h5 className="text-xs font-bold text-[#0F172A] dark:text-white uppercase tracking-widest">
-
-                    3. Serie, Precios y Stock de esta Variante
-
-                  </h5>
-
-                </div>
-
-
-
-                {/* Banner informativo para gestionar otras series */}
-
-                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-between gap-3 text-xs text-blue-700 dark:text-blue-300">
-
-                  <div className="flex items-center gap-2">
-
-                    <Info size={15} className="shrink-0" />
-
-                    <span className="text-[11px] leading-snug">
-
-                      Esta ventana edita únicamente esta variante. Para activar o agregar otras series (Adulto, Juvenil, etc.) para este taller, usa el Gestor de Series.
-
-                    </span>
-
-                  </div>
-
-                  {supplierSeriesTargetModel && editProduct && (
-
-                    <button
-
-                      type="button"
-
-                      onClick={() => {
-
-                        setShowEditProduct(false);
-
-                        openEditSupplierSeries(editProduct, supplierSeriesTargetModel);
-
-                      }}
-
-                      className="px-2.5 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white dark:bg-blue-600 dark:hover:bg-blue-500 text-[11px] font-bold rounded-lg transition-colors cursor-pointer shrink-0 flex items-center gap-1"
-
-                    >
-
-                      <Layers size={12} />
-
-                      <span>Gestionar Series</span>
-
-                    </button>
-
-                  )}
-
-                </div>
-
-
-
-                <div className="space-y-3">
-
-                  {(() => {
-
-                    const currentVariantSerie = series.find(s => s.id === editProductSerieId) || (series.length > 0 ? series[0] : null);
-
-                    const displaySeries = currentVariantSerie ? [currentVariantSerie] : series;
-
-
-
-                    return displaySeries.map(s => {
-
-                      const isActive = true;
-
-                      const prices = supplierSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
-
-                      const selectedTallaIds = supplierSeriesCustomTallas[s.id] || [];
-
-
-
-                      return (
-
-                        <div
-
-                          key={s.id}
-
-                          className="rounded-xl border border-[#0F172A] bg-[#0F172A]/5 dark:border-white/20 dark:bg-white/5 shadow-sm overflow-hidden"
-
-                        >
-
-                          {/* Header de la Serie Actual */}
-
-                          <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
-
-                            <div className="flex items-center gap-2">
-
-                              <span className="text-sm font-extrabold text-[var(--foreground)]">
-
-                                {getNombreSerie(s, series)}
+                                SERIE DE ESTA VARIANTE
 
                               </span>
 
                             </div>
 
-                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">
-
-                              SERIE DE ESTA VARIANTE
-
-                            </span>
-
-                          </div>
 
 
+                            {/* Detalle si la serie está activa */}
 
-                          {/* Detalle si la serie está activa */}
+                            {isActive && (() => {
 
-                          {isActive && (() => {
+                              const costVal = parseDecimalNumber(prices.costPrice);
 
-                          const costVal = parseDecimalNumber(prices.costPrice);
+                              const saleVal = parseDecimalNumber(prices.salePrice);
 
-                          const saleVal = parseDecimalNumber(prices.salePrice);
+                              const hasCost = !isNaN(costVal) && costVal > 0;
 
-                          const hasCost = !isNaN(costVal) && costVal > 0;
+                              const hasSale = !isNaN(saleVal) && saleVal > 0;
 
-                          const hasSale = !isNaN(saleVal) && saleVal > 0;
+                              const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
 
-                          const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
+                              const isLoss = hasCost && hasSale && saleVal < costVal;
 
-                          const isLoss = hasCost && hasSale && saleVal < costVal;
+                              const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
 
-                          const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
+                              const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
 
-                          const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
-
-                          const suggestedProfit = hasCost && suggestedSale ? (parseFloat(suggestedSale) - costVal).toFixed(2) : "0.00";
+                              const suggestedProfit = hasCost && suggestedSale ? (parseFloat(suggestedSale) - costVal).toFixed(2) : "0.00";
 
 
 
-                          return (
+                              return (
 
-                            <div className="px-4 pb-4 pt-3 space-y-3">
+                                <div className="px-4 pb-4 pt-3 space-y-3">
 
-                              {/* Inputs de Precio */}
+                                  {/* Inputs de Precio */}
 
-                              <div className="grid grid-cols-2 gap-3">
+                                  <div className="grid grid-cols-2 gap-3">
 
-                                <div>
+                                    <div>
 
-                                  <Lbl t="Precio de Compra ($)" req />
+                                      <Lbl t="Precio de Compra ($)" req />
 
-                                  <input
+                                      <input
 
-                                    type="text"
+                                        type="text"
 
-                                    inputMode="decimal"
+                                        inputMode="decimal"
 
-                                    value={prices.costPrice}
+                                        value={prices.costPrice}
 
-                                    onChange={e => {
+                                        onChange={e => {
 
-                                      const val = normalizeDecimalInput(e.target.value);
-
-                                      setSupplierSeriesPrices(prev => ({
-
-                                        ...prev,
-
-                                        [s.id]: { ...prev[s.id], costPrice: val }
-
-                                      }));
-
-                                    }}
-
-                                    placeholder="0.00"
-
-                                    className={INPUT}
-
-                                  />
-
-                                </div>
-
-                                <div>
-
-                                  <div className="flex items-center justify-between">
-
-                                    <Lbl t="Precio de Venta ($)" req />
-
-                                    {hasCost && suggestedSale && (
-
-                                      <button
-
-                                        type="button"
-
-                                        onClick={() => {
+                                          const val = normalizeDecimalInput(e.target.value);
 
                                           setSupplierSeriesPrices(prev => ({
 
                                             ...prev,
 
-                                            [s.id]: { ...prev[s.id], salePrice: suggestedSale }
+                                            [s.id]: { ...prev[s.id], costPrice: val }
 
                                           }));
 
                                         }}
 
-                                        className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                                        placeholder="0.00"
 
-                                        title="Auto-asignar precio sugerido con margen de ganancia"
+                                        className={INPUT}
 
-                                      >
+                                      />
 
-                                        Auto: ${suggestedSale}
+                                    </div>
 
-                                      </button>
+                                    <div>
 
-                                    )}
+                                      <div className="flex items-center justify-between">
+
+                                        <Lbl t="Precio de Venta ($)" req />
+
+                                        {hasCost && suggestedSale && (
+
+                                          <button
+
+                                            type="button"
+
+                                            onClick={() => {
+
+                                              setSupplierSeriesPrices(prev => ({
+
+                                                ...prev,
+
+                                                [s.id]: { ...prev[s.id], salePrice: suggestedSale }
+
+                                              }));
+
+                                            }}
+
+                                            className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+
+                                            title="Auto-asignar precio sugerido con margen de ganancia"
+
+                                          >
+
+                                            Auto: ${suggestedSale}
+
+                                          </button>
+
+                                        )}
+
+                                      </div>
+
+                                      <input
+
+                                        type="text"
+
+                                        inputMode="decimal"
+
+                                        value={prices.salePrice}
+
+                                        onChange={e => {
+
+                                          const val = normalizeDecimalInput(e.target.value);
+
+                                          setSupplierSeriesPrices(prev => ({
+
+                                            ...prev,
+
+                                            [s.id]: { ...prev[s.id], salePrice: val }
+
+                                          }));
+
+                                        }}
+
+                                        placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
+
+                                        className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`}
+
+                                      />
+
+                                    </div>
 
                                   </div>
 
-                                  <input
-
-                                    type="text"
-
-                                    inputMode="decimal"
-
-                                    value={prices.salePrice}
-
-                                    onChange={e => {
-
-                                      const val = normalizeDecimalInput(e.target.value);
-
-                                      setSupplierSeriesPrices(prev => ({
-
-                                        ...prev,
-
-                                        [s.id]: { ...prev[s.id], salePrice: val }
-
-                                      }));
-
-                                    }}
-
-                                    placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
-
-                                    className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`}
-
-                                  />
-
-                                </div>
-
-                              </div>
 
 
+                                  {/* Indicador de Margen Configurable */}
 
-                              {/* Indicador de Margen Configurable */}
+                                  {hasCost && (
 
-                              {hasCost && (
+                                    <div className="text-[11px] font-semibold">
 
-                                <div className="text-[11px] font-semibold">
+                                      {hasSale ? (
 
-                                  {hasSale ? (
+                                        isLoss ? (
 
-                                    isLoss ? (
+                                          <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
 
-                                      <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
+                                            <AlertCircle size={14} className="shrink-0 animate-bounce" />
 
-                                        <AlertCircle size={14} className="shrink-0 animate-bounce" />
+                                            <span>Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
 
-                                        <span>Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+                                          </div>
 
-                                      </div>
+                                        ) : (
 
-                                    ) : (
+                                          <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
 
-                                      <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
+                                            <CheckCircle size={14} className="shrink-0" />
 
-                                        <CheckCircle size={14} className="shrink-0" />
+                                            <span>Margen de ganancia: <strong className="font-extrabold">{marginPercent.toFixed(1)}%</strong> (+${profitAmount.toFixed(2)} de utilidad por par)</span>
 
-                                        <span>Margen de ganancia: <strong className="font-extrabold">{marginPercent.toFixed(1)}%</strong> (+${profitAmount.toFixed(2)} de utilidad por par)</span>
+                                          </div>
 
-                                      </div>
+                                        )
 
-                                    )
+                                      ) : (
 
-                                  ) : (
+                                        <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
 
-                                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
+                                          <DollarSign size={14} className="shrink-0" />
 
-                                      <DollarSign size={14} className="shrink-0" />
+                                          <span>Precio sugerido ({marginPct}% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${suggestedProfit}/par)</span>
 
-                                      <span>Precio sugerido ({marginPct}% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${suggestedProfit}/par)</span>
+                                        </div>
+
+                                      )}
 
                                     </div>
 
                                   )}
 
-                                </div>
-
-                              )}
 
 
+                                  {/* Componente de Curva de Tallas con Steppers */}
 
-                              {/* Componente de Curva de Tallas con Steppers */}
+                                  <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
 
-                              <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
+                                    <div className="flex items-center justify-between">
 
-                                <div className="flex items-center justify-between">
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
 
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-
-                                    Serie: {getNombreSerie(s, series).toUpperCase()}
-
-                                  </span>
-
-                                  <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
-
-                                    = {selectedTallaIds.length} pares total
-
-                                  </span>
-
-                                </div>
-
-
-
-                                {/* Steppers por talla */}
-
-                                <div className="flex flex-wrap gap-2">
-
-                                  {s.tallas?.sort((a, b) => a.numero - b.numero).map(t => {
-
-                                    const count = selectedTallaIds.filter(id => id === t.id).length;
-
-                                    return (
-
-                                      <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
-
-                                        <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
-
-                                        <button
-
-                                          type="button"
-
-                                          onClick={() => removeOneTallaInSupplierSeries(s.id, t.id)}
-
-                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors cursor-pointer"
-
-                                        >−</button>
-
-                                        <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
-
-                                        <button
-
-                                          type="button"
-
-                                          onClick={() => addTallaRepeatInSupplierSeries(s.id, t.id)}
-
-                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors cursor-pointer"
-
-                                        >+</button>
-
-                                      </div>
-
-                                    );
-
-                                  })}
-
-                                </div>
-
-
-
-                                {/* Total de pares y botón para restablecer docena estándar */}
-
-                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/30">
-
-                                  <div className="flex items-center gap-2">
-
-                                    <span className="text-[11px] font-bold text-[var(--foreground)] font-mono">
-
-                                      = {selectedTallaIds.length} pares total ({getDocenaLabelExt(selectedTallaIds.length)})
-
-                                    </span>
-
-                                    {selectedTallaIds.length !== 12 && (
-
-                                      <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
-
-                                        Una docena estándar suma 12 pares
+                                        Serie: {getNombreSerie(s, series).toUpperCase()}
 
                                       </span>
 
-                                    )}
+                                      <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
+
+                                        = {selectedTallaIds.length} pares total
+
+                                      </span>
+
+                                    </div>
+
+
+
+                                    {/* Steppers por talla */}
+
+                                    <div className="flex flex-wrap gap-2">
+
+                                      {s.tallas?.sort((a, b) => a.numero - b.numero).map(t => {
+
+                                        const count = selectedTallaIds.filter(id => id === t.id).length;
+
+                                        return (
+
+                                          <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
+
+                                            <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
+
+                                            <button
+
+                                              type="button"
+
+                                              onClick={() => removeOneTallaInSupplierSeries(s.id, t.id)}
+
+                                              className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors cursor-pointer"
+
+                                            >−</button>
+
+                                            <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
+
+                                            <button
+
+                                              type="button"
+
+                                              onClick={() => addTallaRepeatInSupplierSeries(s.id, t.id)}
+
+                                              className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors cursor-pointer"
+
+                                            >+</button>
+
+                                          </div>
+
+                                        );
+
+                                      })}
+
+                                    </div>
+
+
+
+                                    {/* Total de pares y botón para restablecer docena estándar */}
+
+                                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/30">
+
+                                      <div className="flex items-center gap-2">
+
+                                        <span className="text-[11px] font-bold text-[var(--foreground)] font-mono">
+
+                                          = {selectedTallaIds.length} pares total ({getDocenaLabelExt(selectedTallaIds.length)})
+
+                                        </span>
+
+                                        {selectedTallaIds.length !== 12 && (
+
+                                          <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
+
+                                            Una docena estándar suma 12 pares
+
+                                          </span>
+
+                                        )}
+
+                                      </div>
+
+                                      {(() => {
+
+                                        const tallasSorted = (s.tallas || []).slice().sort((a, b) => a.numero - b.numero);
+
+                                        const minTalla = tallasSorted[0]?.numero;
+
+                                        const maxTalla = tallasSorted[tallasSorted.length - 1]?.numero;
+
+                                        const rangoTexto = minTalla && maxTalla ? `${minTalla}-${maxTalla}` : 'estándar';
+
+                                        return (
+
+                                          <button
+
+                                            type="button"
+
+                                            onClick={() => restablecerDocenaEstandarEnSupplierSeries(s.id)}
+
+                                            className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+
+                                            title={`Reemplazar y dejar exactamente 1 docena base (${rangoTexto} = 12 pares)`}
+
+                                          >
+
+                                            <RefreshCw size={11} />
+
+                                            <span>Restablecer estándar ({rangoTexto})</span>
+
+                                          </button>
+
+                                        );
+
+                                      })()}
+
+                                    </div>
+
+
+
+                                    {/* Selección de Stock en Bodega */}
+
+                                    <div className="space-y-1.5 pt-2 border-t border-[var(--border)]/40">
+
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+
+                                        Stock en Bodega para esta variante:
+
+                                      </span>
+
+                                      <div className="flex flex-wrap gap-2">
+
+                                        <button
+
+                                          type="button"
+
+                                          onClick={() => aplicarCurvaEnSupplierSeries(s.id, 'DOCENA')}
+
+                                          className="px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer border-emerald-600/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 active:scale-95 shadow-xs"
+
+                                          title="Suma 1 docena completa (12 pares distribuidos según la serie) al stock actual"
+
+                                        >
+
+                                          <Plus size={13} />
+
+                                          <span>1 Docena en Bodega (+12 pares según serie)</span>
+
+                                        </button>
+
+                                        <button
+
+                                          type="button"
+
+                                          onClick={() => aplicarCurvaEnSupplierSeries(s.id, 'NINGUNA')}
+
+                                          className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${selectedTallaIds.length === 0
+
+                                            ? "border-slate-600 bg-slate-700 text-white shadow-xs"
+
+                                            : "border-slate-300 dark:border-slate-700 bg-[var(--card)] hover:bg-rose-500/10 text-rose-600"
+
+                                            }`}
+
+                                        >
+
+                                          {selectedTallaIds.length === 0 && <Check size={13} />}
+
+                                          Sin Stock (0 pares, solo catálogo para pedidos)
+
+                                        </button>
+
+                                      </div>
+
+                                    </div>
 
                                   </div>
 
-                                  {(() => {
-
-                                    const tallasSorted = (s.tallas || []).slice().sort((a, b) => a.numero - b.numero);
-
-                                    const minTalla = tallasSorted[0]?.numero;
-
-                                    const maxTalla = tallasSorted[tallasSorted.length - 1]?.numero;
-
-                                    const rangoTexto = minTalla && maxTalla ? `${minTalla}-${maxTalla}` : 'estándar';
-
-                                    return (
-
-                                      <button
-
-                                        type="button"
-
-                                        onClick={() => restablecerDocenaEstandarEnSupplierSeries(s.id)}
-
-                                        className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-
-                                        title={`Reemplazar y dejar exactamente 1 docena base (${rangoTexto} = 12 pares)`}
-
-                                      >
-
-                                        <RefreshCw size={11} />
-
-                                        <span>Restablecer estándar ({rangoTexto})</span>
-
-                                      </button>
-
-                                    );
-
-                                  })()}
-
                                 </div>
 
+                              );
 
+                            })()}
 
-                                {/* Selección de Stock en Bodega */}
+                          </div>
 
-                                <div className="space-y-1.5 pt-2 border-t border-[var(--border)]/40">
+                        );
 
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                      });
 
-                                    Stock en Bodega para esta variante:
+                    })()}
 
-                                  </span>
-
-                                  <div className="flex flex-wrap gap-2">
-
-                                    <button
-
-                                      type="button"
-
-                                      onClick={() => aplicarCurvaEnSupplierSeries(s.id, 'DOCENA')}
-
-                                      className="px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer border-emerald-600/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 active:scale-95 shadow-xs"
-
-                                      title="Suma 1 docena completa (12 pares distribuidos según la serie) al stock actual"
-
-                                    >
-
-                                      <Plus size={13} />
-
-                                      <span>1 Docena en Bodega (+12 pares según serie)</span>
-
-                                    </button>
-
-                                    <button
-
-                                      type="button"
-
-                                      onClick={() => aplicarCurvaEnSupplierSeries(s.id, 'NINGUNA')}
-
-                                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-
-                                        selectedTallaIds.length === 0
-
-                                          ? "border-slate-600 bg-slate-700 text-white shadow-xs"
-
-                                          : "border-slate-300 dark:border-slate-700 bg-[var(--card)] hover:bg-rose-500/10 text-rose-600"
-
-                                      }`}
-
-                                    >
-
-                                      {selectedTallaIds.length === 0 && <Check size={13} />}
-
-                                      Sin Stock (0 pares, solo catálogo para pedidos)
-
-                                    </button>
-
-                                  </div>
-
-                                </div>
-
-                              </div>
-
-                            </div>
-
-                          );
-
-                        })()}
-
-                      </div>
-
-                    );
-
-                  });
-
-                  })()}
+                  </div>
 
                 </div>
 
-              </div>
 
 
+                {error && (
 
-              {error && (
+                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
 
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                    <AlertCircle size={14} /> {error}
 
-                  <AlertCircle size={14} /> {error}
+                  </div>
 
-                </div>
-
-              )}
+                )}
 
               </div>
 
@@ -11228,117 +11172,183 @@ export default function ModelosComponent({
 
               <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
 
-              <div>
+                <div>
 
-                <Lbl t="Nombre del Modelo" req />
+                  <Lbl t="Nombre del Modelo" req />
 
-                <input type="text" value={editModelName} onChange={e => setEditModelName(e.target.value)}
+                  <input type="text" value={editModelName} onChange={e => setEditModelName(e.target.value)}
 
-                  className={INPUT} required placeholder="Ej: Botín Chelsea" />
+                    className={INPUT} required placeholder="Ej: Botín Chelsea" />
 
-              </div>
+                </div>
 
-              <div>
+                <div>
 
-                <Lbl t="Marca" req />
+                  <Lbl t="Marca" req />
 
-                <input type="text" value={editModelBrand} onChange={e => setEditModelBrand(e.target.value)}
+                  <input type="text" value={editModelBrand} onChange={e => setEditModelBrand(e.target.value)}
 
-                  className={INPUT} required placeholder="Ej: NEXORA" />
+                    className={INPUT} required placeholder="Ej: NEXORA" />
 
-              </div>
+                </div>
 
-              <div>
+                <div>
 
-                <Lbl t="Código Base" req />
+                  <Lbl t="Código Base" req />
 
-                <input type="text" value={editModelBaseCode} onChange={e => setEditModelBaseCode(e.target.value)}
+                  <input type="text" value={editModelBaseCode} onChange={e => setEditModelBaseCode(e.target.value)}
 
-                  className={INPUT} required placeholder="Ej: BCH-001" />
+                    className={INPUT} required placeholder="Ej: BCH-001" />
 
-              </div>
+                </div>
 
-              <div>
+                <div>
 
-                <Lbl t="Material (Opcional)" />
+                  <Lbl t="Material (Opcional)" />
 
-                <input type="text" value={editModelMaterial} onChange={e => setEditModelMaterial(e.target.value)}
+                  <input type="text" value={editModelMaterial} onChange={e => setEditModelMaterial(e.target.value)}
 
-                  className={INPUT} placeholder="Ej: Cuero genuino" />
+                    className={INPUT} placeholder="Ej: Cuero genuino" />
 
-              </div>
+                </div>
 
 
 
-              {/* ── Proveedor Principal ── */}
+                {/* ── Proveedor Principal ── */}
 
-              <div>
+                <div>
 
-                <Lbl t="Proveedor Principal" />
+                  <Lbl t="Proveedor Principal" />
 
-                <div className="flex gap-2">
+                  <div className="flex gap-2">
 
-                  <select
+                    <select
 
-                    value={editModelSupplierId}
+                      value={editModelSupplierId}
 
-                    onChange={e => {
+                      onChange={e => {
 
-                      const newPrincipal = e.target.value;
+                        const newPrincipal = e.target.value;
 
-                      const oldPrincipal = editModelSupplierId;
+                        const oldPrincipal = editModelSupplierId;
 
-                      setEditModelSupplierId(newPrincipal);
+                        setEditModelSupplierId(newPrincipal);
 
-                      setEditModelAlternateIds(prev => {
+                        setEditModelAlternateIds(prev => {
 
-                        let updated = [...prev];
+                          let updated = [...prev];
 
-                        // Si el nuevo principal estaba en los alternos, removerlo de alternos
+                          // Si el nuevo principal estaba en los alternos, removerlo de alternos
 
-                        if (newPrincipal) {
+                          if (newPrincipal) {
 
-                          updated = updated.filter(id => id !== newPrincipal);
+                            updated = updated.filter(id => id !== newPrincipal);
+
+                          }
+
+                          // Si había un principal previo y es distinto al nuevo, pasa automáticamente a ser alterno para no perderlo
+
+                          if (oldPrincipal && oldPrincipal !== newPrincipal && !updated.includes(oldPrincipal)) {
+
+                            updated.push(oldPrincipal);
+
+                          }
+
+                          return updated;
+
+                        });
+
+
+
+                        // Conmutar series, precios y tallas correspondientes EXCLUSIVAMENTE al proveedor seleccionado
+
+                        if (editModel) {
+
+                          const nextCfg = getSeriesConfigForSupplier(editModel, newPrincipal || null);
+
+                          setEditModelSerieIds(nextCfg.activeSerieIds);
+
+                          setEditModelSeriesPrices(nextCfg.prices);
+
+                          setEditModelCustomTallas(nextCfg.customTallas);
 
                         }
 
-                        // Si había un principal previo y es distinto al nuevo, pasa automáticamente a ser alterno para no perderlo
+                      }}
 
-                        if (oldPrincipal && oldPrincipal !== newPrincipal && !updated.includes(oldPrincipal)) {
+                      className={`${INPUT} flex-1`}
 
-                          updated.push(oldPrincipal);
+                    >
 
-                        }
+                      <option value="">-- Sin Proveedor --</option>
 
-                        return updated;
+                      {listaProveedores.map(p => (
 
-                      });
+                        <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
+
+                      ))}
+
+                    </select>
+
+                    <button type="button" onClick={() => { setQsContext('edit'); setShowQuickSupplier(true); }}
+
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-xl flex items-center gap-1 shrink-0 transition-colors">
+
+                      <Plus size={12} /><span>Nuevo</span>
+
+                    </button>
+
+                  </div>
+
+                </div>
 
 
 
-                      // Conmutar series, precios y tallas correspondientes EXCLUSIVAMENTE al proveedor seleccionado
+                {/* ── Proveedores Alternos ── */}
 
-                      if (editModel) {
+                <div>
 
-                        const nextCfg = getSeriesConfigForSupplier(editModel, newPrincipal || null);
+                  <Lbl t="Proveedores Alternos (Suplencia / Alta Demanda)" />
 
-                        setEditModelSerieIds(nextCfg.activeSerieIds);
+                  <div className="flex flex-wrap gap-1.5 mb-2">
 
-                        setEditModelSeriesPrices(nextCfg.prices);
+                    {editModelAlternateIds.map(altId => {
 
-                        setEditModelCustomTallas(nextCfg.customTallas);
+                      const prov = listaProveedores.find(p => p.id === altId);
 
-                      }
+                      return prov ? (
 
-                    }}
+                        <span key={altId} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[10px] font-bold">
 
-                    className={`${INPUT} flex-1`}
+                          <Truck size={10} />{prov.razonSocial}
 
-                  >
+                          <button type="button" onClick={() => setEditModelAlternateIds(prev => prev.filter(x => x !== altId))}
 
-                    <option value="">-- Sin Proveedor --</option>
+                            className="text-rose-500 hover:text-rose-700 ml-0.5"><X size={10} /></button>
 
-                    {listaProveedores.map(p => (
+                        </span>
+
+                      ) : null;
+
+                    })}
+
+                  </div>
+
+                  <select value="" onChange={e => {
+
+                    const val = e.target.value;
+
+                    if (val && !editModelAlternateIds.includes(val) && val !== editModelSupplierId) {
+
+                      setEditModelAlternateIds(prev => [...prev, val]);
+
+                    }
+
+                  }} className={INPUT}>
+
+                    <option value="">-- Agregar proveedor alterno --</option>
+
+                    {listaProveedores.filter(p => p.id !== editModelSupplierId && !editModelAlternateIds.includes(p.id)).map(p => (
 
                       <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
 
@@ -11346,419 +11356,345 @@ export default function ModelosComponent({
 
                   </select>
 
-                  <button type="button" onClick={() => { setQsContext('edit'); setShowQuickSupplier(true); }}
-
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-xl flex items-center gap-1 shrink-0 transition-colors">
-
-                    <Plus size={12} /><span>Nuevo</span>
-
-                  </button>
-
                 </div>
 
-              </div>
+
+
+                {/* ── Sección: Series y Precios del Modelo ── */}
+
+                <div className="space-y-4 pt-2 border-t border-[var(--border)]">
+
+                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+
+                    <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest">Series y Precios del Modelo</h5>
+
+                    <button type="button" onClick={() => { setNewSerieNombre(""); setNewSerieTallasDesde("38"); setNewSerieTallasHasta("43"); setError(""); setShowCreateSeriesModal(true); }}
+
+                      className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A] hover:underline">
+
+                      <Plus size={13} /> <span>Crear Nueva Serie</span>
+
+                    </button>
+
+                  </div>
+
+                  <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">
+
+                    Modifica las series asignadas al modelo, sus precios de compra y venta, y su distribución de curva de tallas.
+
+                  </p>
 
 
 
-              {/* ── Proveedores Alternos ── */}
+                  <div className="space-y-3">
 
-              <div>
+                    {getSeriesParaModelo(editModel?.id, series).map(s => {
 
-                <Lbl t="Proveedores Alternos (Suplencia / Alta Demanda)" />
+                      const isActive = editModelSerieIds.includes(s.id);
 
-                <div className="flex flex-wrap gap-1.5 mb-2">
+                      const prices = editModelSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
 
-                  {editModelAlternateIds.map(altId => {
-
-                    const prov = listaProveedores.find(p => p.id === altId);
-
-                    return prov ? (
-
-                      <span key={altId} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[10px] font-bold">
-
-                        <Truck size={10} />{prov.razonSocial}
-
-                        <button type="button" onClick={() => setEditModelAlternateIds(prev => prev.filter(x => x !== altId))}
-
-                          className="text-rose-500 hover:text-rose-700 ml-0.5"><X size={10} /></button>
-
-                      </span>
-
-                    ) : null;
-
-                  })}
-
-                </div>
-
-                <select value="" onChange={e => {
-
-                  const val = e.target.value;
-
-                  if (val && !editModelAlternateIds.includes(val) && val !== editModelSupplierId) {
-
-                    setEditModelAlternateIds(prev => [...prev, val]);
-
-                  }
-
-                }} className={INPUT}>
-
-                  <option value="">-- Agregar proveedor alterno --</option>
-
-                  {listaProveedores.filter(p => p.id !== editModelSupplierId && !editModelAlternateIds.includes(p.id)).map(p => (
-
-                    <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
-
-                  ))}
-
-                </select>
-
-              </div>
+                      const selectedTallaIds = editModelCustomTallas[s.id] || [];
 
 
 
-              {/* ── Sección: Series y Precios del Modelo ── */}
+                      return (
 
-              <div className="space-y-4 pt-2 border-t border-[var(--border)]">
-
-                <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
-
-                  <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest">Series y Precios del Modelo</h5>
-
-                  <button type="button" onClick={() => { setNewSerieNombre(""); setNewSerieTallasDesde("38"); setNewSerieTallasHasta("43"); setError(""); setShowCreateSeriesModal(true); }}
-
-                    className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A] hover:underline">
-
-                    <Plus size={13} /> <span>Crear Nueva Serie</span>
-
-                  </button>
-
-                </div>
-
-                <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">
-
-                  Modifica las series asignadas al modelo, sus precios de compra y venta, y su distribución de curva de tallas.
-
-                </p>
-
-
-
-                <div className="space-y-3">
-
-                  {getSeriesParaModelo(editModel?.id, series).map(s => {
-
-                    const isActive = editModelSerieIds.includes(s.id);
-
-                    const prices = editModelSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
-
-                    const selectedTallaIds = editModelCustomTallas[s.id] || [];
-
-
-
-                    return (
-
-                      <div key={s.id} className={`rounded-xl border transition-all overflow-hidden ${
-
-                        isActive
+                        <div key={s.id} className={`rounded-xl border transition-all overflow-hidden ${isActive
 
                           ? "border-[#0F172A] bg-[#0F172A]/5 shadow-sm"
 
                           : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
 
-                      }`}>
+                          }`}>
 
-                        {/* Toggle Header */}
+                          {/* Toggle Header */}
 
-                        <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
+                          <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
 
-                          <div className="flex items-center gap-3 cursor-pointer" onClick={() => toggleEditModelSerie(s.id)}>
+                            <div className="flex items-center gap-3 cursor-pointer" onClick={() => toggleEditModelSerie(s.id)}>
 
-                            <div className={`w-10 h-5 rounded-full relative transition-colors ${
+                              <div className={`w-10 h-5 rounded-full relative transition-colors ${isActive ? "bg-[#0F172A]" : "bg-[var(--border)]"
 
-                              isActive ? "bg-[#0F172A]" : "bg-[var(--border)]"
+                                }`}>
 
-                            }`}>
+                                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isActive ? "translate-x-5" : "translate-x-0.5"
 
-                              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                  }`} />
 
-                                isActive ? "translate-x-5" : "translate-x-0.5"
+                              </div>
 
-                              }`} />
+                              <span className={`text-sm font-bold ${isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
+
+                                }`}>{getNombreSerie(s, series)}</span>
 
                             </div>
 
-                            <span className={`text-sm font-bold ${
-
-                              isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
-
-                            }`}>{getNombreSerie(s, series)}</span>
-
-                          </div>
 
 
+                            <div className="flex items-center gap-2">
 
-                          <div className="flex items-center gap-2">
+                              <button type="button" onClick={() => openEditSeriesModal(s)}
 
-                            <button type="button" onClick={() => openEditSeriesModal(s)}
+                                className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)]/50 transition-colors flex items-center gap-1 text-[11px] font-semibold"
 
-                              className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)]/50 transition-colors flex items-center gap-1 text-[11px] font-semibold"
+                                title="Editar rango o nombre de esta serie">
 
-                              title="Editar rango o nombre de esta serie">
+                                <Edit2 size={13} />
 
-                              <Edit2 size={13} />
-
-                              <span>Editar</span>
-
-                            </button>
-
-                            {!SERIES_CANONICAS.includes(s.nombre) && (
-
-                              <button type="button" onClick={(ev) => { ev.stopPropagation(); handleDeleteSeries(s); }}
-
-                                className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-500/10 transition-colors flex items-center gap-1 text-[11px] font-semibold"
-
-                                title={`Eliminar serie duplicada "${s.nombre}"`}>
-
-                                <Trash2 size={13} />
-
-                                <span>Eliminar</span>
+                                <span>Editar</span>
 
                               </button>
 
-                            )}
+                              {!SERIES_CANONICAS.includes(s.nombre) && (
 
-                            {isActive && (
+                                <button type="button" onClick={(ev) => { ev.stopPropagation(); handleDeleteSeries(s); }}
 
-                              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">ACTIVA</span>
+                                  className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-500/10 transition-colors flex items-center gap-1 text-[11px] font-semibold"
 
-                            )}
+                                  title={`Eliminar serie duplicada "${s.nombre}"`}>
 
-                          </div>
+                                  <Trash2 size={13} />
 
-                        </div>
+                                  <span>Eliminar</span>
 
-
-
-                        {/* Detalle si la serie está activa */}
-
-                        {isActive && (() => {
-
-                          const costVal = parseDecimalNumber(prices.costPrice);
-
-                          const saleVal = parseDecimalNumber(prices.salePrice);
-
-                          const hasCost = !isNaN(costVal) && costVal > 0;
-
-                          const hasSale = !isNaN(saleVal) && saleVal > 0;
-
-                          const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
-
-                          const isLoss = hasCost && hasSale && saleVal < costVal;
-
-                          const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
-
-                          const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
-
-                          const suggestedProfit = hasCost && suggestedSale ? (parseFloat(suggestedSale) - costVal).toFixed(2) : "0.00";
-
-
-
-                          return (
-
-                            <div className="px-4 pb-4 pt-3 space-y-3">
-
-                              {/* Inputs de Precio */}
-
-                              <div className="grid grid-cols-2 gap-3">
-
-                                <div>
-
-                                  <Lbl t="Precio de Compra ($)" req />
-
-                                  <input type="text" inputMode="decimal"
-
-                                    value={prices.costPrice}
-
-                                    onChange={e => {
-
-                                      const val = normalizeDecimalInput(e.target.value);
-
-                                      setEditModelSeriesPrices(prev => ({
-
-                                        ...prev,
-
-                                        [s.id]: { ...prev[s.id], costPrice: val }
-
-                                      }));
-
-                                    }}
-
-                                    placeholder="0.00" className={INPUT} />
-
-                                </div>
-
-                                <div>
-
-                                  <Lbl t="Precio de Venta ($)" req />
-
-                                  <input type="text" inputMode="decimal"
-
-                                    value={prices.salePrice}
-
-                                    onChange={e => {
-
-                                      const val = normalizeDecimalInput(e.target.value);
-
-                                      setEditModelSeriesPrices(prev => ({
-
-                                        ...prev,
-
-                                        [s.id]: { ...prev[s.id], salePrice: val }
-
-                                      }));
-
-                                    }}
-
-                                    placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
-
-                                    className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
-
-                                </div>
-
-                              </div>
-
-
-
-                              {/* Indicador de Margen */}
-
-                              {hasCost && (
-
-                                <div className="text-[11px] font-semibold">
-
-                                  {hasSale ? (
-
-                                    isLoss ? (
-
-                                      <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
-
-                                        <AlertCircle size={14} className="shrink-0 animate-bounce" />
-
-                                        <span>Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
-
-                                      </div>
-
-                                    ) : (
-
-                                      <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
-
-                                        <CheckCircle size={14} />
-
-                                        <span>Margen de ganancia: <strong className="font-extrabold">{marginPercent.toFixed(1)}%</strong> (+${profitAmount.toFixed(2)} de utilidad por par)</span>
-
-                                      </div>
-
-                                    )
-
-                                  ) : (
-
-                                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
-
-                                      <DollarSign size={14} className="shrink-0" />
-
-                                      <span>Precio sugerido ({marginPct}% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${suggestedProfit}/par)</span>
-
-                                    </div>
-
-                                  )}
-
-                                </div>
+                                </button>
 
                               )}
 
+                              {isActive && (
 
+                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">ACTIVA</span>
 
-                              {/* Distribución de pares por número para la serie */}
-                              <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-                                    Serie: {getNombreSerie(s, series).toUpperCase()}
-                                  </span>
-                                  <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
-                                    = {selectedTallaIds.length} pares total
-                                  </span>
-                                </div>
-
-                                {/* Steppers: pares que vienen por cada talla */}
-                                <div className="flex flex-wrap gap-2">
-                                  {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
-                                    const count = selectedTallaIds.filter(id => id === t.id).length;
-                                    return (
-                                      <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
-                                        <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
-                                        <button type="button"
-                                          onClick={() => removeOneTallaInEditModel(s.id, t.id)}
-                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors cursor-pointer"
-                                        >−</button>
-                                        <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
-                                        <button type="button"
-                                          onClick={() => addTallaRepeatInEditModel(s.id, t.id)}
-                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors cursor-pointer"
-                                        >+</button>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-
-                                {/* Total de pares y restablecer docena estándar */}
-                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/30">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[11px] font-bold text-[var(--foreground)] font-mono">
-                                      = {selectedTallaIds.length} pares total ({getDocenaLabelExt(selectedTallaIds.length)})
-                                    </span>
-                                    {selectedTallaIds.length !== 12 && (
-                                      <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
-                                        Una docena estándar suma 12 pares
-                                      </span>
-                                    )}
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => restablecerDocenaEstandarEnEditModel(s.id)}
-                                    className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                                    title={`Restablecer curva base de 12 pares según las tallas de la serie ${getNombreSerie(s, series)}`}
-                                  >
-                                    <RefreshCw size={11} />
-                                    <span>Restablecer docena estándar</span>
-                                  </button>
-                                </div>
-                              </div>
+                              )}
 
                             </div>
 
-                          );
+                          </div>
 
-                        })()}
 
-                      </div>
 
-                    );
+                          {/* Detalle si la serie está activa */}
 
-                  })}
+                          {isActive && (() => {
+
+                            const costVal = parseDecimalNumber(prices.costPrice);
+
+                            const saleVal = parseDecimalNumber(prices.salePrice);
+
+                            const hasCost = !isNaN(costVal) && costVal > 0;
+
+                            const hasSale = !isNaN(saleVal) && saleVal > 0;
+
+                            const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
+
+                            const isLoss = hasCost && hasSale && saleVal < costVal;
+
+                            const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
+
+                            const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
+
+                            const suggestedProfit = hasCost && suggestedSale ? (parseFloat(suggestedSale) - costVal).toFixed(2) : "0.00";
+
+
+
+                            return (
+
+                              <div className="px-4 pb-4 pt-3 space-y-3">
+
+                                {/* Inputs de Precio */}
+
+                                <div className="grid grid-cols-2 gap-3">
+
+                                  <div>
+
+                                    <Lbl t="Precio de Compra ($)" req />
+
+                                    <input type="text" inputMode="decimal"
+
+                                      value={prices.costPrice}
+
+                                      onChange={e => {
+
+                                        const val = normalizeDecimalInput(e.target.value);
+
+                                        setEditModelSeriesPrices(prev => ({
+
+                                          ...prev,
+
+                                          [s.id]: { ...prev[s.id], costPrice: val }
+
+                                        }));
+
+                                      }}
+
+                                      placeholder="0.00" className={INPUT} />
+
+                                  </div>
+
+                                  <div>
+
+                                    <Lbl t="Precio de Venta ($)" req />
+
+                                    <input type="text" inputMode="decimal"
+
+                                      value={prices.salePrice}
+
+                                      onChange={e => {
+
+                                        const val = normalizeDecimalInput(e.target.value);
+
+                                        setEditModelSeriesPrices(prev => ({
+
+                                          ...prev,
+
+                                          [s.id]: { ...prev[s.id], salePrice: val }
+
+                                        }));
+
+                                      }}
+
+                                      placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
+
+                                      className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
+
+                                  </div>
+
+                                </div>
+
+
+
+                                {/* Indicador de Margen */}
+
+                                {hasCost && (
+
+                                  <div className="text-[11px] font-semibold">
+
+                                    {hasSale ? (
+
+                                      isLoss ? (
+
+                                        <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
+
+                                          <AlertCircle size={14} className="shrink-0 animate-bounce" />
+
+                                          <span>Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+
+                                        </div>
+
+                                      ) : (
+
+                                        <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
+
+                                          <CheckCircle size={14} />
+
+                                          <span>Margen de ganancia: <strong className="font-extrabold">{marginPercent.toFixed(1)}%</strong> (+${profitAmount.toFixed(2)} de utilidad por par)</span>
+
+                                        </div>
+
+                                      )
+
+                                    ) : (
+
+                                      <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
+
+                                        <DollarSign size={14} className="shrink-0" />
+
+                                        <span>Precio sugerido ({marginPct}% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${suggestedProfit}/par)</span>
+
+                                      </div>
+
+                                    )}
+
+                                  </div>
+
+                                )}
+
+
+
+                                {/* Distribución de pares por número para la serie */}
+                                <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                                      Serie: {getNombreSerie(s, series).toUpperCase()}
+                                    </span>
+                                    <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
+                                      = {selectedTallaIds.length} pares total
+                                    </span>
+                                  </div>
+
+                                  {/* Steppers: pares que vienen por cada talla */}
+                                  <div className="flex flex-wrap gap-2">
+                                    {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
+                                      const count = selectedTallaIds.filter(id => id === t.id).length;
+                                      return (
+                                        <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
+                                          <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
+                                          <button type="button"
+                                            onClick={() => removeOneTallaInEditModel(s.id, t.id)}
+                                            className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors cursor-pointer"
+                                          >−</button>
+                                          <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
+                                          <button type="button"
+                                            onClick={() => addTallaRepeatInEditModel(s.id, t.id)}
+                                            className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors cursor-pointer"
+                                          >+</button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* Total de pares y restablecer docena estándar */}
+                                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/30">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[11px] font-bold text-[var(--foreground)] font-mono">
+                                        = {selectedTallaIds.length} pares total ({getDocenaLabelExt(selectedTallaIds.length)})
+                                      </span>
+                                      {selectedTallaIds.length !== 12 && (
+                                        <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
+                                          Una docena estándar suma 12 pares
+                                        </span>
+                                      )}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => restablecerDocenaEstandarEnEditModel(s.id)}
+                                      className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                      title={`Restablecer curva base de 12 pares según las tallas de la serie ${getNombreSerie(s, series)}`}
+                                    >
+                                      <RefreshCw size={11} />
+                                      <span>Restablecer docena estándar</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                              </div>
+
+                            );
+
+                          })()}
+
+                        </div>
+
+                      );
+
+                    })}
+
+                  </div>
 
                 </div>
 
-              </div>
 
 
+                {error && (
 
-              {error && (
+                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
 
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                    <AlertCircle size={14} /> {error}
 
-                  <AlertCircle size={14} /> {error}
+                  </div>
 
-                </div>
-
-              )}
+                )}
 
               </div>
 
@@ -11976,15 +11912,13 @@ export default function ModelosComponent({
 
                           key={s.id}
 
-                          className={`rounded-xl border transition-all overflow-hidden ${
+                          className={`rounded-xl border transition-all overflow-hidden ${isActive
 
-                            isActive
+                            ? "border-[#0F172A] bg-[#0F172A]/5 shadow-sm"
 
-                              ? "border-[#0F172A] bg-[#0F172A]/5 shadow-sm"
+                            : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
 
-                              : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
-
-                          }`}
+                            }`}
 
                         >
 
@@ -12002,21 +11936,17 @@ export default function ModelosComponent({
 
                               <div
 
-                                className={`w-10 h-5 rounded-full relative transition-colors ${
+                                className={`w-10 h-5 rounded-full relative transition-colors ${isActive ? "bg-[#0F172A]" : "bg-[var(--border)]"
 
-                                  isActive ? "bg-[#0F172A]" : "bg-[var(--border)]"
-
-                                }`}
+                                  }`}
 
                               >
 
                                 <div
 
-                                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isActive ? "translate-x-5" : "translate-x-0.5"
 
-                                    isActive ? "translate-x-5" : "translate-x-0.5"
-
-                                  }`}
+                                    }`}
 
                                 />
 
@@ -12024,11 +11954,9 @@ export default function ModelosComponent({
 
                               <span
 
-                                className={`text-sm font-bold ${
+                                className={`text-sm font-bold ${isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
 
-                                  isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
-
-                                }`}
+                                  }`}
 
                               >
 
@@ -12450,15 +12378,13 @@ export default function ModelosComponent({
 
             <div className={`p-5 flex items-start gap-4 ${confirmModal.danger ? "bg-red-500/5" : "bg-amber-500/5"}`}>
 
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${confirmModal.danger
 
-                confirmModal.danger
+                ? "bg-red-500/15 text-red-500"
 
-                  ? "bg-red-500/15 text-red-500"
+                : "bg-amber-500/15 text-amber-500"
 
-                  : "bg-amber-500/15 text-amber-500"
-
-              }`}>
+                }`}>
 
                 <AlertTriangle size={22} />
 
@@ -12498,15 +12424,13 @@ export default function ModelosComponent({
 
                 onClick={() => confirmModal.onConfirm()}
 
-                className={`px-5 py-2.5 text-sm font-bold rounded-xl transition-all ${
+                className={`px-5 py-2.5 text-sm font-bold rounded-xl transition-all ${confirmModal.danger
 
-                  confirmModal.danger
+                  ? "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20"
 
-                    ? "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20"
+                  : "bg-[#0F172A] hover:bg-slate-800 text-white"
 
-                    : "bg-[#0F172A] hover:bg-slate-800 text-white"
-
-                }`}>
+                  }`}>
 
                 {confirmModal.confirmText || "Confirmar"}
 
@@ -12528,9 +12452,9 @@ export default function ModelosComponent({
 
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
 
-             onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier()); }}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier()); }}
 
-             onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier()); }}>
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier()); }}>
 
           <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-lg max-h-[92dvh] sm:max-h-[88vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
 
