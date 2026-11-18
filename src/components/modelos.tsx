@@ -727,21 +727,19 @@ const getDocenaBaseParaSerie = (sObj?: SerieConfig | null): Record<number, numbe
 
 
   // Caso 5 tallas general: extremos 2, intermedias 3 (2+3+3+2+2 = 12)
-
   if (n === 5) {
-
     result[nums[0]] = 2;
-
     result[nums[1]] = 3;
-
     result[nums[2]] = 3;
-
     result[nums[3]] = 2;
-
     result[nums[4]] = 2;
-
     return result;
+  }
 
+  // Para rangos personalizados mayores a 6 tallas (ej. 37 a 45): arrancar con 2 pares por cada talla
+  if (n > 6) {
+    nums.forEach(num => { result[num] = 2; });
+    return result;
   }
 
 
@@ -1911,35 +1909,43 @@ export default function ModelosComponent({
 
 
   const resetForm = () => {
-
     setSelectedMatrizModelId("");
-
     setBaseCode("");
-
     setBaseCodeManual(false);
-
     setName("");
-
     setBrand("");
-
     setMaterial("");
-
     setSupplierId("");
-
     setCreateAlternateIds([]);
-
     setColors([{ color: "", foto: null, supplierId: "" }]);
 
-    setSerieIds([]);
+    // Preseleccionar por defecto Juvenil (34-38) y Adulto (38-42) como base
+    const sJuvenil = series.find(s => s.nombre.toUpperCase().includes("JUVENIL"));
+    const sAdulto = series.find(s => s.nombre.toUpperCase().includes("ADULTO") && !s.nombre.toUpperCase().includes("GRANDE"));
 
-    setSeriesPrices({});
+    const defaultSerieIds: string[] = [];
+    const defaultCustomTallas: Record<string, string[]> = {};
+    const defaultSeriesPrices: Record<string, { costPrice: string; salePrice: string }> = {};
 
-    setCustomTallas({});
+    if (sJuvenil) {
+      defaultSerieIds.push(sJuvenil.id);
+      const docenaJuv = getDocenaBaseParaSerie(sJuvenil);
+      defaultCustomTallas[sJuvenil.id] = buildTallaIdsFromCurva(sJuvenil, docenaJuv);
+      defaultSeriesPrices[sJuvenil.id] = { costPrice: "", salePrice: "" };
+    }
 
+    if (sAdulto) {
+      defaultSerieIds.push(sAdulto.id);
+      const docenaAdu = getDocenaBaseParaSerie(sAdulto);
+      defaultCustomTallas[sAdulto.id] = buildTallaIdsFromCurva(sAdulto, docenaAdu);
+      defaultSeriesPrices[sAdulto.id] = { costPrice: "", salePrice: "" };
+    }
+
+    setSerieIds(defaultSerieIds);
+    setSeriesPrices(defaultSeriesPrices);
+    setCustomTallas(defaultCustomTallas);
     setStockInicial("1");
-
     setError("");
-
   };
 
 
@@ -3153,68 +3159,96 @@ export default function ModelosComponent({
     setError("");
 
     try {
-      if (SERIES_CANONICAS.includes(editingSerie.nombre)) {
-        // La serie es una de las canónicas del sistema (ADULTO, JUVENIL, etc.)
-        // Buscar si ya existe otra serie en el catálogo con este rango exacto
-        const matchingSerie = series.find(s => {
+      if (showEditModel && editModel) {
+        // ÁMBITO EXCLUSIVO DEL MODELO Y PROVEEDOR
+        // 1. Buscar si ya existe una serie en el catálogo con este rango exacto
+        let targetSerie = series.find(s => {
           const sorted = (s.tallas || []).map(t => t.numero).sort((a, b) => a - b);
           return sorted.length > 0 && sorted[0] === desde && sorted[sorted.length - 1] === hasta;
         });
 
-        if (matchingSerie && matchingSerie.id !== editingSerie.id) {
-          // Asignar la serie coincidente al modelo
-          if (showEditModel) {
-            setEditModelSerieIds(prev => {
-              const filtered = prev.filter(x => x !== editingSerie.id);
-              return filtered.includes(matchingSerie.id) ? filtered : [...filtered, matchingSerie.id];
-            });
-            if (matchingSerie.tallas && matchingSerie.tallas.length > 0) {
-              const docena = getDocenaBaseParaSerie(matchingSerie);
-              const ids = buildTallaIdsFromCurva(matchingSerie, docena);
-              setEditModelCustomTallas(prev => ({ ...prev, [matchingSerie.id]: ids }));
-            }
-            if (editModelSeriesPrices[editingSerie.id]) {
-              setEditModelSeriesPrices(prev => ({
-                ...prev,
-                [matchingSerie.id]: prev[editingSerie.id]
-              }));
-            }
-          }
-          setSuccess(`Serie con rango ${desde}-${hasta} asignada.`);
-          setShowEditSeriesModal(false);
-          setEditingSerie(null);
-          setTimeout(() => setSuccess(""), 4000);
-          return;
+        // 2. Si no existe, crear la serie específica con nombre limpio y rango (ej. "ADULTO (37-45)")
+        if (!targetSerie) {
+          const baseName = editingSerie.nombre.replace(/\s*\(\d+-\d+\)/g, "").trim();
+          const targetName = `${baseName} (${desde}-${hasta})`;
+          const createdRes = await ApiService.post('/configuracion/series-completa', {
+            nombre: targetName,
+            tallasDesde: desde,
+            tallasHasta: hasta,
+          });
+          targetSerie = createdRes?.serie || createdRes;
         }
 
-        setError(`La serie "${editingSerie.nombre}" es una serie base del sistema y no se puede modificar directamente. Para crear un nuevo rango (${desde} a ${hasta}), presiona el botón "+ Crear Nueva Serie".`);
+        if (targetSerie && targetSerie.id) {
+          const finalTarget = targetSerie;
+          setSeries(prev => {
+            const exists = prev.some(s => s.id === finalTarget.id);
+            if (exists) return prev.map(s => s.id === finalTarget.id ? finalTarget : s);
+            return [...prev, finalTarget].sort((a: any, b: any) => {
+              const idxA = SERIES_ORDEN.indexOf(a.nombre);
+              const idxB = SERIES_ORDEN.indexOf(b.nombre);
+              return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+            });
+          });
+
+          // Reemplazar la serie en las series activas de este modelo
+          setEditModelSerieIds(prev => {
+            const filtered = prev.filter(x => x !== editingSerie.id);
+            return filtered.includes(finalTarget.id) ? filtered : [...filtered, finalTarget.id];
+          });
+
+          // Inicializar tallas: 2 pares por cada número o docena si corresponde
+          if (finalTarget.tallas && finalTarget.tallas.length > 0) {
+            const docena = getDocenaBaseParaSerie(finalTarget);
+            const ids = buildTallaIdsFromCurva(finalTarget, docena);
+            setEditModelCustomTallas(prev => ({ ...prev, [finalTarget.id]: ids }));
+          }
+
+          // Mantener o transferir precios
+          if (editModelSeriesPrices[editingSerie.id]) {
+            setEditModelSeriesPrices(prev => ({
+              ...prev,
+              [finalTarget.id]: prev[editingSerie.id]
+            }));
+          }
+
+          setSuccess(`Serie con rango ${desde}-${hasta} asignada al modelo "${editModel.name}".`);
+        }
+
+        setShowEditSeriesModal(false);
+        setEditingSerie(null);
+        await loadData();
+        setTimeout(() => setSuccess(""), 4000);
         return;
       }
 
-      // Si NO es canónica, actualizarla directamente en la BD con PUT (cero series duplicadas)
-      const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
-        nombre: editSerieNombre,
-        tallasDesde: desde,
-        tallasHasta: hasta,
-      });
-      const sUpdated = updatedSerieRes?.serie || updatedSerieRes;
+      // Si se edita fuera del modelo y no es canónica:
+      if (!SERIES_CANONICAS.includes(editingSerie.nombre)) {
+        const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
+          nombre: editSerieNombre,
+          tallasDesde: desde,
+          tallasHasta: hasta,
+        });
+        const sUpdated = updatedSerieRes?.serie || updatedSerieRes;
 
-      if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
-        const docena = getDocenaBaseParaSerie(sUpdated);
-        const ids = buildTallaIdsFromCurva(sUpdated, docena);
-        setEditModelCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
-        setSupplierSeriesCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
-        setNewColorCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+        if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
+          const docena = getDocenaBaseParaSerie(sUpdated);
+          const ids = buildTallaIdsFromCurva(sUpdated, docena);
+          setEditModelCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+          setSupplierSeriesCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+          setNewColorCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+          setSeries(prev => prev.map(s => s.id === sUpdated.id ? sUpdated : s));
+        }
 
-        // Actualizar la lista local de series de inmediato para que las tallas se vean sin recargar
-        setSeries(prev => prev.map(s => s.id === sUpdated.id ? sUpdated : s));
+        setSuccess(`Serie "${editSerieNombre}" actualizada correctamente.`);
+        setShowEditSeriesModal(false);
+        setEditingSerie(null);
+        await loadData();
+        setTimeout(() => setSuccess(""), 4000);
+        return;
       }
 
-      setSuccess(`Serie "${editSerieNombre}" actualizada correctamente.`);
-      setShowEditSeriesModal(false);
-      setEditingSerie(null);
-      await loadData();
-      setTimeout(() => setSuccess(""), 4000);
+      setError(`Para modificar el rango de la serie "${editingSerie.nombre}", edítala directamente dentro del modelo donde deseas aplicarla.`);
     } catch (err: any) {
       setError(err.message || "Error al actualizar la serie.");
     } finally {
