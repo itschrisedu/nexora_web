@@ -2050,33 +2050,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       );
 
-      // El saldo deudor contable exacto es Total Facturado a Crédito menos Total Abonado menos Devoluciones (coincidente con el Historial Comercial)
-      const cobrosCredito = listaCobros.filter((c) => c.tipo !== 'CONTADO');
-
-      const totalCreditoFacturado = cobrosCredito.reduce(
-        (sum, c) => sum + Number(c.montoOriginal ?? c.montoTotal ?? 0),
-        0,
+      // Saldo deudor = suma de saldoPendiente de cada cobro pendiente de crédito (misma lógica que el backend)
+      const saldoTotalPendiente = Math.max(0, Math.round(
+        listaCobros.reduce((sum, c) => {
+          if (c.estado === 'SALDADO' || c.tipo === 'CONTADO') return sum;
+          return sum + Number(c.saldoPendiente || 0);
+        }, 0) * 100) / 100,
       );
-
-      const totalAbonosCredito = cobrosCredito.reduce(
-        (sum, c) => sum + (c.abonos || []).reduce((s, a) => s + Number(a.monto || 0), 0),
-        0,
-      );
-
-      // Restar devoluciones descontadas al cliente (enviadas por el backend)
-      const devolucionesDescontadas = Number(listaCobros[0]?.devolucionesDescontadasCliente || 0);
-
-      const saldoContableReal = Math.max(0, Math.round((totalCreditoFacturado - totalAbonosCredito - devolucionesDescontadas) * 100) / 100);
-
-      const saldoSumadoCobros = listaCobros.reduce((sum, c) => {
-
-        if (c.estado === 'SALDADO' || c.tipo === 'CONTADO') return sum;
-
-        return sum + Number(c.saldoPendiente || 0);
-
-      }, 0);
-
-      const saldoTotalPendiente = totalCreditoFacturado > 0 ? saldoContableReal : saldoSumadoCobros;
 
 
 
