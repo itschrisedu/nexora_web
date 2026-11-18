@@ -3071,176 +3071,127 @@ export default function ModelosComponent({
     try {
 
       const createdSerie = await ApiService.post("/configuracion/series-completa", {
-
         nombre: newSerieNombre,
-
         tallasDesde: desde,
-
         tallasHasta: hasta,
-
       });
 
-      setSuccess(`Serie "${createdSerie.nombre}" creada correctamente.`);
+      const sData = createdSerie?.serie || createdSerie;
 
+      setSuccess(`Serie "${sData.nombre}" creada correctamente.`);
       setShowCreateSeriesModal(false);
-
       setNewSerieNombre("");
 
-      await loadData();
+      if (sData?.id) {
+        // Actualizar la lista local de series de inmediato para que se refleje sin recargar
+        setSeries(prev => {
+          const filtered = prev.filter(s => s.id !== sData.id);
+          return [...filtered, sData].sort((a: any, b: any) => {
+            const idxA = SERIES_ORDEN.indexOf(a.nombre);
+            const idxB = SERIES_ORDEN.indexOf(b.nombre);
+            return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+          });
+        });
 
-      if (createdSerie?.id) {
+        const docena = getDocenaBaseParaSerie(sData);
+        const ids = buildTallaIdsFromCurva(sData, docena);
 
-        if (showEditProduct) {
-
-          setSupplierSeriesActiveIds([createdSerie.id]);
-
-          setEditProductSerieId(createdSerie.id);
-
-          const docena = getDocenaBaseParaSerie(createdSerie);
-
-          const ids = buildTallaIdsFromCurva(createdSerie, docena);
-
-          setSupplierSeriesCustomTallas(ct => ({ ...ct, [createdSerie.id]: ids }));
-
+        if (showEditModel) {
+          // Asignar y activar de inmediato la nueva serie para el modelo en edición
+          setEditModelSerieIds(prev => (prev.includes(sData.id) ? prev : [...prev, sData.id]));
+          setEditModelCustomTallas(ct => ({ ...ct, [sData.id]: ids }));
+          setEditModelSeriesPrices(sp => ({
+            ...sp,
+            [sData.id]: sp[sData.id] || { costPrice: "", salePrice: "" }
+          }));
+        } else if (showEditProduct) {
+          setSupplierSeriesActiveIds([sData.id]);
+          setEditProductSerieId(sData.id);
+          setSupplierSeriesCustomTallas(ct => ({ ...ct, [sData.id]: ids }));
         } else if (showSupplierSeriesModal) {
-
-          setSupplierSeriesActiveIds(prev => (prev.includes(createdSerie.id) ? prev : [...prev, createdSerie.id]));
-
-          const docena = getDocenaBaseParaSerie(createdSerie);
-
-          const ids = buildTallaIdsFromCurva(createdSerie, docena);
-
-          setSupplierSeriesCustomTallas(ct => ({ ...ct, [createdSerie.id]: ids }));
-
+          setSupplierSeriesActiveIds(prev => (prev.includes(sData.id) ? prev : [...prev, sData.id]));
+          setSupplierSeriesCustomTallas(ct => ({ ...ct, [sData.id]: ids }));
         } else if (showAddColorModal) {
-
-          setNewColorSerieIds(prev => (prev.includes(createdSerie.id) ? prev : [...prev, createdSerie.id]));
-
-          const docena = getDocenaBaseParaSerie(createdSerie);
-
-          const ids = buildTallaIdsFromCurva(createdSerie, docena);
-
-          setNewColorCustomTallas(ct => ({ ...ct, [createdSerie.id]: ids }));
-
+          setNewColorSerieIds(prev => (prev.includes(sData.id) ? prev : [...prev, sData.id]));
+          setNewColorCustomTallas(ct => ({ ...ct, [sData.id]: ids }));
         } else {
-
-          toggleSerie(createdSerie.id);
-
+          toggleSerie(sData.id);
         }
-
       }
 
+      await loadData();
       setTimeout(() => setSuccess(""), 4000);
-
     } catch (err: any) {
-
       setError(err.message || "Error al crear la serie.");
-
     } finally {
-
       setSaving(false);
-
     }
-
   };
-
-
 
   const openEditSeriesModal = (s: SerieConfig) => {
-
     setEditingSerie(s);
-
     setEditSerieNombre(s.nombre);
-
     const sorted = s.tallas && s.tallas.length > 0 ? [...s.tallas].sort((a, b) => a.numero - b.numero) : [];
-
     setEditSerieTallasDesde(sorted.length > 0 ? String(sorted[0].numero) : "38");
-
     setEditSerieTallasHasta(sorted.length > 0 ? String(sorted[sorted.length - 1].numero) : "43");
-
     setError("");
-
     setShowEditSeriesModal(true);
-
   };
 
-
-
   const handleUpdateSeries = async (e: React.FormEvent) => {
-
     e.preventDefault();
-
     if (!editingSerie) return;
 
     const desde = parseInt(editSerieTallasDesde);
-
     const hasta = parseInt(editSerieTallasHasta);
-
     if (isNaN(desde) || isNaN(hasta) || hasta < desde) {
-
       setError("Ingresa un rango de tallas válido (ej: 38 a 43).");
-
       return;
-
     }
 
     setSaving(true);
-
     setError("");
 
     try {
-      if (showEditModel && editModel) {
-        // ÁMBITO EXCLUSIVO DEL MODELO: El cambio de serie debe aplicar ÚNICAMENTE al modelo que se está editando
-        // Buscar si ya existe una serie con este rango exacto (ej. 34 a 38 corresponde a Juvenil)
+      if (SERIES_CANONICAS.includes(editingSerie.nombre)) {
+        // La serie es una de las canónicas del sistema (ADULTO, JUVENIL, etc.)
+        // Buscar si ya existe otra serie en el catálogo con este rango exacto
         const matchingSerie = series.find(s => {
           const sorted = (s.tallas || []).map(t => t.numero).sort((a, b) => a - b);
           return sorted.length > 0 && sorted[0] === desde && sorted[sorted.length - 1] === hasta;
         });
 
-        let targetSerie: SerieConfig;
-        if (matchingSerie) {
-          targetSerie = matchingSerie;
-        } else {
-          // Si no existe, crear la serie específica para no alterar las series de los otros modelos
-          const createdRes = await ApiService.post('/configuracion/series-completa', {
-            nombre: editSerieNombre.trim() || `SERIE_${desde}_${hasta}`,
-            tallasDesde: desde,
-            tallasHasta: hasta,
-          });
-          targetSerie = createdRes?.serie || createdRes;
+        if (matchingSerie && matchingSerie.id !== editingSerie.id) {
+          // Asignar la serie coincidente al modelo
+          if (showEditModel) {
+            setEditModelSerieIds(prev => {
+              const filtered = prev.filter(x => x !== editingSerie.id);
+              return filtered.includes(matchingSerie.id) ? filtered : [...filtered, matchingSerie.id];
+            });
+            if (matchingSerie.tallas && matchingSerie.tallas.length > 0) {
+              const docena = getDocenaBaseParaSerie(matchingSerie);
+              const ids = buildTallaIdsFromCurva(matchingSerie, docena);
+              setEditModelCustomTallas(prev => ({ ...prev, [matchingSerie.id]: ids }));
+            }
+            if (editModelSeriesPrices[editingSerie.id]) {
+              setEditModelSeriesPrices(prev => ({
+                ...prev,
+                [matchingSerie.id]: prev[editingSerie.id]
+              }));
+            }
+          }
+          setSuccess(`Serie con rango ${desde}-${hasta} asignada.`);
+          setShowEditSeriesModal(false);
+          setEditingSerie(null);
+          setTimeout(() => setSuccess(""), 4000);
+          return;
         }
 
-        // Asignar la serie objetivo exclusivamente a este modelo, reemplazando la serie anterior en la selección
-        if (targetSerie && targetSerie.id) {
-          setEditModelSerieIds(prev => {
-            const filtered = prev.filter(x => x !== editingSerie.id);
-            return filtered.includes(targetSerie.id) ? filtered : [...filtered, targetSerie.id];
-          });
-
-          if (targetSerie.tallas && targetSerie.tallas.length > 0) {
-            const docena = getDocenaBaseParaSerie(targetSerie);
-            const ids = buildTallaIdsFromCurva(targetSerie, docena);
-            setEditModelCustomTallas(prev => ({ ...prev, [targetSerie.id]: ids }));
-          }
-
-          if (editModelSeriesPrices[editingSerie.id]) {
-            setEditModelSeriesPrices(prev => ({
-              ...prev,
-              [targetSerie.id]: prev[editingSerie.id],
-            }));
-          }
-
-          setSuccess(`Serie con rango ${desde}-${hasta} asignada exclusivamente al modelo "${editModel.name}".`);
-        }
-
-        setShowEditSeriesModal(false);
-        setEditingSerie(null);
-        await loadData();
-        setTimeout(() => setSuccess(""), 4000);
+        setError(`La serie "${editingSerie.nombre}" es una serie base del sistema y no se puede modificar directamente. Para crear un nuevo rango (${desde} a ${hasta}), presiona el botón "+ Crear Nueva Serie".`);
         return;
       }
 
-      // Siempre actualizar la serie existente con PUT (nunca crear una nueva con POST)
+      // Si NO es canónica, actualizarla directamente en la BD con PUT (cero series duplicadas)
       const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
         nombre: editSerieNombre,
         tallasDesde: desde,
@@ -3254,30 +3205,22 @@ export default function ModelosComponent({
         setEditModelCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
         setSupplierSeriesCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
         setNewColorCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+
+        // Actualizar la lista local de series de inmediato para que las tallas se vean sin recargar
+        setSeries(prev => prev.map(s => s.id === sUpdated.id ? sUpdated : s));
       }
 
       setSuccess(`Serie "${editSerieNombre}" actualizada correctamente.`);
-
       setShowEditSeriesModal(false);
-
       setEditingSerie(null);
-
       await loadData();
-
       setTimeout(() => setSuccess(""), 4000);
-
     } catch (err: any) {
-
       setError(err.message || "Error al actualizar la serie.");
-
     } finally {
-
       setSaving(false);
-
     }
-
   };
-
 
   // Series canónicas protegidas que no se pueden eliminar
   const SERIES_CANONICAS = ["ADULTO", "JUVENIL", "NINO", "NINO_PEQUENO_A", "BEBE", "TALLA_GRANDE"];
@@ -3289,22 +3232,30 @@ export default function ModelosComponent({
       return;
     }
 
-    const confirmMsg = `¿Estás seguro de eliminar la serie "${s.nombre}"?\n\nSi tiene productos asociados, serán reasignados automáticamente a la serie canónica correspondiente.`;
-    if (!window.confirm(confirmMsg)) return;
-
-    setSaving(true);
-    setError("");
-    try {
-      await ApiService.delete(`/configuracion/series/${s.id}`);
-      setSuccess(`Serie "${s.nombre}" eliminada correctamente.`);
-      await loadData();
-      setTimeout(() => setSuccess(""), 4000);
-    } catch (err: any) {
-      setError(err.message || "Error al eliminar la serie.");
-      setTimeout(() => setError(""), 5000);
-    } finally {
-      setSaving(false);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Eliminar Serie",
+      message: `¿Estás seguro de eliminar la serie "${s.nombre}"?\n\nSi tiene productos asociados, serán reasignados automáticamente a la serie canónica correspondiente.`,
+      confirmText: "Sí, eliminar",
+      cancelText: "Cancelar",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setSaving(true);
+        setError("");
+        try {
+          await ApiService.delete(`/configuracion/series/${s.id}`);
+          setSuccess(`Serie "${s.nombre}" eliminada correctamente.`);
+          await loadData();
+          setTimeout(() => setSuccess(""), 4000);
+        } catch (err: any) {
+          setError(err.message || "Error al eliminar la serie.");
+          setTimeout(() => setError(""), 5000);
+        } finally {
+          setSaving(false);
+        }
+      }
+    });
   };
 
 
