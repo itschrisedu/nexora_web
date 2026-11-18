@@ -3204,77 +3204,20 @@ export default function ModelosComponent({
 
     try {
 
-      const isScopedToModel = Boolean(supplierSeriesTargetModel || editModel || showEditProduct);
-      let sUpdated: any = null;
+      // Siempre actualizar la serie existente con PUT (nunca crear una nueva con POST)
+      const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
+        nombre: editSerieNombre,
+        tallasDesde: desde,
+        tallasHasta: hasta,
+      });
+      const sUpdated = updatedSerieRes?.serie || updatedSerieRes;
 
-      if (isScopedToModel) {
-        // Se aplica EXCLUSIVAMENTE a este modelo y a este proveedor sin alterar otros calzados del catálogo
-        const cleanBase = editSerieNombre.replace(/\s*\(\d+-\d+\)/g, '').trim();
-        const targetNombre = `${cleanBase} (${desde}-${hasta})`;
-        const res = await ApiService.post("/configuracion/series-completa", {
-          nombre: targetNombre,
-          tallasDesde: desde,
-          tallasHasta: hasta,
-        });
-        sUpdated = res?.serie || res;
-
-        if (sUpdated?.id) {
-          const newId = sUpdated.id;
-          const oldId = editingSerie.id;
-
-          if (showSupplierSeriesModal) {
-            setSupplierSeriesActiveIds(prev => {
-              const next = prev.filter(id => id !== oldId);
-              return next.includes(newId) ? next : [...next, newId];
-            });
-            setSupplierSeriesPrices(prev => ({
-              ...prev,
-              [newId]: prev[oldId] || { costPrice: "", salePrice: "" },
-            }));
-            const docena = getDocenaBaseParaSerie(sUpdated);
-            const ids = buildTallaIdsFromCurva(sUpdated, docena);
-            setSupplierSeriesCustomTallas(prev => ({
-              ...prev,
-              [newId]: ids,
-            }));
-          }
-
-          if (showEditModel) {
-            setEditModelSerieIds(prev => {
-              const next = prev.filter(id => id !== oldId);
-              return next.includes(newId) ? next : [...next, newId];
-            });
-            setEditModelSeriesPrices(prev => ({
-              ...prev,
-              [newId]: prev[oldId] || { costPrice: "", salePrice: "" },
-            }));
-            const docena = getDocenaBaseParaSerie(sUpdated);
-            const ids = buildTallaIdsFromCurva(sUpdated, docena);
-            setEditModelCustomTallas(prev => ({
-              ...prev,
-              [newId]: ids,
-            }));
-          }
-
-          if (showEditProduct) {
-            setEditProductSerieId(newId);
-          }
-        }
-      } else {
-        const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
-          nombre: editSerieNombre,
-          tallasDesde: desde,
-          tallasHasta: hasta,
-        });
-        sUpdated = updatedSerieRes?.serie || updatedSerieRes;
-
-        if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
-          const docena = getDocenaBaseParaSerie(sUpdated);
-          const ids = buildTallaIdsFromCurva(sUpdated, docena);
-          setEditModelCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
-          setSupplierSeriesCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
-          setNewColorCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
-        }
+      if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
+        const docena = getDocenaBaseParaSerie(sUpdated);
+        const ids = buildTallaIdsFromCurva(sUpdated, docena);
+        setEditModelCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+        setSupplierSeriesCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+        setNewColorCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
       }
 
       setSuccess(`Serie "${editSerieNombre}" actualizada correctamente.`);
