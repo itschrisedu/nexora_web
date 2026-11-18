@@ -3243,6 +3243,35 @@ export default function ModelosComponent({
   };
 
 
+  // Series canónicas protegidas que no se pueden eliminar
+  const SERIES_CANONICAS = ["ADULTO", "JUVENIL", "NINO", "NINO_PEQUENO_A", "BEBE", "TALLA_GRANDE"];
+
+  const handleDeleteSeries = async (s: SerieConfig) => {
+    if (SERIES_CANONICAS.includes(s.nombre)) {
+      setError(`La serie "${s.nombre}" es una serie base oficial y no se puede eliminar.`);
+      setTimeout(() => setError(""), 4000);
+      return;
+    }
+
+    const confirmMsg = `¿Estás seguro de eliminar la serie "${s.nombre}"?\n\nSi tiene productos asociados, serán reasignados automáticamente a la serie canónica correspondiente.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setSaving(true);
+    setError("");
+    try {
+      await ApiService.delete(`/configuracion/series/${s.id}`);
+      setSuccess(`Serie "${s.nombre}" eliminada correctamente.`);
+      await loadData();
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err.message || "Error al eliminar la serie.");
+      setTimeout(() => setError(""), 5000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+
 
   const handleNewColorFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
 
@@ -6718,15 +6747,29 @@ export default function ModelosComponent({
 
                                   {variants.map(p => {
 
-                                    const isAdulto = ((p.serie?.nombre || '').toUpperCase().includes('ADULTO') || (p.serie?.nombre || '').toUpperCase().includes('CABALLERO') || (p.serie?.nombre || '').toUpperCase().includes('HOMBRE')) && !(p.serie?.nombre || '').toUpperCase().includes('GRANDE');
-                                    const isJuvenil = (p.serie?.nombre || '').toUpperCase().includes('JUVENIL');
-                                    const tallas = (p.tallas || (p as any).stockPorTalla || []).filter((t: any) => {
-                                      const num = Number(t.numero ?? t.nombre);
-                                      const cant = Number(t.cantidad ?? t.stock ?? t.disponible ?? 0);
-                                      // (filtro adulto eliminado - se respetan las tallas configuradas)
-                                      // (filtro juvenil eliminado - se respetan las tallas configuradas)
-                                      return true;
-                                    });
+                                    const pSerie = series.find(s => s.id === (p.serie?.id || (p as any).serieId) || s.nombre === p.serie?.nombre);
+                                    let allowedNumeros: Set<number> | null = null;
+                                    if (pSerie?.tallas && pSerie.tallas.length > 0) {
+                                      allowedNumeros = new Set(pSerie.tallas.map(t => Number(t.numero)));
+                                    } else {
+                                      const matchRange = (p.serie?.nombre || '').match(/\((\d+)\s*-\s*(\d+)\)/);
+                                      if (matchRange) {
+                                        const d = parseInt(matchRange[1], 10);
+                                        const h = parseInt(matchRange[2], 10);
+                                        allowedNumeros = new Set<number>();
+                                        for (let i = d; i <= h; i++) allowedNumeros.add(i);
+                                      }
+                                    }
+
+                                    const tallas = (p.tallas || (p as any).stockPorTalla || [])
+                                      .filter((t: any) => {
+                                        const num = Number(t.numero ?? t.nombre);
+                                        if (allowedNumeros && allowedNumeros.size > 0) {
+                                          return allowedNumeros.has(num);
+                                        }
+                                        return true;
+                                      })
+                                      .sort((a: any, b: any) => Number(a.numero ?? a.nombre) - Number(b.numero ?? b.nombre));
 
                                     const totalStock = tallas.reduce((acc: number, t: any) => acc + (t.cantidad ?? t.disponible ?? 0), 0);
 
@@ -8347,6 +8390,22 @@ export default function ModelosComponent({
                               <span>Editar</span>
 
                             </button>
+
+                            {!SERIES_CANONICAS.includes(s.nombre) && (
+
+                              <button type="button" onClick={(ev) => { ev.stopPropagation(); handleDeleteSeries(s); }}
+
+                                className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-500/10 transition-colors flex items-center gap-1 text-[11px] font-semibold"
+
+                                title={`Eliminar serie duplicada "${s.nombre}"`}>
+
+                                <Trash2 size={13} />
+
+                                <span>Eliminar</span>
+
+                              </button>
+
+                            )}
 
                             {isActive && (
 
@@ -11488,6 +11547,22 @@ export default function ModelosComponent({
 
                             </button>
 
+                            {!SERIES_CANONICAS.includes(s.nombre) && (
+
+                              <button type="button" onClick={(ev) => { ev.stopPropagation(); handleDeleteSeries(s); }}
+
+                                className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-500/10 transition-colors flex items-center gap-1 text-[11px] font-semibold"
+
+                                title={`Eliminar serie duplicada "${s.nombre}"`}>
+
+                                <Trash2 size={13} />
+
+                                <span>Eliminar</span>
+
+                              </button>
+
+                            )}
+
                             {isActive && (
 
                               <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">ACTIVA</span>
@@ -12081,6 +12156,28 @@ export default function ModelosComponent({
                                 <span>Editar</span>
 
                               </button>
+
+                              {!SERIES_CANONICAS.includes(s.nombre) && (
+
+                                <button
+
+                                  type="button"
+
+                                  onClick={(ev) => { ev.stopPropagation(); handleDeleteSeries(s); }}
+
+                                  className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-500/10 transition-colors flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
+
+                                  title={`Eliminar serie duplicada "${s.nombre}"`}
+
+                                >
+
+                                  <Trash2 size={13} />
+
+                                  <span>Eliminar</span>
+
+                                </button>
+
+                              )}
 
                               {isActive && (
 
