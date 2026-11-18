@@ -508,13 +508,19 @@ const normalizarClaveSerie = (nombre: string): string => {
   return n;
 };
 
+// Comprueba si una serie pertenece de forma exclusiva a un modelo (insensible a mayúsculas/minúsculas)
+const esSerieDeModelo = (serieNombre: string | undefined | null, targetId: string | undefined | null): boolean => {
+  if (!serieNombre || !targetId) return false;
+  return serieNombre.toLowerCase().includes(`_m_${targetId.toLowerCase()}`);
+};
+
 // Filtra las series relevantes para un modelo específico, garantizando que siempre existan las 6 series base
 const getSeriesParaModelo = (modelId: string | undefined | null, allSeries: SerieConfig[]): SerieConfig[] => {
   const seriesList = allSeries || [];
 
   const candidatas = seriesList.filter(s => {
-    if (s.nombre && s.nombre.includes('_M_')) {
-      return modelId ? (s.nombre.endsWith(`_M_${modelId}`) || s.nombre.includes(`_M_${modelId}`)) : false;
+    if (s.nombre && s.nombre.toLowerCase().includes('_m_')) {
+      return modelId ? esSerieDeModelo(s.nombre, modelId) : false;
     }
     return true;
   });
@@ -523,10 +529,10 @@ const getSeriesParaModelo = (modelId: string | undefined | null, allSeries: Seri
 
   // 1. Para cada una de las 6 categorías canónicas, garantizar que SIEMPRE exista una serie
   for (const c of CANONICAS_BASE) {
-    // A) Buscar si este modelo tiene una versión exclusiva de esta categoría
+    // A) Buscar si este modelo tiene una versión exclusiva de esta categoría (comparación case-insensitive)
     const exclusiva = candidatas.find(s =>
       s.nombre &&
-      s.nombre.includes('_M_') &&
+      esSerieDeModelo(s.nombre, modelId) &&
       normalizarClaveSerie(s.nombre) === c.key
     );
 
@@ -538,7 +544,7 @@ const getSeriesParaModelo = (modelId: string | undefined | null, allSeries: Seri
     // B) Buscar la serie canónica base general en la lista
     const base = candidatas.find(s =>
       s.nombre &&
-      !s.nombre.includes('_M_') &&
+      !s.nombre.toLowerCase().includes('_m_') &&
       normalizarClaveSerie(s.nombre) === c.key
     );
 
@@ -566,7 +572,7 @@ const getSeriesParaModelo = (modelId: string | undefined | null, allSeries: Seri
   const personalizadas = candidatas.filter(s => {
     const key = normalizarClaveSerie(s.nombre);
     const esCanonica = CANONICAS_BASE.some(c => c.key === key);
-    return !esCanonica && !s.nombre.includes('_M_');
+    return !esCanonica && !s.nombre.toLowerCase().includes('_m_');
   });
 
   const resultado: SerieConfig[] = [];
@@ -3261,7 +3267,7 @@ export default function ModelosComponent({
 
       if (targetModelId) {
         // AISLAMIENTO: Esta modificación aplica exclusivamente a este modelo y sus colores
-        const isExclusiveToThisModel = editingSerie.nombre.includes(`_M_${targetModelId}`);
+        const isExclusiveToThisModel = esSerieDeModelo(editingSerie.nombre, targetModelId);
 
         if (isExclusiveToThisModel) {
           // Ya es la serie exclusiva de este modelo: actualizar directamente in-place con PUT
@@ -3327,7 +3333,7 @@ export default function ModelosComponent({
               if (s.id === sUpdated.id) return false;
               // Solo removemos editingSerie si era una versión exclusiva previa de este mismo modelo.
               // La serie canónica base compartida DEBE permanecer intacta para todos los demás modelos.
-              if (s.id === editingSerie.id && editingSerie.nombre.includes(`_M_${targetModelId}`)) return false;
+              if (s.id === editingSerie.id && esSerieDeModelo(editingSerie.nombre, targetModelId)) return false;
               return true;
             });
             return [...filtered, sUpdated];
