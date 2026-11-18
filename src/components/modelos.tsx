@@ -3189,6 +3189,56 @@ export default function ModelosComponent({
     setError("");
 
     try {
+      if (showEditModel && editModel) {
+        // ÁMBITO EXCLUSIVO DEL MODELO: El cambio de serie debe aplicar ÚNICAMENTE al modelo que se está editando
+        // Buscar si ya existe una serie con este rango exacto (ej. 34 a 38 corresponde a Juvenil)
+        const matchingSerie = series.find(s => {
+          const sorted = (s.tallas || []).map(t => t.numero).sort((a, b) => a - b);
+          return sorted.length > 0 && sorted[0] === desde && sorted[sorted.length - 1] === hasta;
+        });
+
+        let targetSerie: SerieConfig;
+        if (matchingSerie) {
+          targetSerie = matchingSerie;
+        } else {
+          // Si no existe, crear la serie específica para no alterar las series de los otros modelos
+          const createdRes = await ApiService.post('/configuracion/series-completa', {
+            nombre: editSerieNombre.trim() || `SERIE_${desde}_${hasta}`,
+            tallasDesde: desde,
+            tallasHasta: hasta,
+          });
+          targetSerie = createdRes?.serie || createdRes;
+        }
+
+        // Asignar la serie objetivo exclusivamente a este modelo, reemplazando la serie anterior en la selección
+        if (targetSerie && targetSerie.id) {
+          setEditModelSerieIds(prev => {
+            const filtered = prev.filter(x => x !== editingSerie.id);
+            return filtered.includes(targetSerie.id) ? filtered : [...filtered, targetSerie.id];
+          });
+
+          if (targetSerie.tallas && targetSerie.tallas.length > 0) {
+            const docena = getDocenaBaseParaSerie(targetSerie);
+            const ids = buildTallaIdsFromCurva(targetSerie, docena);
+            setEditModelCustomTallas(prev => ({ ...prev, [targetSerie.id]: ids }));
+          }
+
+          if (editModelSeriesPrices[editingSerie.id]) {
+            setEditModelSeriesPrices(prev => ({
+              ...prev,
+              [targetSerie.id]: prev[editingSerie.id],
+            }));
+          }
+
+          setSuccess(`Serie con rango ${desde}-${hasta} asignada exclusivamente al modelo "${editModel.name}".`);
+        }
+
+        setShowEditSeriesModal(false);
+        setEditingSerie(null);
+        await loadData();
+        setTimeout(() => setSuccess(""), 4000);
+        return;
+      }
 
       // Siempre actualizar la serie existente con PUT (nunca crear una nueva con POST)
       const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
