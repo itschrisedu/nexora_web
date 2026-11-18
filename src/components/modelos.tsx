@@ -3274,7 +3274,7 @@ export default function ModelosComponent({
         } else {
           // Es la serie canónica compartida: NO modificar la canónica para no afectar a los demás modelos.
           // Crear la versión exclusiva para este modelo con el rango elegido.
-          const baseCat = formatearNombreSerie(editingSerie.nombre).toUpperCase().replace(/\s+/g, '_');
+          const baseCat = normalizarClaveSerie(editingSerie.nombre);
           const exclusiveName = `${baseCat}_M_${targetModelId}`;
 
           const createdRes = await ApiService.post("/configuracion/series-completa", {
@@ -3285,9 +3285,22 @@ export default function ModelosComponent({
           sUpdated = createdRes?.serie || createdRes;
         }
 
-        if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
-          const docena = getDocenaBaseParaSerie(sUpdated);
-          const ids = buildTallaIdsFromCurva(sUpdated, docena);
+        // Si la respuesta del backend no trajo tallas (caso borde), construirlas localmente
+        if (sUpdated && (!sUpdated.tallas || sUpdated.tallas.length === 0)) {
+          const syntheticTallas = [];
+          for (let n = desde; n <= hasta; n++) {
+            syntheticTallas.push({ id: `synth-${sUpdated.id}-${n}`, numero: n, serieId: sUpdated.id });
+          }
+          sUpdated = { ...sUpdated, tallas: syntheticTallas };
+        }
+
+        if (sUpdated && sUpdated.id) {
+          const tallasParaCurva = sUpdated.tallas || [];
+          let ids: string[] = [];
+          if (tallasParaCurva.length > 0) {
+            const docena = getDocenaBaseParaSerie(sUpdated);
+            ids = buildTallaIdsFromCurva(sUpdated, docena);
+          }
 
           // Asegurar que la serie quede estrictamente activa en el modelo actual
           setEditModelSerieIds(prev => {
@@ -3297,7 +3310,7 @@ export default function ModelosComponent({
           setEditModelCustomTallas(prev => {
             const copy = { ...prev };
             delete copy[editingSerie.id];
-            copy[sUpdated.id] = ids;
+            if (ids.length > 0) copy[sUpdated.id] = ids;
             return copy;
           });
           setEditModelSeriesPrices(prev => {
