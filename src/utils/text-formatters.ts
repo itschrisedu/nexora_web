@@ -395,6 +395,13 @@ export function formatearNombreSerie(serieNombre?: string | null): string {
     return MAPA_SERIES[upper];
   }
 
+  // Detectar series canónicas con prefijos o sufijos de modelo/rango
+  for (const [key, label] of Object.entries(MAPA_SERIES)) {
+    if (upper.startsWith(key + " ") || upper.startsWith(key + "_") || upper.startsWith(key + "-")) {
+      return label;
+    }
+  }
+
   return s
     .split(/\s+/)
     .filter(Boolean)

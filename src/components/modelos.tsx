@@ -478,6 +478,39 @@ const getNombreSerie = (s: SerieConfig | string | null | undefined, seriesList?:
 
 };
 
+const SERIES_CANONICAS = ["ADULTO", "JUVENIL", "NINO", "NINO_PEQUENO_A", "BEBE", "TALLA_GRANDE"];
+
+// Filtra las series relevantes para un modelo específico, aislando series exclusivas
+const getSeriesParaModelo = (modelId: string | undefined | null, allSeries: SerieConfig[]): SerieConfig[] => {
+  if (!allSeries || allSeries.length === 0) return [];
+  if (!modelId) {
+    return allSeries.filter(s => !s.nombre.includes('_M_'));
+  }
+
+  const candidatas = allSeries.filter(s => {
+    if (s.nombre.includes('_M_')) {
+      return s.nombre.endsWith(`_M_${modelId}`) || s.nombre.includes(`_M_${modelId}`);
+    }
+    return true;
+  });
+
+  const categoriasExclusivas = new Set<string>();
+  candidatas.forEach(s => {
+    if (s.nombre.includes(`_M_${modelId}`)) {
+      const cat = formatearNombreSerie(s.nombre).toUpperCase();
+      categoriasExclusivas.add(cat);
+    }
+  });
+
+  return candidatas.filter(s => {
+    const cat = formatearNombreSerie(s.nombre).toUpperCase();
+    if (SERIES_CANONICAS.includes(s.nombre) && categoriasExclusivas.has(cat)) {
+      return false;
+    }
+    return true;
+  });
+};
+
 
 
 // Curvas estándar de distribución por serie
@@ -3153,29 +3186,81 @@ export default function ModelosComponent({
     setError("");
 
     try {
-      // MODIFICAR DIRECTAMENTE LA SERIE EXISTENTE (NUNCA CREAR OTRA SERIE)
-      const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
-        nombre: editingSerie.nombre,
-        tallasDesde: desde,
-        tallasHasta: hasta,
-      });
-      const sUpdated = updatedSerieRes?.serie || updatedSerieRes;
+      let sUpdated: any;
+      const targetModelId = showEditModel && editModel ? editModel.id : null;
 
-      if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
-        const docena = getDocenaBaseParaSerie(sUpdated);
-        const ids = buildTallaIdsFromCurva(sUpdated, docena);
+      if (targetModelId) {
+        // AISLAMIENTO: Esta modificación aplica exclusivamente a este modelo y sus colores
+        const isExclusiveToThisModel = editingSerie.nombre.includes(`_M_${targetModelId}`);
 
-        if (showEditModel) {
-          setEditModelSerieIds(prev => (prev.includes(editingSerie.id) ? prev : [...prev, editingSerie.id]));
-          setEditModelCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+        if (isExclusiveToThisModel) {
+          // Ya es la serie exclusiva de este modelo: actualizar directamente in-place con PUT
+          const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
+            nombre: editingSerie.nombre,
+            tallasDesde: desde,
+            tallasHasta: hasta,
+          });
+          sUpdated = updatedSerieRes?.serie || updatedSerieRes;
+        } else {
+          // Es la serie canónica compartida: NO modificar la canónica para no afectar a los demás modelos.
+          // Crear la versión exclusiva para este modelo con el rango elegido.
+          const baseCat = formatearNombreSerie(editingSerie.nombre).toUpperCase().replace(/\s+/g, '_');
+          const exclusiveName = `${baseCat}_M_${targetModelId}`;
+
+          const createdRes = await ApiService.post("/configuracion/series-completa", {
+            nombre: exclusiveName,
+            tallasDesde: desde,
+            tallasHasta: hasta,
+          });
+          sUpdated = createdRes?.serie || createdRes;
         }
 
-        setSupplierSeriesCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
-        setNewColorCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
-        setSeries(prev => prev.map(s => s.id === sUpdated.id ? sUpdated : s));
+        if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
+          const docena = getDocenaBaseParaSerie(sUpdated);
+          const ids = buildTallaIdsFromCurva(sUpdated, docena);
+
+          // Reemplazar la serie en el modelo actual
+          setEditModelSerieIds(prev => {
+            const filtered = prev.filter(x => x !== editingSerie.id);
+            return filtered.includes(sUpdated.id) ? filtered : [...filtered, sUpdated.id];
+          });
+          setEditModelCustomTallas(prev => {
+            const copy = { ...prev };
+            delete copy[editingSerie.id];
+            copy[sUpdated.id] = ids;
+            return copy;
+          });
+          setEditModelSeriesPrices(prev => {
+            const copy = { ...prev };
+            const prevPrice = copy[editingSerie.id] || { costPrice: "", salePrice: "" };
+            delete copy[editingSerie.id];
+            copy[sUpdated.id] = prevPrice;
+            return copy;
+          });
+
+          // Actualizar lista local de series
+          setSeries(prev => {
+            const filtered = prev.filter(s => s.id !== sUpdated.id);
+            return [...filtered, sUpdated];
+          });
+        }
+      } else {
+        // Fuera de edición de modelo: actualización estándar in-place
+        const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
+          nombre: editingSerie.nombre,
+          tallasDesde: desde,
+          tallasHasta: hasta,
+        });
+        sUpdated = updatedSerieRes?.serie || updatedSerieRes;
+
+        if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
+          const docena = getDocenaBaseParaSerie(sUpdated);
+          const ids = buildTallaIdsFromCurva(sUpdated, docena);
+          setSeries(prev => prev.map(s => s.id === sUpdated.id ? sUpdated : s));
+        }
       }
 
-      setSuccess(`Serie actualizada correctamente.`);
+      setSuccess(`Rango de tallas (${desde}-${hasta}) actualizado exclusivamente para este modelo.`);
       setShowEditSeriesModal(false);
       setEditingSerie(null);
       await loadData();
@@ -3186,9 +3271,6 @@ export default function ModelosComponent({
       setSaving(false);
     }
   };
-
-  // Series canónicas protegidas que no se pueden eliminar
-  const SERIES_CANONICAS = ["ADULTO", "JUVENIL", "NINO", "NINO_PEQUENO_A", "BEBE", "TALLA_GRANDE"];
 
   const handleDeleteSeries = async (s: SerieConfig) => {
     if (SERIES_CANONICAS.includes(s.nombre)) {
@@ -4987,7 +5069,21 @@ export default function ModelosComponent({
 
 
 
-      if (s.tallas) {
+      // Si las variantes de este modelo ya tienen tallas configuradas, respetarlas; si no, calcular curva base
+      const prodsConEstaSerie = prodsSup.filter(prod => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id));
+      const existingTallaIds: string[] = [];
+      prodsConEstaSerie.forEach(prod => {
+        ((prod as any).stockByTalla || []).forEach((st: any) => {
+          const tid = st.tallaId || st.talla?.id;
+          if (tid && !existingTallaIds.includes(tid)) {
+            existingTallaIds.push(tid);
+          }
+        });
+      });
+
+      if (existingTallaIds.length > 0) {
+        customTallas[s.id] = existingTallaIds;
+      } else if (s.tallas) {
         const docena = getDocenaBaseParaSerie(s);
         customTallas[s.id] = buildTallaIdsFromCurva(s, docena);
       }
@@ -8204,7 +8300,7 @@ export default function ModelosComponent({
 
                 <div className="space-y-3">
 
-                  {series.map(s => {
+                  {getSeriesParaModelo(undefined, series).map(s => {
 
                     const isActive = serieIds.includes(s.id);
 
@@ -8251,8 +8347,6 @@ export default function ModelosComponent({
                               isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
 
                             }`}>{getNombreSerie(s, series)}</span>
-
-                            <span className="text-[10px] text-[var(--muted-foreground)] font-mono">({s.nombre})</span>
 
                           </div>
 
@@ -9148,7 +9242,7 @@ export default function ModelosComponent({
 
                 <div className="space-y-3">
 
-                  {series.map(s => {
+                  {getSeriesParaModelo(selectedModelForColor?.id, series).map(s => {
 
                     const isActive = newColorSerieIds.includes(s.id);
 
@@ -9195,8 +9289,6 @@ export default function ModelosComponent({
                               isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
 
                             }`}>{getNombreSerie(s, series)}</span>
-
-                            <span className="text-[10px] text-[var(--muted-foreground)] font-mono">({s.nombre})</span>
 
                           </div>
 
@@ -10612,12 +10704,6 @@ export default function ModelosComponent({
 
                               </span>
 
-                              <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
-
-                                ({s.nombre})
-
-                              </span>
-
                             </div>
 
                             <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">
@@ -11360,7 +11446,7 @@ export default function ModelosComponent({
 
                 <div className="space-y-3">
 
-                  {series.map(s => {
+                  {getSeriesParaModelo(editModel?.id, series).map(s => {
 
                     const isActive = editModelSerieIds.includes(s.id);
 
@@ -11407,8 +11493,6 @@ export default function ModelosComponent({
                               isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
 
                             }`}>{getNombreSerie(s, series)}</span>
-
-                            <span className="text-[10px] text-[var(--muted-foreground)] font-mono">({s.nombre})</span>
 
                           </div>
 
@@ -11878,7 +11962,7 @@ export default function ModelosComponent({
 
                   <div className="space-y-3">
 
-                    {series.map(s => {
+                    {getSeriesParaModelo(supplierSeriesTargetModel?.id, series).map(s => {
 
                       const isActive = supplierSeriesActiveIds.includes(s.id);
 
@@ -11951,12 +12035,6 @@ export default function ModelosComponent({
                               >
 
                                 {getNombreSerie(s, series)}
-
-                              </span>
-
-                              <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
-
-                                ({s.nombre})
 
                               </span>
 
