@@ -6602,34 +6602,32 @@ export default function ModelosComponent({
 
                           return supplierGroups.map(([supKey, rawVariants]) => {
 
-                            // Garantizar estrictamente una única tarjeta por serie para este proveedor, priorizando la que tiene stock físico
-
+                            // Garantizar estrictamente una única tarjeta por serie para este proveedor, priorizando la activa y con stock físico
                             const serieMap = new Map<string, Producto>();
 
                             for (const v of rawVariants) {
+                              const catKey = formatearNombreSerie(v.serie?.nombre).toUpperCase() || (v as any).serieId || v.id;
 
-                              const sKey = (v.serie as any)?.id || (v as any).serieId || v.serie?.nombre || v.id;
-
-                              if (!serieMap.has(sKey)) {
-
-                                serieMap.set(sKey, v);
-
+                              if (!serieMap.has(catKey)) {
+                                serieMap.set(catKey, v);
                               } else {
-
-                                const existing = serieMap.get(sKey)!;
-
+                                const existing = serieMap.get(catKey)!;
                                 const stockExisting = (existing.tallas || (existing as any).stockPorTalla || []).reduce((acc: number, t: any) => acc + (t.cantidad ?? t.disponible ?? 0), 0);
-
                                 const stockNew = (v.tallas || (v as any).stockPorTalla || []).reduce((acc: number, t: any) => acc + (t.cantidad ?? t.disponible ?? 0), 0);
 
-                                if (stockNew > stockExisting) {
+                                const existingActive = existing.activo !== false;
+                                const newActive = v.activo !== false;
 
-                                  serieMap.set(sKey, v);
-
+                                if (!existingActive && newActive) {
+                                  serieMap.set(catKey, v);
+                                } else if (existingActive && !newActive) {
+                                  // Mantener existing activa
+                                } else if (stockNew > stockExisting) {
+                                  serieMap.set(catKey, v);
+                                } else if (stockNew === stockExisting && /-\d{3}$/.test(existing.codigo) && !/-\d{3}$/.test(v.codigo)) {
+                                  serieMap.set(catKey, v);
                                 }
-
                               }
-
                             }
 
                             const variants = Array.from(serieMap.values());
