@@ -308,6 +308,8 @@ interface Cobro {
 
   saldoPendiente: number;
 
+  devolucionesDescontadasCliente?: number;
+
   estado: EstadoCobro;
 
   tipo?: string;
@@ -2048,7 +2050,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       );
 
-      // El saldo deudor contable exacto es Total Facturado a Crédito menos Total Abonado (coincidente con el Historial Comercial)
+      // El saldo deudor contable exacto es Total Facturado a Crédito menos Total Abonado menos Devoluciones (coincidente con el Historial Comercial)
       const cobrosCredito = listaCobros.filter((c) => c.tipo !== 'CONTADO');
 
       const totalCreditoFacturado = cobrosCredito.reduce(
@@ -2061,7 +2063,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         0,
       );
 
-      const saldoContableReal = Math.max(0, Math.round((totalCreditoFacturado - totalAbonosCredito) * 100) / 100);
+      // Restar devoluciones descontadas al cliente (enviadas por el backend)
+      const devolucionesDescontadas = Number(listaCobros[0]?.devolucionesDescontadasCliente || 0);
+
+      const saldoContableReal = Math.max(0, Math.round((totalCreditoFacturado - totalAbonosCredito - devolucionesDescontadas) * 100) / 100);
 
       const saldoSumadoCobros = listaCobros.reduce((sum, c) => {
 
@@ -7816,7 +7821,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                 <span className="text-base font-black text-red-600 dark:text-red-400 font-mono">
 
-                  ${carteraSeleccionada.saldoTotalPendiente.toFixed(2)}
+                  ${(historialCliente && historialCliente.cliente?.id === carteraSeleccionada.clientId
+                    ? historialCliente.resumen.saldoPendienteTotal
+                    : carteraSeleccionada.saldoTotalPendiente
+                  ).toFixed(2)}
 
                 </span>
 
@@ -7912,7 +7920,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                           onClick={() => {
 
-                            const val = Number(carteraSeleccionada.saldoTotalPendiente).toFixed(2);
+                            const saldoEfectivo = (historialCliente && historialCliente.cliente?.id === carteraSeleccionada.clientId
+                              ? Number(historialCliente.resumen.saldoPendienteTotal)
+                              : Number(carteraSeleccionada.saldoTotalPendiente)
+                            );
+
+                            const val = Number(saldoEfectivo).toFixed(2);
 
                             setMontoAbono(val);
 
@@ -7922,7 +7935,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                         >
 
-                          Totalidad (${Number(carteraSeleccionada.saldoTotalPendiente).toFixed(2)})
+                          Totalidad (${(historialCliente && historialCliente.cliente?.id === carteraSeleccionada.clientId
+                            ? Number(historialCliente.resumen.saldoPendienteTotal)
+                            : Number(carteraSeleccionada.saldoTotalPendiente)
+                          ).toFixed(2)})
 
                         </button>
 
