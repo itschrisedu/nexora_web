@@ -3219,10 +3219,10 @@ export default function ModelosComponent({
           const docena = getDocenaBaseParaSerie(sUpdated);
           const ids = buildTallaIdsFromCurva(sUpdated, docena);
 
-          // Reemplazar la serie en el modelo actual
+          // Asegurar que la serie quede estrictamente activa en el modelo actual
           setEditModelSerieIds(prev => {
-            const filtered = prev.filter(x => x !== editingSerie.id);
-            return filtered.includes(sUpdated.id) ? filtered : [...filtered, sUpdated.id];
+            const filtered = prev.filter(x => x !== editingSerie.id && x !== sUpdated.id);
+            return [...filtered, sUpdated.id];
           });
           setEditModelCustomTallas(prev => {
             const copy = { ...prev };
@@ -3238,10 +3238,14 @@ export default function ModelosComponent({
             return copy;
           });
 
-          // Actualizar lista local de series
+          // Actualizar lista local de series en memoria para visualización y activación inmediata
           setSeries(prev => {
-            const filtered = prev.filter(s => s.id !== sUpdated.id);
-            return [...filtered, sUpdated];
+            const filtered = prev.filter(s => s.id !== sUpdated.id && s.id !== editingSerie.id);
+            return [...filtered, sUpdated].sort((a: any, b: any) => {
+              const idxA = SERIES_ORDEN.indexOf(a.nombre);
+              const idxB = SERIES_ORDEN.indexOf(b.nombre);
+              return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+            });
           });
         }
       } else {
@@ -3263,7 +3267,10 @@ export default function ModelosComponent({
       setSuccess(`Rango de tallas (${desde}-${hasta}) actualizado exclusivamente para este modelo.`);
       setShowEditSeriesModal(false);
       setEditingSerie(null);
-      await loadData();
+      // No llamar a loadData() si estamos editando el modelo para no sobreescribir el estado en pantalla
+      if (!targetModelId) {
+        await loadData();
+      }
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
       setError(err.message || "Error al actualizar la serie.");
