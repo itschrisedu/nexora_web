@@ -1160,6 +1160,16 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
   const [clienteExpandidoId, setClienteExpandidoId] = useState<string | null>(null);
 
+  const [notasDesplegadasIds, setNotasDesplegadasIds] = useState<Record<string, boolean>>({});
+
+  const toggleNotaDesplegada = (cobroId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setNotasDesplegadasIds((prev) => ({
+      ...prev,
+      [cobroId]: !prev[cobroId],
+    }));
+  };
+
   const [showCuentaModal, setShowCuentaModal] = useState(false);
 
 
@@ -6975,6 +6985,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                         const isCobroActive = (cobroSeleccionadoId === cobroItem.id);
 
+                                        const isNotaExpanded = Boolean(notasDesplegadasIds[cobroItem.id]);
+
 
 
                                         return (
@@ -6983,309 +6995,627 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                             key={cobroItem.id}
 
-                                            onClick={(e) => {
+                                            className={`rounded-2xl border transition-all overflow-hidden ${
 
-                                              e.stopPropagation();
+                                              isNotaExpanded
 
-                                              if (orderId && onNavigateToPedido) {
+                                                ? 'bg-[var(--card)] border-blue-500/50 shadow-md ring-1 ring-blue-500/20'
 
-                                                onNavigateToPedido(orderId, cobroItem.tenantId);
+                                                : isCobroActive
 
-                                                return;
+                                                  ? 'bg-[#0F172A]/10 border-[#0F172A]/40 shadow-xs ring-1 ring-[#0F172A]/30'
 
-                                              }
-
-                                              setClienteSeleccionadoId(cliente.clientId);
-
-                                              setCobroSeleccionadoId(cobroItem.id);
-
-                                              setDetalleNotaModalAbierto(true);
-
-                                              setAcordeonNotasAbierto(false);
-
-                                              setMontoAbono('');
-
-                                              setNotasAbono('');
-
-                                              setShowCuentaModal(true);
-
-                                            }}
-
-                                            className={`group p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all cursor-pointer ${
-
-                                              isCobroActive
-
-                                                ? 'bg-[#0F172A]/10 border-[#0F172A]/40 shadow-xs ring-1 ring-[#0F172A]/30'
-
-                                                : 'bg-[var(--card)] border-[var(--border)] hover:bg-[var(--muted)]/40 hover:border-blue-500/60 dark:hover:border-blue-400/60 hover:shadow-xs'
+                                                  : 'bg-[var(--card)] border-[var(--border)] hover:bg-[var(--muted)]/30 hover:border-blue-500/40 hover:shadow-2xs'
 
                                             }`}
 
-                                            title={
-
-                                              orderId
-
-                                                ? `Redirigir al detalle del pedido ${orderCodigo || ''} en la sección de Pedidos`
-
-                                                : `Abrir directamente ${numNota} y ver sus artículos`
-
-                                            }
-
                                           >
 
-                                            <div className="flex items-center gap-3">
+                                            {/* Fila Principal de la Nota */}
 
-                                              <div className="p-2 rounded-xl bg-slate-500/10 text-slate-700 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                            <div
 
-                                                <FileText size={16} />
+                                              onClick={(e) => {
+
+                                                toggleNotaDesplegada(cobroItem.id, e);
+
+                                              }}
+
+                                              className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none"
+
+                                              title={isNotaExpanded ? "Clic para ocultar calzado de esta nota" : "Clic para ver qué modelos y pares se entregaron en esta nota"}
+
+                                            >
+
+                                              <div className="flex items-center gap-2.5">
+
+                                                {/* Botón Acordeón Desplegable con Chevron */}
+
+                                                <button
+
+                                                  type="button"
+
+                                                  onClick={(e) => toggleNotaDesplegada(cobroItem.id, e)}
+
+                                                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+
+                                                    isNotaExpanded
+
+                                                      ? 'bg-blue-600 text-white shadow-xs'
+
+                                                      : 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+
+                                                  }`}
+
+                                                  title={isNotaExpanded ? "Plegar calzado de esta nota" : "Desplegar calzado entregado en esta nota"}
+
+                                                >
+
+                                                  {isNotaExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+
+                                                </button>
+
+
+
+                                                <div className="p-2 rounded-xl bg-slate-500/10 text-slate-700 dark:text-slate-300 shrink-0">
+
+                                                  <FileText size={16} />
+
+                                                </div>
+
+
+
+                                                <div>
+
+                                                  <div className="font-bold text-xs text-[var(--foreground)] flex items-center gap-2 flex-wrap">
+
+                                                    <span className="font-extrabold text-xs text-[var(--foreground)] flex items-center gap-1.5">
+
+                                                      <span>{numNota}</span>
+
+                                                    </span>
+
+
+
+                                                    {/* REFERENCIA AL PEDIDO ASOCIADO */}
+
+                                                    {orderCodigo ? (
+
+                                                      <span
+
+                                                        onClick={(e) => {
+
+                                                          e.stopPropagation();
+
+                                                          if (orderId && onNavigateToPedido) {
+
+                                                            onNavigateToPedido(orderId, cobroItem.tenantId);
+
+                                                          }
+
+                                                        }}
+
+                                                        className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white transition-all shadow-2xs cursor-pointer"
+
+                                                        title={`Generado desde el pedido ${orderCodigo} · Clic para ver en Pedidos`}
+
+                                                      >
+
+                                                        <Package size={11} />
+
+                                                        <span>Pedido #{orderCodigo}</span>
+
+                                                        <ExternalLink size={10} className="opacity-75" />
+
+                                                      </span>
+
+                                                    ) : (
+
+                                                      <span className="text-[10px] text-[var(--muted-foreground)] italic">
+
+                                                        (Registro manual)
+
+                                                      </span>
+
+                                                    )}
+
+                                                    {activeSucursalId === 'TODAS' && (
+
+                                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+
+                                                        <Building size={10} /> {cobroItem.sucursalNombre || 'Matriz'}
+
+                                                      </span>
+
+                                                    )}
+
+                                                    <span className="px-2 py-0.2 bg-[var(--muted)] text-[var(--muted-foreground)] rounded text-[10px]">
+
+                                                      {cobroItem.tipo || 'Crédito'}
+
+                                                    </span>
+
+                                                    <span className={`px-2 py-0.2 rounded text-[10px] font-bold ${cCfg.color}`}>
+
+                                                      {cCfg.label}
+
+                                                    </span>
+
+                                                    {abonosHoyCobro.length > 0 && (
+
+                                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-mono">
+
+                                                        <CheckCircle2 size={11} className="text-emerald-600 dark:text-emerald-400" />
+
+                                                        <span>Abonado hoy: ${totalAbonadoHoyCobro.toFixed(2)}</span>
+
+                                                      </span>
+
+                                                    )}
+
+                                                  </div>
+
+                                                  <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-3 mt-1 flex-wrap">
+
+                                                    <span>Fecha: {new Date(cobroItem.createdAt).toLocaleDateString('es-EC')}</span>
+
+                                                    {cobroItem.fechaVencimiento && (
+
+                                                      <span>Vence: {new Date(cobroItem.fechaVencimiento).toLocaleDateString('es-EC')}</span>
+
+                                                    )}
+
+                                                    {cobroItem.vendedorNombre && (
+
+                                                      <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+
+                                                        <User size={10} />
+
+                                                        <span>Vendedor: {cobroItem.vendedorNombre}</span>
+
+                                                      </span>
+
+                                                    )}
+
+                                                    {activeSucursalId === 'TODAS' && cobroItem.sucursalNombre && (
+
+                                                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+
+                                                        <Building size={10} />
+
+                                                        <span>Sucursal: {cobroItem.sucursalNombre}</span>
+
+                                                      </span>
+
+                                                    )}
+
+                                                  </div>
+
+                                                </div>
 
                                               </div>
 
-                                              <div>
-
-                                                <div className="font-bold text-xs text-[var(--foreground)] flex items-center gap-2 flex-wrap">
-
-                                                  <span className="font-extrabold text-xs text-[var(--foreground)] group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-1.5">
-
-                                                    <span>{numNota}</span>
-
-                                                  </span>
 
 
+                                              {/* Derecha: Precios y Botones de Acción */}
 
-                                                  {/* REFERENCIA AL PEDIDO ASOCIADO */}
+                                              <div
 
-                                                  {orderCodigo ? (
+                                                onClick={(e) => e.stopPropagation()}
 
-                                                    <span
+                                                className="text-right flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-[var(--border)]"
+
+                                              >
+
+                                                <div>
+
+                                                  <div className="text-[10px] text-[var(--muted-foreground)]">Original: ${montoOrig.toFixed(2)}</div>
+
+                                                  <div className="text-xs font-black text-red-500">
+
+                                                    Saldo: ${Number(cobroItem.saldoPendiente).toFixed(2)}
+
+                                                  </div>
+
+                                                </div>
+
+
+
+                                                <div className="flex items-center gap-2">
+
+                                                  <button
+
+                                                    type="button"
+
+                                                    onClick={(e) => {
+
+                                                      e.stopPropagation();
+
+                                                      handleAbrirCambiarTipo(cobroItem);
+
+                                                    }}
+
+                                                    className="px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-600 hover:text-white text-blue-700 dark:text-blue-300 text-xs font-bold rounded-xl transition-all border border-blue-500/20 flex items-center gap-1 cursor-pointer shadow-2xs"
+
+                                                    title={cobroItem.tipo === 'CONTADO' ? 'Convertir a Crédito' : 'Convertir a Contado'}
+
+                                                  >
+
+                                                    {cobroItem.tipo === 'CONTADO' ? <CreditCard size={13} /> : <DollarSign size={13} />}
+
+                                                    <span>{cobroItem.tipo === 'CONTADO' ? 'A Crédito' : 'A Contado'}</span>
+
+                                                  </button>
+
+
+
+                                                  <button
+
+                                                    type="button"
+
+                                                    onClick={(e) => {
+
+                                                      e.stopPropagation();
+
+                                                      handleAbrirFacturacion(cliente, cobroItem);
+
+                                                    }}
+
+                                                    className="px-2.5 py-1.5 bg-[#0F172A]/10 hover:bg-[#0F172A] hover:text-white text-[#0F172A] text-xs font-bold rounded-xl transition-all border border-[#0F172A]/20 flex items-center gap-1"
+
+                                                    title="Emitir factura electrónica SRI para esta nota"
+
+                                                  >
+
+                                                    <Receipt size={13} />
+
+                                                    <span>Facturar SRI</span>
+
+                                                  </button>
+
+
+
+                                                  <button
+
+                                                    type="button"
+
+                                                    onClick={(e) => {
+
+                                                      e.stopPropagation();
+
+                                                      setClienteSeleccionadoId(cliente.clientId);
+
+                                                      setCobroSeleccionadoId(cobroItem.id);
+
+                                                      setDetalleNotaModalAbierto(true);
+
+                                                      setAcordeonNotasAbierto(false);
+
+                                                      setMontoAbono('');
+
+                                                      setNotasAbono('');
+
+                                                      setShowCuentaModal(true);
+
+                                                    }}
+
+                                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+
+                                                      isCobroActive
+
+                                                        ? 'bg-[#0F172A] text-white'
+
+                                                        : 'bg-[var(--muted)] text-[var(--foreground)] hover:bg-[#0F172A] hover:text-white'
+
+                                                    }`}
+
+                                                  >
+
+                                                    {Number(cobroItem.saldoPendiente) > 0 ? 'Abonar Esta Nota' : 'Ver Detalles'}
+
+                                                  </button>
+
+                                                </div>
+
+                                              </div>
+
+                                            </div>
+
+
+
+                                            {/* SECCIÓN DESPLEGABLE CON EL DETALLE DE CALZADO Y CURVAS DE TALLAS ENTREGADO */}
+
+                                            {isNotaExpanded && (
+
+                                              <div className="p-3.5 sm:p-4 bg-[var(--muted)]/15 border-t border-[var(--border)] space-y-3 animate-in fade-in duration-200">
+
+                                                <div className="flex items-center justify-between gap-2 flex-wrap pb-1">
+
+                                                  <div className="flex items-center gap-2">
+
+                                                    <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+
+                                                      <Package size={14} />
+
+                                                    </div>
+
+                                                    <div>
+
+                                                      <span className="font-extrabold text-xs text-[var(--foreground)]">
+
+                                                        Calzado Entregado en {numNota} {orderCodigo ? `· Pedido #${orderCodigo}` : ''}
+
+                                                      </span>
+
+                                                      <span className="text-[10px] text-[var(--muted-foreground)] block">
+
+                                                        {cobroItem.tipoEntrega === 'ENVIO'
+
+                                                          ? `Logística: Envío por ${cobroItem.courier || 'Transporte'}${cobroItem.guiaEnvio ? ` · Guía: ${cobroItem.guiaEnvio}` : ''}${cobroItem.ciudadEnvio ? ` · ${cobroItem.ciudadEnvio}` : ''}`
+
+                                                          : 'Logística: Entrega presencial en mostrador'}
+
+                                                      </span>
+
+                                                    </div>
+
+                                                  </div>
+
+                                                  {orderId && onNavigateToPedido && (
+
+                                                    <button
+
+                                                      type="button"
 
                                                       onClick={(e) => {
 
                                                         e.stopPropagation();
 
-                                                        if (orderId && onNavigateToPedido) {
-
-                                                          onNavigateToPedido(orderId, cobroItem.tenantId);
-
-                                                        }
+                                                        onNavigateToPedido(orderId, cobroItem.tenantId);
 
                                                       }}
 
-                                                      className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-2xs cursor-pointer"
-
-                                                      title={`Generado desde el pedido ${orderCodigo} · Clic para ver en Pedidos`}
+                                                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 hover:underline cursor-pointer"
 
                                                     >
 
-                                                      <Package size={11} />
+                                                      <span>Ver pedido completo</span>
 
-                                                      <span>Pedido #${orderCodigo}</span>
+                                                      <ExternalLink size={12} />
 
-                                                      <ExternalLink size={10} className="opacity-75" />
-
-                                                    </span>
-
-                                                  ) : (
-
-                                                    <span className="text-[10px] text-[var(--muted-foreground)] italic">
-
-                                                      (Registro manual)
-
-                                                    </span>
-
-                                                  )}
-
-                                                  {activeSucursalId === 'TODAS' && (
-
-                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-
-                                                      <Building size={10} /> {cobroItem.sucursalNombre || 'Matriz'}
-
-                                                    </span>
-
-                                                  )}
-
-                                                  <span className="px-2 py-0.2 bg-[var(--muted)] text-[var(--muted-foreground)] rounded text-[10px]">
-
-                                                    {cobroItem.tipo || 'Crédito'}
-
-                                                  </span>
-
-                                                  <span className={`px-2 py-0.2 rounded text-[10px] font-bold ${cCfg.color}`}>
-
-                                                    {cCfg.label}
-
-                                                  </span>
-
-                                                  {abonosHoyCobro.length > 0 && (
-
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-mono">
-
-                                                      <CheckCircle2 size={11} className="text-emerald-600 dark:text-emerald-400" />
-
-                                                      <span>Abonado hoy: ${totalAbonadoHoyCobro.toFixed(2)}</span>
-
-                                                    </span>
+                                                    </button>
 
                                                   )}
 
                                                 </div>
 
-                                                <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-3 mt-1 flex-wrap">
 
-                                                  <span>Fecha: {new Date(cobroItem.createdAt).toLocaleDateString('es-EC')}</span>
 
-                                                  {cobroItem.fechaVencimiento && (
+                                                {(() => {
 
-                                                    <span>Vence: {new Date(cobroItem.fechaVencimiento).toLocaleDateString('es-EC')}</span>
+                                                  const lineas = cobroItem.lines || cobroItem.saleNote?.lines || [];
 
-                                                  )}
+                                                  const grupos = agruparLineasPorModelo(lineas, catalogoProductos);
 
-                                                  {cobroItem.vendedorNombre && (
 
-                                                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
 
-                                                      <User size={10} />
+                                                  if (grupos.length === 0) {
 
-                                                      <span>Vendedor: {cobroItem.vendedorNombre}</span>
+                                                    return (
 
-                                                    </span>
+                                                      <div className="p-4 bg-[var(--card)] rounded-xl border border-dashed border-[var(--border)] text-center text-xs text-[var(--muted-foreground)] italic">
 
-                                                  )}
+                                                        No hay modelos o pares registrados para esta nota.
 
-                                                  {activeSucursalId === 'TODAS' && cobroItem.sucursalNombre && (
+                                                      </div>
 
-                                                    <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                                                    );
 
-                                                      <Building size={10} />
+                                                  }
 
-                                                      <span>Sucursal: {cobroItem.sucursalNombre}</span>
 
-                                                    </span>
 
-                                                  )}
+                                                  const totalParesEntrega = grupos.reduce((acc, g) => acc + (g.totalPares || 0), 0);
 
-                                                </div>
+                                                  const totalDocenas = (totalParesEntrega / 12).toFixed(1).replace('.0', '');
+
+
+
+                                                  return (
+
+                                                    <div className="space-y-2.5">
+
+                                                      <div className={`grid gap-2.5 ${grupos.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+
+                                                        {grupos.map((g) => {
+
+                                                          const serieTexto = getNombreSerie(g.serieNombre, g.tallas);
+
+                                                          return (
+
+                                                            <div
+
+                                                              key={g.key}
+
+                                                              className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl flex items-start gap-3 shadow-2xs hover:border-slate-400 dark:hover:border-slate-600 transition-all"
+
+                                                            >
+
+                                                              {/* Miniatura del calzado */}
+
+                                                              <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center">
+
+                                                                {g.imageUrl ? (
+
+                                                                  <img src={g.imageUrl} alt={g.modelName} className="w-full h-full object-cover" />
+
+                                                                ) : (
+
+                                                                  <Package className="text-slate-400" size={22} />
+
+                                                                )}
+
+                                                              </div>
+
+
+
+                                                              {/* Detalle del modelo y pastillas de tallas */}
+
+                                                              <div className="flex-1 min-w-0">
+
+                                                                <div className="flex items-start justify-between gap-1.5">
+
+                                                                  <div className="min-w-0 flex-1">
+
+                                                                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+
+                                                                      Modelo
+
+                                                                    </span>
+
+                                                                    <h4 className="font-black text-xs sm:text-sm text-slate-900 dark:text-white truncate leading-tight">
+
+                                                                      {g.modelName}
+
+                                                                    </h4>
+
+                                                                  </div>
+
+
+
+                                                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold shrink-0 ${
+
+                                                                    g.totalPares >= 6
+
+                                                                      ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30'
+
+                                                                      : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+
+                                                                  }`}>
+
+                                                                    {g.etiquetaVolumen}
+
+                                                                  </span>
+
+                                                                </div>
+
+
+
+                                                                <div className="flex items-center flex-wrap gap-1.5 mt-1">
+
+                                                                  <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-blue-700 dark:text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
+
+                                                                    <span>Serie:</span>
+
+                                                                    <span>{serieTexto}</span>
+
+                                                                  </span>
+
+                                                                  {g.color && (
+
+                                                                    <span className="inline-flex items-center text-[10px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+
+                                                                      🎨 {g.color}
+
+                                                                    </span>
+
+                                                                  )}
+
+                                                                </div>
+
+
+
+                                                                {/* Pastillas de tallas de la curva */}
+
+                                                                <div className="flex flex-wrap gap-1 mt-1.5">
+
+                                                                  {g.tallas.map((t) => (
+
+                                                                    <span
+
+                                                                      key={t.numero}
+
+                                                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-rose-200/90 dark:border-rose-900/50 bg-rose-50/80 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 text-[10px] font-black"
+
+                                                                    >
+
+                                                                      <span>T{t.numero}:</span>
+
+                                                                      <span className="font-black text-rose-900 dark:text-rose-100">{t.cantidad}</span>
+
+                                                                    </span>
+
+                                                                  ))}
+
+                                                                </div>
+
+
+
+                                                                {/* Subtotal del modelo */}
+
+                                                                <div className="mt-2 pt-1 border-t border-[var(--border)] flex items-center justify-between text-xs">
+
+                                                                  <span className="text-slate-500 dark:text-slate-400 font-semibold text-[11px]">
+
+                                                                    ${g.precioUnitario.toFixed(2)} c/par
+
+                                                                  </span>
+
+                                                                  <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs">
+
+                                                                    Subtotal: ${g.subtotal.toFixed(2)}
+
+                                                                  </span>
+
+                                                                </div>
+
+                                                              </div>
+
+                                                            </div>
+
+                                                          );
+
+                                                        })}
+
+                                                      </div>
+
+
+
+                                                      {/* Resumen al pie de la entrega */}
+
+                                                      <div className="p-2.5 bg-[var(--card)] rounded-xl border border-[var(--border)] flex items-center justify-between text-xs font-bold text-[var(--foreground)] flex-wrap gap-2">
+
+                                                        <span className="flex items-center gap-1.5 text-[var(--muted-foreground)]">
+
+                                                          <Package size={13} className="text-blue-600" />
+
+                                                          <span>Total en esta entrega:</span>
+
+                                                          <strong className="text-[var(--foreground)]">
+
+                                                            {totalParesEntrega} {totalParesEntrega === 1 ? 'par' : 'pares'} ({totalDocenas} {Number(totalDocenas) === 1 ? 'Docena' : 'Docenas'})
+
+                                                          </strong>
+
+                                                        </span>
+
+                                                        <span className="font-mono font-black text-slate-900 dark:text-white">
+
+                                                          Monto Facturado: ${montoOrig.toFixed(2)}
+
+                                                        </span>
+
+                                                      </div>
+
+                                                    </div>
+
+                                                  );
+
+                                                })()}
 
                                               </div>
 
-                                            </div>
-
-
-
-                                            <div className="text-right flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-[var(--border)]">
-
-                                              <div>
-
-                                                <div className="text-[10px] text-[var(--muted-foreground)]">Original: ${montoOrig.toFixed(2)}</div>
-
-                                                <div className="text-xs font-black text-red-500">
-
-                                                  Saldo: ${Number(cobroItem.saldoPendiente).toFixed(2)}
-
-                                                </div>
-
-                                              </div>
-
-
-
-                                              <div className="flex items-center gap-2">
-
-                                                <button
-
-                                                  type="button"
-
-                                                  onClick={(e) => {
-
-                                                    e.stopPropagation();
-
-                                                    handleAbrirCambiarTipo(cobroItem);
-
-                                                  }}
-
-                                                  className="px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-600 hover:text-white text-blue-700 dark:text-blue-300 text-xs font-bold rounded-xl transition-all border border-blue-500/20 flex items-center gap-1 cursor-pointer shadow-2xs"
-
-                                                  title={cobroItem.tipo === 'CONTADO' ? 'Convertir a Crédito' : 'Convertir a Contado'}
-
-                                                >
-
-                                                  {cobroItem.tipo === 'CONTADO' ? <CreditCard size={13} /> : <DollarSign size={13} />}
-
-                                                  <span>{cobroItem.tipo === 'CONTADO' ? 'A Crédito' : 'A Contado'}</span>
-
-                                                </button>
-
-
-
-                                                <button
-
-                                                  type="button"
-
-                                                  onClick={(e) => {
-
-                                                    e.stopPropagation();
-
-                                                    handleAbrirFacturacion(cliente, cobroItem);
-
-                                                  }}
-
-                                                  className="px-2.5 py-1.5 bg-[#0F172A]/10 hover:bg-[#0F172A] hover:text-white text-[#0F172A] text-xs font-bold rounded-xl transition-all border border-[#0F172A]/20 flex items-center gap-1"
-
-                                                  title="Emitir factura electrónica SRI para esta nota"
-
-                                                >
-
-                                                  <Receipt size={13} />
-
-                                                  <span>Facturar SRI</span>
-
-                                                </button>
-
-
-
-                                                <button
-
-                                                  type="button"
-
-                                                  onClick={(e) => {
-
-                                                    e.stopPropagation();
-
-                                                    setClienteSeleccionadoId(cliente.clientId);
-
-                                                    setCobroSeleccionadoId(cobroItem.id);
-
-                                                    setDetalleNotaModalAbierto(true);
-
-                                                    setAcordeonNotasAbierto(false);
-
-                                                    setMontoAbono('');
-
-                                                    setNotasAbono('');
-
-                                                    setShowCuentaModal(true);
-
-                                                  }}
-
-                                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
-
-                                                    isCobroActive
-
-                                                      ? 'bg-[#0F172A] text-white'
-
-                                                      : 'bg-[var(--muted)] text-[var(--foreground)] hover:bg-[#0F172A] hover:text-white'
-
-                                                  }`}
-
-                                                >
-
-                                                  {Number(cobroItem.saldoPendiente) > 0 ? 'Abonar Esta Nota' : 'Ver Detalles'}
-
-                                                </button>
-
-                                              </div>
-
-                                            </div>
+                                            )}
 
                                           </div>
 
