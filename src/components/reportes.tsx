@@ -3305,7 +3305,7 @@ export default function ReportesComponent({
 
                   id: 'ventas_modelos_foto',
 
-                  label: 'Consolidado de Calzado (con Fotos)',
+                  label: 'Consolidado de Calzado',
 
                   icon: <Package size={14} />,
 
