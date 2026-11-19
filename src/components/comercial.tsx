@@ -861,10 +861,26 @@ export default function ComercialComponent({
 
 
   // Series Disponibles para Pedidos Especiales
-
   const [listaSeriesDisponibles, setListaSeriesDisponibles] = useState<any[]>([]);
-
   const [serieEspecialId, setSerieEspecialId] = useState<string>('');
+
+  // Series especiales únicas y limpias (solo 1 por categoría canónica o creada a mano, sin códigos técnicos _M_)
+  const seriesEspecialesDisponibles = useMemo(() => {
+    const map = new Map<string, any>();
+    // 1. Priorizar series base o personalizadas creadas sin _M_
+    listaSeriesDisponibles.forEach((s) => {
+      if (!s.nombre || s.nombre.includes('_M_')) return;
+      const key = formatearNombreSerie(s.nombre).toLowerCase();
+      if (!map.has(key)) map.set(key, s);
+    });
+    // 2. Si alguna serie solo existiera con _M_, agregar de respaldo para no perder ninguna categoría
+    listaSeriesDisponibles.forEach((s) => {
+      if (!s.nombre) return;
+      const key = formatearNombreSerie(s.nombre).toLowerCase();
+      if (!map.has(key)) map.set(key, s);
+    });
+    return Array.from(map.values());
+  }, [listaSeriesDisponibles]);
 
 
 
@@ -1370,6 +1386,12 @@ export default function ComercialComponent({
 
   const [serieFiltroBuscador, setSerieFiltroBuscador] = useState<string>('TODAS');
 
+  // Helper para comparar serie considerando nombres canónicos formateados
+  const coincideSerieFiltro = useCallback((serieProd?: string | null, filtro?: string) => {
+    if (!filtro || filtro === 'TODAS') return true;
+    return formatearNombreSerie(serieProd).toLowerCase() === formatearNombreSerie(filtro).toLowerCase();
+  }, []);
+
 
 
   // Búsqueda Dual Omnicanal: Modelo + Color (Fase 6)
@@ -1430,11 +1452,7 @@ export default function ComercialComponent({
 
     catalogoProductos.forEach((p) => {
 
-      if (serieFiltroBuscador !== 'TODAS') {
-
-        if ((p.serieNombre || '').toLowerCase().trim() !== serieFiltroBuscador.toLowerCase().trim()) return;
-
-      }
+      if (!coincideSerieFiltro(p.serieNombre, serieFiltroBuscador)) return;
 
       if (filtroColorCascada.trim() && !filtroModeloCascada.trim()) {
 
@@ -1523,19 +1541,10 @@ export default function ComercialComponent({
     if (!q || q.length < 2 || filtroModeloCascada) return [];
 
     return catalogoProductos
-
       .filter((p) => {
-
-        if (serieFiltroBuscador !== 'TODAS') {
-
-          if ((p.serieNombre || '').toLowerCase().trim() !== serieFiltroBuscador.toLowerCase().trim()) return false;
-
-        }
-
+        if (!coincideSerieFiltro(p.serieNombre, serieFiltroBuscador)) return false;
         const full = `${p.modelName || ''} ${p.color || ''} ${p.code || ''}`.toLowerCase();
-
         return full.includes(q);
-
       })
 
       .slice(0, 4);
@@ -1567,17 +1576,9 @@ export default function ComercialComponent({
 
 
     if (filtroModeloCascada.trim()) {
-
       const variantesModelo = catalogoProductos.filter((p) => {
-
-        if (serieFiltroBuscador !== 'TODAS') {
-
-          if ((p.serieNombre || '').toLowerCase().trim() !== serieFiltroBuscador.toLowerCase().trim()) return false;
-
-        }
-
+        if (!coincideSerieFiltro(p.serieNombre, serieFiltroBuscador)) return false;
         return (p.modelName || '').toLowerCase().trim() === filtroModeloCascada.toLowerCase().trim();
-
       });
 
       list = variantesModelo.map((v) => {
@@ -1607,12 +1608,7 @@ export default function ComercialComponent({
       const map = new Map<string, { color: string; countModelos: number; stock: number; variante: any; imageUrl?: string; serieNombre?: string }>();
 
       catalogoProductos.forEach((p) => {
-
-        if (serieFiltroBuscador !== 'TODAS') {
-
-          if ((p.serieNombre || '').toLowerCase().trim() !== serieFiltroBuscador.toLowerCase().trim()) return;
-
-        }
+        if (!coincideSerieFiltro(p.serieNombre, serieFiltroBuscador)) return;
 
         const col = p.color?.trim() || 'Estándar';
 
@@ -1711,13 +1707,7 @@ export default function ComercialComponent({
 
 
     if (serieFiltroBuscador !== 'TODAS') {
-
-      list = list.filter(
-
-        (p) => (p.serieNombre || '').toLowerCase().trim() === serieFiltroBuscador.toLowerCase().trim()
-
-      );
-
+      list = list.filter((p) => coincideSerieFiltro(p.serieNombre, serieFiltroBuscador));
     }
 
 
@@ -2383,11 +2373,9 @@ export default function ComercialComponent({
         const srs = await ApiService.get('/configuracion/series');
 
         if (Array.isArray(srs)) {
-
           setListaSeriesDisponibles(srs);
-
-          if (srs.length > 0) setSerieEspecialId(srs[0].id);
-
+          const primeraLimpia = srs.find((s: any) => s.nombre && !s.nombre.includes('_M_')) || srs[0];
+          if (primeraLimpia) setSerieEspecialId(primeraLimpia.id);
         }
 
       }
@@ -4133,8 +4121,7 @@ export default function ComercialComponent({
     const prodObj = productoSeleccionadoObj;
 
     const tallasList = tipoVentaItem === 'SERIE_ESPECIAL'
-
-      ? (listaSeriesDisponibles.find((s) => s.id === serieEspecialId)?.tallas || [
+      ? (seriesEspecialesDisponibles.find((s) => s.id === serieEspecialId)?.tallas || listaSeriesDisponibles.find((s) => s.id === serieEspecialId)?.tallas || [
 
           { id: 't-esp-38', numero: 38 },
 
@@ -4181,9 +4168,7 @@ export default function ComercialComponent({
           serieId: tipoVentaItem === 'SERIE_ESPECIAL' ? serieEspecialId : (prodObj.serieId || ''),
 
           serieNombre: tipoVentaItem === 'SERIE_ESPECIAL'
-
-            ? `${listaSeriesDisponibles.find((s) => s.id === serieEspecialId)?.nombre?.replace(/_/g, ' ') || 'Serie Especial'} [Bajo Pedido]`
-
+            ? `${formatearNombreSerie(listaSeriesDisponibles.find((s) => s.id === serieEspecialId)?.nombre || 'Serie Especial')} [Bajo Pedido]`
             : (prodObj.serieNombre || 'ADULTO'),
 
           imageUrl: prodObj.imageUrl,
@@ -9636,102 +9621,64 @@ export default function ComercialComponent({
 
                       {(() => {
 
-                        const seriesUnicas = Array.from(
+                        // Agrupar por serie canónica para que solo aparezca 1 píldora por serie (Adulto, Juvenil, etc.)
+                        const mapaSeries = new Map<string, { label: string; count: number }>();
 
-                          new Set(
+                        catalogoProductos.forEach((p) => {
+                          const raw = p.serieNombre?.trim();
+                          if (!raw) return;
+                          const label = formatearNombreSerie(raw);
+                          const key = label.toLowerCase();
+                          const existing = mapaSeries.get(key);
+                          if (existing) {
+                            existing.count += 1;
+                          } else {
+                            mapaSeries.set(key, { label, count: 1 });
+                          }
+                        });
 
-                            catalogoProductos
-
-                              .map((p) => p.serieNombre?.trim())
-
-                              .filter((s): s is string => Boolean(s && s.length > 0))
-
-                          )
-
-                        ).sort();
-
-
+                        const seriesUnicas = Array.from(mapaSeries.values()).sort((a, b) =>
+                          a.label.localeCompare(b.label, 'es', { sensitivity: 'base' })
+                        );
 
                         if (seriesUnicas.length === 0) return null;
 
-
-
                         return (
-
                           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
-
                             <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-0.5 shrink-0">
-
                               Series:
-
                             </span>
-
-                            {seriesUnicas.map((ser) => {
-
-                              const isActiva = serieFiltroBuscador.toLowerCase() === ser.toLowerCase();
-
-                              const count = catalogoProductos.filter(
-
-                                (p) => (p.serieNombre || '').toLowerCase() === ser.toLowerCase()
-
-                              ).length;
-
-
+                            {seriesUnicas.map(({ label, count }) => {
+                              const isActiva = serieFiltroBuscador.toLowerCase() === label.toLowerCase();
 
                               return (
-
                                 <button
-
-                                  key={ser}
-
+                                  key={label}
                                   type="button"
-
                                   onClick={() => {
-
-                                    const nueva = isActiva ? 'TODAS' : ser;
-
+                                    const nueva = isActiva ? 'TODAS' : label;
                                     setSerieFiltroBuscador(nueva);
-
                                     if (busquedaModelo.trim().length > 0) {
-
                                       setShowDropdownModelo(true);
-
                                     } else {
-
                                       setShowDropdownModelo(false);
-
                                     }
-
                                   }}
-
                                   className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
-
                                     isActiva
-
                                       ? 'bg-emerald-600 text-white shadow-xs border border-emerald-500 font-black'
-
                                       : 'bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]'
-
                                   }`}
-
-                                  title={`Filtrar variantes de serie ${ser}`}
-
+                                  title={`Filtrar variantes de serie ${label}`}
                                 >
-
-                                  <span>{formatearNombreSerie(ser)}</span>
-
+                                  <span>{label}</span>
                                   <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${isActiva ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'}`}>
-
                                     {count}
-
-                                  </span></button>
-
+                                  </span>
+                                </button>
                               );
-
                             })}
-
                           </div>
-
                         );
 
                       })()}
@@ -10315,8 +10262,10 @@ export default function ComercialComponent({
                         onClick={() => {
 
                           setTipoVentaItem('SERIE_ESPECIAL');
-
-                          const sObj = listaSeriesDisponibles.find((s) => s.id === serieEspecialId) || listaSeriesDisponibles[0];
+                          const sObj = seriesEspecialesDisponibles.find((s) => s.id === serieEspecialId) || seriesEspecialesDisponibles[0] || listaSeriesDisponibles.find((s) => s.id === serieEspecialId) || listaSeriesDisponibles[0];
+                          if (sObj?.id && sObj.id !== serieEspecialId) {
+                            setSerieEspecialId(sObj.id);
+                          }
 
                           if (sObj?.tallas) {
 
@@ -10439,8 +10388,7 @@ export default function ComercialComponent({
                       const prodObj = productoSeleccionadoObj;
 
                       const tallasList = tipoVentaItem === 'SERIE_ESPECIAL'
-
-                        ? (listaSeriesDisponibles.find((s) => s.id === serieEspecialId)?.tallas || [
+                        ? (seriesEspecialesDisponibles.find((s) => s.id === serieEspecialId)?.tallas || listaSeriesDisponibles.find((s) => s.id === serieEspecialId)?.tallas || [
 
                             { id: 't-esp-38', numero: 38 },
 
@@ -10625,47 +10573,33 @@ export default function ComercialComponent({
                                     </label>
 
                                     <select
-
                                       value={serieEspecialId}
-
                                       onChange={(e) => {
-
                                         const newSerieId = e.target.value;
-
                                         setSerieEspecialId(newSerieId);
-
-                                        const sObj = listaSeriesDisponibles.find((s) => s.id === newSerieId);
-
+                                        const sObj = seriesEspecialesDisponibles.find((s) => s.id === newSerieId) || listaSeriesDisponibles.find((s) => s.id === newSerieId);
                                         if (sObj?.tallas) {
-
                                           const map: Record<string, number> = {};
-
                                           sObj.tallas.forEach((t: any) => {
-
                                             map[t.id || `t-${t.numero}`] = 1;
-
                                           });
-
                                           setTallaCantidadesMap(map);
-
                                         }
-
                                       }}
-
                                       className="px-2.5 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-bold focus:outline-none focus:border-purple-600"
-
                                     >
-
-                                      {listaSeriesDisponibles.map((s) => (
-
-                                        <option key={s.id} value={s.id}>
-
-                                          {s.nombre.replace(/_/g, ' ')}
-
-                                        </option>
-
-                                      ))}
-
+                                      {seriesEspecialesDisponibles.map((s) => {
+                                        const label = formatearNombreSerie(s.nombre);
+                                        const tallasNums = (s.tallas || [])
+                                          .map((t: any) => t.numero)
+                                          .filter((n: any) => typeof n === 'number' && !isNaN(n));
+                                        const rangoStr = tallasNums.length > 0 ? ` (${Math.min(...tallasNums)}-${Math.max(...tallasNums)})` : '';
+                                        return (
+                                          <option key={s.id} value={s.id}>
+                                            {label}{rangoStr}
+                                          </option>
+                                        );
+                                      })}
                                     </select>
 
                                   </div>
