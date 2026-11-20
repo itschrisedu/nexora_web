@@ -754,9 +754,15 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
     movimientosCronologicos.forEach((mov, idx) => {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.8);
+      const colComprobanteW = 22; // Ancho máximo para columna Comprobante (33 a 55)
       const colDetalleW = 72; // Ancho ampliado para que no se corten los modelos
+
+      // Calcular líneas necesarias para comprobante y detalle
+      doc.setFont('helvetica', 'bold');
+      const lineasComprobante = doc.splitTextToSize(mov.referencia, colComprobanteW);
+      doc.setFont('helvetica', 'normal');
       const lineasDetalle = doc.splitTextToSize(mov.detalle, colDetalleW);
-      const numLineas = Math.max(1, lineasDetalle.length);
+      const numLineas = Math.max(1, lineasComprobante.length, lineasDetalle.length);
       const rowHeight = numLineas > 1 ? 5.2 + (numLineas - 1) * 3.4 : 5.6;
 
       checkSaltoPagina(rowHeight + 1);
@@ -772,7 +778,7 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
       doc.setTextColor(30, 41, 59);
       doc.text(mov.fecha, 15, y + 3.2);
 
-      // Comprobante
+      // Comprobante (con salto de línea si es largo)
       doc.setFont('helvetica', 'bold');
       if (mov.referencia === 'SALDO ANTERIOR') {
         doc.setTextColor(71, 85, 105);
@@ -783,7 +789,7 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
       } else {
         doc.setTextColor(225, 29, 72);
       }
-      doc.text(mov.referencia, 33, y + 3.2);
+      doc.text(lineasComprobante, 33, y + 3.2);
 
       // Detalle Operativo (adaptable a 1 o más líneas con interlineado perfecto)
       doc.setFont('helvetica', 'normal');
