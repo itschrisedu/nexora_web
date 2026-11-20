@@ -549,6 +549,100 @@ export default function DashboardComponent({
     return Math.max(...topModelos.map((m) => m.pares), 1);
   }, [topModelos]);
 
+  // Consolidación de Series de Calzado para Curva de Tallas (evita que una serie como Adulto o Juvenil se duplique)
+  const seriesConsolidadasCurva = useMemo(() => {
+    if (!curvaSeries || typeof curvaSeries !== "object") return {};
+
+    const mapa: Record<string, {
+      clave: string;
+      nombreVisible: string;
+      totalModelos: number;
+      totalPares: number;
+      rawKeys: string[];
+      tallasMap: Record<number, { numero: number; paresTotal: number; modelosBajos: number }>;
+    }> = {};
+
+    Object.entries(curvaSeries).forEach(([rawKey, sData]) => {
+      if (!sData) return;
+      const nombreVisible = formatearNombreSerie(sData.serieNombre || rawKey);
+      const claveCanonica = nombreVisible.toUpperCase().trim();
+
+      if (!mapa[claveCanonica]) {
+        mapa[claveCanonica] = {
+          clave: claveCanonica,
+          nombreVisible,
+          totalModelos: 0,
+          totalPares: 0,
+          rawKeys: [],
+          tallasMap: {},
+        };
+      }
+
+      const item = mapa[claveCanonica];
+      item.rawKeys.push(rawKey);
+      item.totalModelos += Number(sData.totalModelos || 0);
+      item.totalPares += Number(sData.totalPares || 0);
+
+      if (Array.isArray(sData.tallas)) {
+        sData.tallas.forEach((t) => {
+          const num = Number(t.numero);
+          if (isNaN(num) || num <= 0) return;
+          if (!item.tallasMap[num]) {
+            item.tallasMap[num] = {
+              numero: num,
+              paresTotal: 0,
+              modelosBajos: 0,
+            };
+          }
+          item.tallasMap[num].paresTotal += Number(t.paresTotal || 0);
+          item.tallasMap[num].modelosBajos += Number(t.modelosBajos || 0);
+        });
+      }
+    });
+
+    const resultado: Record<string, {
+      clave: string;
+      nombreVisible: string;
+      totalModelos: number;
+      totalPares: number;
+      rawKeys: string[];
+      tallas: { numero: number; paresTotal: number; modelosBajos: number }[];
+    }> = {};
+
+    Object.entries(mapa).forEach(([clave, datos]) => {
+      resultado[clave] = {
+        clave: datos.clave,
+        nombreVisible: datos.nombreVisible,
+        totalModelos: datos.totalModelos,
+        totalPares: datos.totalPares,
+        rawKeys: datos.rawKeys,
+        tallas: Object.values(datos.tallasMap).sort((a, b) => a.numero - b.numero),
+      };
+    });
+
+    return resultado;
+  }, [curvaSeries]);
+
+  const serieActivaData = useMemo(() => {
+    const seriesList = Object.values(seriesConsolidadasCurva);
+    if (seriesList.length === 0) return null;
+
+    const claveBuscada = (serieActivaCurva || "").toUpperCase().trim();
+    if (seriesConsolidadasCurva[claveBuscada]) {
+      return seriesConsolidadasCurva[claveBuscada];
+    }
+
+    const nombreBuscado = formatearNombreSerie(serieActivaCurva).toUpperCase().trim();
+    if (seriesConsolidadasCurva[nombreBuscado]) {
+      return seriesConsolidadasCurva[nombreBuscado];
+    }
+
+    const encontrada = seriesList.find((sc) => sc.rawKeys.includes(serieActivaCurva));
+    if (encontrada) return encontrada;
+
+    return seriesConsolidadasCurva["ADULTO"] || seriesList[0] || null;
+  }, [seriesConsolidadasCurva, serieActivaCurva]);
+
   return (
     <div className="space-y-2.5 max-w-full pb-2">
       {/* ─── 1. BANNER COMPACTO CON SELECTORES DE SUCURSAL Y PERIODO ─── */}
@@ -885,7 +979,7 @@ export default function DashboardComponent({
                   </div>
                   <div>
                     <h3 className="text-xs font-black tracking-tight text-[var(--foreground)]">
-                      Curva de Tallas por Serie ({formatearNombreSerie(serieActivaCurva)})
+                      Curva de Tallas por Serie ({serieActivaData?.nombreVisible || formatearNombreSerie(serieActivaCurva)})
                     </h3>
                     <p className="text-[9px] text-[var(--muted-foreground)]">
                       Monitoreo de rotación y stock crítico por serie de calzado
@@ -899,24 +993,23 @@ export default function DashboardComponent({
                 </div>
               </div>
 
-              {/* Selector interactivo de Series de Calzado (Píldoras) */}
-              {Object.keys(curvaSeries).length > 0 && (
+              {/* Selector interactivo de Series de Calzado (Píldoras Consolidadas: 1 por cada serie) */}
+              {Object.keys(seriesConsolidadasCurva).length > 0 && (
                 <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5">
-                  {Object.keys(curvaSeries).map((serieKey) => {
-                    const isSelected = serieKey === serieActivaCurva;
-                    const sData = curvaSeries[serieKey];
+                  {Object.values(seriesConsolidadasCurva).map((sc) => {
+                    const isSelected = (serieActivaData?.clave === sc.clave);
                     return (
                       <button
-                        key={serieKey}
+                        key={sc.clave}
                         type="button"
-                        onClick={() => setSerieActivaCurva(serieKey)}
+                        onClick={() => setSerieActivaCurva(sc.clave)}
                         className={`px-2.5 py-1 rounded-xl text-[10px] font-bold border transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                           isSelected
                             ? "bg-amber-500 text-slate-950 border-amber-500 shadow-xs"
                             : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
                         }`}
                       >
-                        <span>{formatearNombreSerie(serieKey)}</span>
+                        <span>{sc.nombreVisible}</span>
                         <span
                           className={`text-[8.5px] px-1 py-0.2 rounded-md font-mono ${
                             isSelected
@@ -924,7 +1017,7 @@ export default function DashboardComponent({
                               : "bg-[var(--muted)] text-[var(--muted-foreground)]"
                           }`}
                         >
-                          {sData?.totalPares || 0} p.
+                          {sc.totalPares || 0} p.
                         </span>
                       </button>
                     );
@@ -934,8 +1027,7 @@ export default function DashboardComponent({
 
               {/* Grid de tallas dinámicas para la serie seleccionada */}
               {(() => {
-                const serieData = curvaSeries[serieActivaCurva];
-                const tallasSerie = serieData?.tallas || [];
+                const tallasSerie = serieActivaData?.tallas || [];
 
                 // Fallback a tallas 37-42 si aún no cargan las series dinámicas
                 if (tallasSerie.length === 0) {
@@ -1021,10 +1113,10 @@ export default function DashboardComponent({
 
               <div className="pt-1 text-[9px] text-[var(--muted-foreground)] flex items-center justify-between border-t border-[var(--border)]">
                 <span>
-                  Serie: <strong className="text-[var(--foreground)]">{formatearNombreSerie(serieActivaCurva)}</strong> ({curvaSeries[serieActivaCurva]?.totalModelos || 0} modelos)
+                  Serie: <strong className="text-[var(--foreground)]">{serieActivaData?.nombreVisible || formatearNombreSerie(serieActivaCurva)}</strong> ({serieActivaData?.totalModelos || 0} modelos)
                 </span>
                 <span className="font-mono font-bold text-[var(--foreground)]">
-                  Total en serie: {curvaSeries[serieActivaCurva]?.totalPares ?? [37, 38, 39, 40, 41, 42].reduce((acc, t) => acc + (tallasBajas[t] || 0), 0)} pares
+                  Total en serie: {serieActivaData?.totalPares ?? [37, 38, 39, 40, 41, 42].reduce((acc, t) => acc + (tallasBajas[t] || 0), 0)} pares
                 </span>
               </div>
             </div>
