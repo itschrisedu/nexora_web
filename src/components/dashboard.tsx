@@ -1209,18 +1209,18 @@ export default function DashboardComponent({
           progressLabel={`Meta: ${metaPares} pares`}
         />
 
-        {/* KPI 3: Caja / Bancos [DINERO REAL EN BD O FLUJO NETO - SÓLO ADMINS] */}
+        {/* KPI 3: Caja / Bancos [DISPONIBILIDAD O FLUJO NETO - SÓLO ADMINS] */}
         {isAdmin && (
           <KpiExecutiveCard
             title="Caja / Bancos"
             value={`$${liquidezIndices.efectivoCaja.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
-            subtitle={liquidezIndices.esSaldoManual ? "Saldo real en BD" : `Flujo neto: $${liquidezIndices.flujoNetoEstimado.toFixed(0)}`}
-            badgeText={liquidezIndices.esSaldoManual ? "Saldo en BD" : "Flujo Calculado"}
+            subtitle={liquidezIndices.esSaldoManual ? "Saldo disponible" : `Flujo neto: $${liquidezIndices.flujoNetoEstimado.toFixed(0)}`}
+            badgeText={liquidezIndices.esSaldoManual ? "Saldo Actual" : "Flujo Calculado"}
             badgePositive={liquidezIndices.efectivoCaja >= 0}
             icon={<Wallet size={14} />}
             accentColor="#10B981"
             progressPercent={Math.min(Math.round((liquidezIndices.efectivoCaja / (metaPeriodo * 0.4 || 1)) * 100), 100)}
-            progressLabel={liquidezIndices.esSaldoManual ? "Verificado en nube" : "Cobros - Egresos"}
+            progressLabel={liquidezIndices.esSaldoManual ? "Saldo verificado" : "Cobros - Egresos"}
           />
         )}
 
@@ -1267,15 +1267,8 @@ export default function DashboardComponent({
 
           {/* Estado de Proveedores, Caja & Capacidad de Compra */}
           <div className="flex items-center gap-2 font-mono text-[10px] flex-wrap">
-            <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+            <span className="text-emerald-600 dark:text-emerald-400 font-bold">
               Caja/Bancos: ${liquidezIndices.efectivoCaja.toFixed(2)}
-              <span className={`px-1 py-0.2 rounded text-[7.5px] uppercase font-black ${
-                liquidezIndices.esSaldoManual
-                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
-                  : "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25"
-              }`}>
-                {liquidezIndices.esSaldoManual ? "En BD" : "Calculado"}
-              </span>
             </span>
             <span className="text-orange-500 font-bold">
               Deuda Proveedores: ${liquidezIndices.deudaProveedores.toFixed(2)}
