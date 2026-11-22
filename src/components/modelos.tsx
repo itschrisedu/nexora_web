@@ -3958,27 +3958,29 @@ export default function ModelosComponent({
     setEditProductMotivo("");
 
     const sid = (p.serie as any)?.id || (p as any).serieId || "";
+    const pSerieNombre = (p.serie as any)?.nombre || "";
 
-    setEditProductSerieId(sid);
+    const matchedSerie = series.find(s => s.id === sid) ||
+      series.find(s => normalizarClaveSerie(s.nombre) === normalizarClaveSerie(pSerieNombre)) ||
+      (series.length > 0 ? series[0] : null);
 
+    const activeSerieId = matchedSerie?.id || sid;
+    setEditProductSerieId(activeSerieId);
 
-
-    const selectedSerie = series.find(s => s.id === sid);
+    const selectedSerie = matchedSerie;
 
     const rawTallas = (p.tallas || (p as any).stockPorTalla || []);
 
     const existingMap: Record<number, { tallaId: string; cantidad: number }> = {};
 
     rawTallas.forEach((t: any) => {
-
-      existingMap[t.numero] = {
-
-        tallaId: t.tallaId || t.id,
-
-        cantidad: t.cantidad ?? t.disponible ?? 0,
-
-      };
-
+      const num = Number(t.numero ?? t.talla?.numero ?? t.sizeNumber);
+      if (num) {
+        existingMap[num] = {
+          tallaId: t.tallaId || t.id,
+          cantidad: Number(t.cantidad ?? t.stock ?? t.disponible ?? 0),
+        };
+      }
     });
 
 
@@ -4083,7 +4085,7 @@ export default function ModelosComponent({
 
       // Para editar una variante específica, la ÚNICA serie activa debe ser la serie de ESTA variante
 
-      const activeSids = sid ? [sid] : (series.length > 0 ? [series[0].id] : []);
+      const activeSids = activeSerieId ? [activeSerieId] : (series.length > 0 ? [series[0].id] : []);
 
 
 
@@ -4097,7 +4099,11 @@ export default function ModelosComponent({
 
       series.forEach(s => {
 
-        if (s.id === sid) {
+        const isTargetVariantSerie = s.id === activeSerieId ||
+                                     (sid && s.id === sid) ||
+                                     (pSerieNombre && normalizarClaveSerie(s.nombre) === normalizarClaveSerie(pSerieNombre));
+
+        if (isTargetVariantSerie) {
 
           // Serie correspondiente a esta variante
 
@@ -4113,19 +4119,21 @@ export default function ModelosComponent({
 
           const currentVariantTallaIds: string[] = [];
 
-          if (s.tallas && rawTallas && rawTallas.length > 0) {
+          if (s.tallas && s.tallas.length > 0) {
 
-            rawTallas.forEach((t: any) => {
+            s.tallas.forEach((st) => {
 
-              const qty = t.cantidad ?? t.disponible ?? 0;
+              const stNum = Number(st.numero);
 
-              const matchingTalla = s.tallas!.find(st => st.numero === t.numero || st.id === t.tallaId || st.id === t.id);
+              const existing = existingMap[stNum];
 
-              if (matchingTalla && qty > 0) {
+              const qty = existing ? existing.cantidad : 0;
+
+              if (qty > 0) {
 
                 for (let k = 0; k < qty; k++) {
 
-                  currentVariantTallaIds.push(matchingTalla.id);
+                  currentVariantTallaIds.push(st.id);
 
                 }
 
@@ -4163,9 +4171,9 @@ export default function ModelosComponent({
 
 
 
-      if (sid && !initialPrices[sid]?.costPrice && p.precioCosto) {
+      if (activeSerieId && !initialPrices[activeSerieId]?.costPrice && p.precioCosto) {
 
-        initialPrices[sid] = {
+        initialPrices[activeSerieId] = {
 
           costPrice: String(p.precioCosto),
 
