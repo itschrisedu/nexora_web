@@ -6368,11 +6368,26 @@ export default function ModelosComponent({
 
                             <>
 
-                              <img src={activeProduct.fotoUrl} alt={m.name} className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-200" />
+                              <img
+                                src={activeProduct.fotoUrl}
+                                alt={m.name}
+                                className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-200"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.parentElement?.querySelector('.img-fallback-icon') as HTMLElement;
+                                  if (fallback) fallback.style.display = 'flex';
+                                }}
+                              />
 
                               <div className="absolute inset-0 bg-black/35 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity text-white">
 
                                 <ZoomIn size={16} />
+
+                              </div>
+
+                              <div className="img-fallback-icon hidden w-full h-full items-center justify-center">
+
+                                <ImageIcon size={20} className="text-[var(--muted-foreground)] opacity-40" />
 
                               </div>
 
@@ -6626,7 +6641,7 @@ export default function ModelosComponent({
 
                             const countTotal = groupProducts.length;
 
-                            const numSuppliers = new Set(groupProducts.map(p => p.supplierId || 'sin')).size;
+                            const numSuppliers = new Set(groupProducts.map(p => (p.supplier as any)?.id || p.supplierId || 'sin')).size;
 
 
 
@@ -6677,12 +6692,13 @@ export default function ModelosComponent({
                         {(() => {
 
                           // Agrupar las variantes del color activo por proveedor
-
+                          // Usar supplier.id resuelto (que refleja el proveedor real) como clave primaria,
+                          // con fallback a supplierId para mantener compatibilidad
                           const bySupplier = new Map<string, Producto[]>();
 
                           for (const p of activeColorProducts) {
 
-                            const key = p.supplierId || (p.supplier as any)?.id || 'sin-proveedor';
+                            const key = (p.supplier as any)?.id || p.supplierId || 'sin-proveedor';
 
                             if (!bySupplier.has(key)) bySupplier.set(key, []);
 
@@ -6758,15 +6774,22 @@ export default function ModelosComponent({
                                     {supplierImage && (
 
                                       <div
-
-                                        className="w-8 h-8 rounded-lg overflow-hidden border border-[var(--border)] shrink-0 cursor-zoom-in"
-
+                                        className="w-8 h-8 rounded-lg overflow-hidden border border-[var(--border)] shrink-0 cursor-zoom-in relative flex items-center justify-center bg-[var(--muted)]/40"
                                         onClick={() => supplierImage && setZoomImage({ url: supplierImage, title: m.name, subtitle: supplierName, color: activeColorLabel, brand: m.brand })}
-
                                       >
-
-                                        <img src={supplierImage} alt={supplierName} className="w-full h-full object-cover" />
-
+                                        <img
+                                          src={supplierImage}
+                                          alt={supplierName}
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                            const fallback = e.currentTarget.parentElement?.querySelector('.img-fallback-icon') as HTMLElement;
+                                            if (fallback) fallback.style.display = 'flex';
+                                          }}
+                                        />
+                                        <div className="img-fallback-icon hidden w-full h-full items-center justify-center">
+                                          <ImageIcon size={14} className="text-[var(--muted-foreground)] opacity-40" />
+                                        </div>
                                       </div>
 
                                     )}
