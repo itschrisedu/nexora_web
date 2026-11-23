@@ -462,6 +462,8 @@ interface ClienteHistorial {
 
     atrasoConsecutivo: number;
 
+    createdAt?: string;
+
   };
 
   resumen: {
@@ -3193,48 +3195,86 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
 
   const rangoFechasHistorial = useMemo(() => {
+    const dHoy = new Date();
+    const hoyStr = `${dHoy.getFullYear()}-${String(dHoy.getMonth() + 1).padStart(2, '0')}-${String(dHoy.getDate()).padStart(2, '0')}`;
 
-    if (!historialCliente?.movimientos || historialCliente.movimientos.length === 0) {
-
-      const hoy = new Date().toISOString().split('T')[0];
-
-      return { minFecha: hoy, maxFecha: hoy, total: 0 };
-
+    if (!historialCliente) {
+      return { minFecha: hoyStr, maxFecha: hoyStr, total: 0 };
     }
 
-    const timestamps = historialCliente.movimientos
+    const candidateTimestamps: number[] = [];
 
-      .map(m => new Date(m.fecha).getTime())
-
-      .filter(t => !isNaN(t));
-
-    if (timestamps.length === 0) {
-
-      const hoy = new Date().toISOString().split('T')[0];
-
-      return { minFecha: hoy, maxFecha: hoy, total: 0 };
-
+    // Fecha de creación/registro del cliente
+    if (historialCliente.cliente?.createdAt) {
+      const t = new Date(historialCliente.cliente.createdAt).getTime();
+      if (!isNaN(t)) candidateTimestamps.push(t);
     }
 
-    const minTimestamp = Math.min(...timestamps);
+    // Fechas de todos los movimientos registrados
+    if (historialCliente.movimientos && historialCliente.movimientos.length > 0) {
+      historialCliente.movimientos.forEach(m => {
+        if (m.fecha) {
+          const t = new Date(m.fecha).getTime();
+          if (!isNaN(t)) candidateTimestamps.push(t);
+        }
+      });
+    }
 
-    const maxTimestamp = Math.max(...timestamps);
+    let minDateStr = hoyStr;
+    if (candidateTimestamps.length > 0) {
+      const minTimestamp = Math.min(...candidateTimestamps);
+      const dMin = new Date(minTimestamp);
+      minDateStr = `${dMin.getFullYear()}-${String(dMin.getMonth() + 1).padStart(2, '0')}-${String(dMin.getDate()).padStart(2, '0')}`;
+    }
 
-    const minDateStr = new Date(minTimestamp).toISOString().split('T')[0];
+    const maxDateStr = hoyStr;
 
-    const maxDateStr = new Date(maxTimestamp).toISOString().split('T')[0];
+    if (minDateStr > maxDateStr) {
+      minDateStr = maxDateStr;
+    }
 
     return {
-
       minFecha: minDateStr,
-
       maxFecha: maxDateStr,
-
-      total: historialCliente.movimientos.length,
-
+      total: historialCliente.movimientos?.length || 0,
     };
-
   }, [historialCliente]);
+
+  const handleCambioFechaInicioCompartir = (nuevaFecha: string) => {
+    if (!nuevaFecha) {
+      setFiltroCompartirFechaInicio(rangoFechasHistorial.minFecha);
+      return;
+    }
+    let fechaAjustada = nuevaFecha;
+    if (rangoFechasHistorial.minFecha && fechaAjustada < rangoFechasHistorial.minFecha) {
+      fechaAjustada = rangoFechasHistorial.minFecha;
+    }
+    if (rangoFechasHistorial.maxFecha && fechaAjustada > rangoFechasHistorial.maxFecha) {
+      fechaAjustada = rangoFechasHistorial.maxFecha;
+    }
+    if (filtroCompartirFechaFin && fechaAjustada > filtroCompartirFechaFin) {
+      fechaAjustada = filtroCompartirFechaFin;
+    }
+    setFiltroCompartirFechaInicio(fechaAjustada);
+  };
+
+  const handleCambioFechaFinCompartir = (nuevaFecha: string) => {
+    if (!nuevaFecha) {
+      setFiltroCompartirFechaFin(rangoFechasHistorial.maxFecha);
+      return;
+    }
+    let fechaAjustada = nuevaFecha;
+    if (rangoFechasHistorial.maxFecha && fechaAjustada > rangoFechasHistorial.maxFecha) {
+      fechaAjustada = rangoFechasHistorial.maxFecha;
+    }
+    if (rangoFechasHistorial.minFecha && fechaAjustada < rangoFechasHistorial.minFecha) {
+      fechaAjustada = rangoFechasHistorial.minFecha;
+    }
+    if (filtroCompartirFechaInicio && fechaAjustada < filtroCompartirFechaInicio) {
+      fechaAjustada = filtroCompartirFechaInicio;
+    }
+    setFiltroCompartirFechaFin(fechaAjustada);
+  };
 
 
 
@@ -14859,7 +14899,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                           max={filtroCompartirFechaFin || rangoFechasHistorial.maxFecha}
 
-                          onChange={(e) => setFiltroCompartirFechaInicio(e.target.value)}
+                          onChange={(e) => handleCambioFechaInicioCompartir(e.target.value)}
+
+                          onBlur={(e) => handleCambioFechaInicioCompartir(e.target.value)}
 
                           className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
 
@@ -14885,7 +14927,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                           max={rangoFechasHistorial.maxFecha}
 
-                          onChange={(e) => setFiltroCompartirFechaFin(e.target.value)}
+                          onChange={(e) => handleCambioFechaFinCompartir(e.target.value)}
+
+                          onBlur={(e) => handleCambioFechaFinCompartir(e.target.value)}
 
                           className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
 
