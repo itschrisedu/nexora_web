@@ -632,11 +632,11 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
 
   return (
     <div className="space-y-5">
-      {/* ── Header & Pestañas CRM ── */}
+      {/* ── Header & Pestañas ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="font-extrabold text-xl tracking-tight text-[var(--foreground)] flex items-center gap-2">
-            <span>Gestión de Clientes & CRM</span>
+            <span>Gestión de Clientes</span>
             {inactivos.length > 0 && (
               <span className="px-2 py-0.5 bg-amber-500/10 text-amber-600 border border-amber-500/20 rounded-full text-xs font-bold flex items-center gap-1">
                 <Clock size={11} /> {inactivos.length} inactivos
@@ -1434,7 +1434,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       )}
 
       {/* ══════════════════════════════════════════════════════════════ */}
-      {/* VISTA 2: CRM DE FIDELIZACIÓN & CLIENTES INACTIVOS (> 30 DÍAS) */}
+      {/* VISTA 2: FIDELIZACIÓN & CLIENTES INACTIVOS (> 30 DÍAS) */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {vista === 'INACTIVOS' && (
         <div className="space-y-5 animate-in fade-in duration-150">
