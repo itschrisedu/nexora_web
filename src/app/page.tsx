@@ -44,8 +44,7 @@ import {
   KeyRound,
   Clock,
   MessageSquare,
-  PanelLeftClose,
-  PanelLeftOpen,
+  ChevronLeft,
 } from 'lucide-react';
 import { GeolocationService } from '@/services/geolocation.service';
 import UserAvatar from '@/components/ui/UserAvatar';
@@ -1469,21 +1468,6 @@ function MainApp() {
                 className="w-9 h-9 object-contain rounded-xl shrink-0 border border-[var(--border)] p-0.5 bg-white shadow-xs"
               />
               <button
-                onClick={() => {
-                  hideTooltip();
-                  setSidebarCollapsed(false);
-                  if (typeof window !== 'undefined') {
-                    localStorage.setItem('nexora_sidebar_collapsed', 'false');
-                  }
-                }}
-                onMouseEnter={(e) => showTooltip(e, 'Expandir menú')}
-                onMouseLeave={hideTooltip}
-                className="w-11 h-9 flex items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--muted)]/70 hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors cursor-pointer"
-                aria-label="Expandir menú"
-              >
-                <PanelLeftOpen size={17} />
-              </button>
-              <button
                 onClick={toggleTheme}
                 onMouseEnter={(e) => showTooltip(e, theme === 'dark' ? 'Modo claro' : 'Modo oscuro')}
                 onMouseLeave={hideTooltip}
@@ -1551,21 +1535,6 @@ function MainApp() {
                 >
                   {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
                 </button>
-                {!isMobile && (
-                  <button
-                    onClick={() => {
-                      setSidebarCollapsed(true);
-                      if (typeof window !== 'undefined') {
-                        localStorage.setItem('nexora_sidebar_collapsed', 'true');
-                      }
-                    }}
-                    className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:opacity-90 transition-all cursor-pointer"
-                    title="Contraer menú"
-                    aria-label="Contraer menú"
-                  >
-                    <PanelLeftClose size={15} />
-                  </button>
-                )}
                 {isMobile && (
                   <button
                     onClick={() => setMobileMenuOpen(false)}
@@ -1838,13 +1807,32 @@ function MainApp() {
     <div className="h-screen max-h-screen w-full flex overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
 
       {/* ─── SIDEBAR ESCRITORIO (Fijo, visible en pantallas >= md) ─── */}
-      <aside
-        className={`hidden md:flex ${
-          sidebarCollapsed ? 'w-[76px]' : 'w-64'
-        } h-full max-h-screen border-r border-[var(--border)] bg-[var(--card)] flex-col justify-between shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out`}
-      >
-        {renderSidebarContent(false)}
-      </aside>
+      <div className="hidden md:block relative h-full max-h-screen shrink-0">
+        <aside
+          className={`flex ${
+            sidebarCollapsed ? 'w-[76px]' : 'w-64'
+          } h-full max-h-screen border-r border-[var(--border)] bg-[var(--card)] flex-col justify-between overflow-hidden transition-[width] duration-300 ease-in-out`}
+        >
+          {renderSidebarContent(false)}
+        </aside>
+        <button
+          onClick={() => {
+            setCollapsedTooltip(null);
+            setSidebarCollapsed((prev) => {
+              const next = !prev;
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('nexora_sidebar_collapsed', String(next));
+              }
+              return next;
+            });
+          }}
+          title={sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'}
+          aria-label={sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'}
+          className="absolute -right-3.5 top-16 -translate-y-1/2 z-40 w-7 h-7 rounded-full border border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:border-[var(--primary)]/50 hover:scale-105 shadow-md flex items-center justify-center transition-all cursor-pointer"
+        >
+          {sidebarCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+        </button>
+      </div>
 
       {/* ─── TOOLTIP FLOTANTE PARA SIDEBAR COLAPSADO (ESCRITORIO) ─── */}
       {sidebarCollapsed && collapsedTooltip && (
