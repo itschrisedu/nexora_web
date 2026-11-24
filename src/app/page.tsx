@@ -44,6 +44,8 @@ import {
   KeyRound,
   Clock,
   MessageSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { GeolocationService } from '@/services/geolocation.service';
 import UserAvatar from '@/components/ui/UserAvatar';
@@ -130,6 +132,8 @@ function MainApp() {
   const [sucursales, setSucursales] = useState<any[]>([]);
   const [activeSucursalId, setActiveSucursalId] = useState<string>('TODAS');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [collapsedTooltip, setCollapsedTooltip] = useState<{ label: string; top: number } | null>(null);
   const [notificacionesModalOpen, setNotificacionesModalOpen] = useState(false);
   const [alertaCount, setAlertaCount] = useState(0);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -208,6 +212,15 @@ function MainApp() {
       return () => clearInterval(interval);
     }
   }, [isLoggedIn, user, checkHorarioLaboral]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('nexora_sidebar_collapsed');
+      if (saved === 'true') {
+        setSidebarCollapsed(true);
+      }
+    }
+  }, []);
 
   // ── Estado y Control Inteligente de Navbar Móvil (Ocultar al bajar, mostrar de inmediato al subir) ──
   const [showHeaderMobile, setShowHeaderMobile] = useState(true);
@@ -1375,6 +1388,18 @@ function MainApp() {
   );
 
   const renderSidebarContent = (isMobile: boolean = false) => {
+    const collapsed = !isMobile && sidebarCollapsed;
+
+    const showTooltip = (e: React.MouseEvent<HTMLElement>, label: string) => {
+      if (!collapsed) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      setCollapsedTooltip({ label, top: rect.top + rect.height / 2 });
+    };
+
+    const hideTooltip = () => {
+      setCollapsedTooltip(null);
+    };
+
     const SECTION_GROUPS: { label: string; ids: Vista[] }[] = [
       { label: 'Operativo Diario', ids: ['dashboard', 'pos', 'comercial', 'inventario'] },
       { label: 'Gestión Comercial', ids: ['financiero', 'clientes', 'proveedores', 'modelos', 'campanas'] },
@@ -1397,78 +1422,162 @@ function MainApp() {
       return !['modelos', 'super-admin'].includes(item.id);
     });
 
+    const logoSrc = isSuperAdmin ? '/logo.png' : businessLogo || '/logo.png';
+    const userRoleLabel = isSuperAdmin
+      ? 'Super Admin'
+      : user?.rol === 'ROL_ADMIN'
+        ? isGlobalAdmin
+          ? 'Admin General'
+          : 'Admin de Sucursal'
+        : user?.rol === 'ROL_VENDEDOR'
+          ? 'Vendedor'
+          : user?.rol === 'ROL_BODEGUERO'
+            ? 'Bodeguero'
+            : 'Desconocido';
+
     return (
       <div className="flex-1 min-h-0 flex flex-col justify-between h-full">
         <div className="flex-1 min-h-0 flex flex-col">
-          {/* Logo + Toggle tema + Botón Cerrar (en móvil) */}
-          <div className="shrink-0 p-4 sm:p-5 border-b border-[var(--border)] flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              {isSuperAdmin ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src="/logo.png"
-                  alt="NEXORA"
-                  className="w-8 h-8 object-contain rounded-lg shrink-0 border border-[var(--border)] p-0.5 bg-white shadow-xs"
-                />
-              ) : businessLogo ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={businessLogo}
-                  alt="Logo"
-                  onError={(e) => {
-                    const img = e.currentTarget;
-                    img.onerror = null;
-                    img.src = '/logo.png';
+          {/* Logo + Toggle tema + Colapsar (escritorio) / Cerrar (móvil) */}
+          {collapsed ? (
+            <div className="shrink-0 py-3.5 px-2 border-b border-[var(--border)] flex flex-col items-center gap-2.5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logoSrc}
+                alt={isSuperAdmin ? 'NEXORA' : 'Logo'}
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  img.onerror = null;
+                  img.src = '/logo.png';
+                  if (!isSuperAdmin && businessLogo) {
                     setBusinessLogo('');
                     if (typeof window !== 'undefined') {
                       localStorage.removeItem('nexora_business_logo');
                     }
                     updateTabFavicon('/favicon.ico');
-                  }}
-                  className="w-8 h-8 object-contain rounded-lg shrink-0 border border-[var(--border)] p-0.5 bg-white shadow-xs"
-                />
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src="/logo.png"
-                  alt="NEXORA"
-                  className="w-8 h-8 object-contain rounded-lg shrink-0 border border-[var(--border)] p-0.5 bg-white shadow-xs"
-                />
-              )}
-              <div className="min-w-0 flex-1 flex flex-col justify-center pr-1">
-                <span 
-                  className="text-xs sm:text-sm font-black tracking-tight block leading-tight break-words font-sans"
-                  style={{ color: 'var(--foreground)' }}
-                >
-                  {isSuperAdmin ? 'NEXORA GLOBAL' : ((businessNombre && businessNombre.trim()) || (user?.tenantName && user.tenantName.trim()) || 'NEXORA')}
-                </span>
-                <span 
-                  className="text-[9.5px] font-extrabold uppercase tracking-wider block mt-0.5"
-                  style={{ color: 'var(--muted-foreground)' }}
-                >
-                  {isSuperAdmin ? 'Control Central de la Plataforma' : (user?.tenantSector || 'Sistema de Gestión Comercial')}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
+                  }
+                }}
+                onMouseEnter={(e) =>
+                  showTooltip(
+                    e,
+                    isSuperAdmin
+                      ? 'NEXORA GLOBAL'
+                      : (businessNombre && businessNombre.trim()) || (user?.tenantName && user.tenantName.trim()) || 'NEXORA'
+                  )
+                }
+                onMouseLeave={hideTooltip}
+                className="w-9 h-9 object-contain rounded-xl shrink-0 border border-[var(--border)] p-0.5 bg-white shadow-xs"
+              />
+              <button
+                onClick={() => {
+                  hideTooltip();
+                  setSidebarCollapsed(false);
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('nexora_sidebar_collapsed', 'false');
+                  }
+                }}
+                onMouseEnter={(e) => showTooltip(e, 'Expandir menú')}
+                onMouseLeave={hideTooltip}
+                className="w-11 h-9 flex items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--muted)]/70 hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors cursor-pointer"
+                aria-label="Expandir menú"
+              >
+                <PanelLeftOpen size={17} />
+              </button>
               <button
                 onClick={toggleTheme}
-                className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--muted)] hover:opacity-80 transition-opacity cursor-pointer"
-                title="Cambiar tema"
+                onMouseEnter={(e) => showTooltip(e, theme === 'dark' ? 'Modo claro' : 'Modo oscuro')}
+                onMouseLeave={hideTooltip}
+                className="w-11 h-9 flex items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--muted)]/50 hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                aria-label="Cambiar tema"
               >
-                {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
               </button>
-              {isMobile && (
-                <button
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
-                  title="Cerrar menú"
-                >
-                  <X size={18} />
-                </button>
-              )}
             </div>
-          </div>
+          ) : (
+            <div className="shrink-0 p-4 sm:p-5 border-b border-[var(--border)] flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                {isSuperAdmin ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src="/logo.png"
+                    alt="NEXORA"
+                    className="w-8 h-8 object-contain rounded-lg shrink-0 border border-[var(--border)] p-0.5 bg-white shadow-xs"
+                  />
+                ) : businessLogo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={businessLogo}
+                    alt="Logo"
+                    onError={(e) => {
+                      const img = e.currentTarget;
+                      img.onerror = null;
+                      img.src = '/logo.png';
+                      setBusinessLogo('');
+                      if (typeof window !== 'undefined') {
+                        localStorage.removeItem('nexora_business_logo');
+                      }
+                      updateTabFavicon('/favicon.ico');
+                    }}
+                    className="w-8 h-8 object-contain rounded-lg shrink-0 border border-[var(--border)] p-0.5 bg-white shadow-xs"
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src="/logo.png"
+                    alt="NEXORA"
+                    className="w-8 h-8 object-contain rounded-lg shrink-0 border border-[var(--border)] p-0.5 bg-white shadow-xs"
+                  />
+                )}
+                <div className="min-w-0 flex-1 flex flex-col justify-center pr-1">
+                  <span
+                    className="text-xs sm:text-sm font-black tracking-tight block leading-tight break-words font-sans"
+                    style={{ color: 'var(--foreground)' }}
+                  >
+                    {isSuperAdmin ? 'NEXORA GLOBAL' : ((businessNombre && businessNombre.trim()) || (user?.tenantName && user.tenantName.trim()) || 'NEXORA')}
+                  </span>
+                  <span
+                    className="text-[9.5px] font-extrabold uppercase tracking-wider block mt-0.5"
+                    style={{ color: 'var(--muted-foreground)' }}
+                  >
+                    {isSuperAdmin ? 'Control Central de la Plataforma' : (user?.tenantSector || 'Sistema de Gestión Comercial')}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={toggleTheme}
+                  className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--muted)] hover:opacity-80 transition-opacity cursor-pointer"
+                  title="Cambiar tema"
+                >
+                  {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+                </button>
+                {!isMobile && (
+                  <button
+                    onClick={() => {
+                      setSidebarCollapsed(true);
+                      if (typeof window !== 'undefined') {
+                        localStorage.setItem('nexora_sidebar_collapsed', 'true');
+                      }
+                    }}
+                    className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:opacity-90 transition-all cursor-pointer"
+                    title="Contraer menú"
+                    aria-label="Contraer menú"
+                  >
+                    <PanelLeftClose size={15} />
+                  </button>
+                )}
+                {isMobile && (
+                  <button
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                    title="Cerrar menú"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Selector de sucursal móvil */}
           {isMobile && user?.rol && user?.rol !== 'ROL_SUPER_ADMIN' && (
@@ -1505,18 +1614,22 @@ function MainApp() {
           )}
 
           {/* Navegación (Scroll vertical independiente únicamente en el área de items) */}
-          <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-0.5">
+          <nav className={`flex-1 min-h-0 overflow-y-auto ${collapsed ? 'px-2.5 py-3 space-y-1' : 'p-4 space-y-0.5'}`}>
             {SECTION_GROUPS.map((group, gi) => {
               const groupItems = group.ids
                 .map((id) => filteredItems.find((fi) => fi.id === id))
                 .filter(Boolean) as NavItem[];
               if (groupItems.length === 0) return null;
               return (
-                <div key={group.label}>
-                  {gi > 0 && <div className="my-2 border-t border-[var(--border)]" />}
-                  <div className="px-3 py-1.5 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                    {group.label}
-                  </div>
+                <div key={group.label} className={collapsed ? 'flex flex-col items-center space-y-1' : undefined}>
+                  {gi > 0 && (
+                    <div className={collapsed ? 'w-8 my-2 border-t border-[var(--border)]' : 'my-2 border-t border-[var(--border)]'} />
+                  )}
+                  {!collapsed && (
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                      {group.label}
+                    </div>
+                  )}
                   {groupItems.map((item) => {
                     const isActive = vistaActual === item.id;
                     return (
@@ -1526,11 +1639,22 @@ function MainApp() {
                           navigateToView(item.id);
                           if (isMobile) setMobileMenuOpen(false);
                         }}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all cursor-pointer ${
-                          isActive
-                            ? 'font-extrabold shadow-sm'
-                            : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
-                        }`}
+                        onMouseEnter={(e) => showTooltip(e, item.label)}
+                        onMouseLeave={hideTooltip}
+                        aria-label={item.label}
+                        className={
+                          collapsed
+                            ? `w-11 h-11 flex items-center justify-center rounded-xl transition-all cursor-pointer shrink-0 group ${
+                                isActive
+                                  ? 'shadow-sm'
+                                  : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
+                              }`
+                            : `w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all cursor-pointer ${
+                                isActive
+                                  ? 'font-extrabold shadow-sm'
+                                  : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
+                              }`
+                        }
                         style={
                           isActive
                             ? {
@@ -1540,23 +1664,34 @@ function MainApp() {
                             : {}
                         }
                       >
-                        <div className="flex items-center gap-3">
+                        {collapsed ? (
                           <span
-                            className="transition-colors"
+                            className="shrink-0 flex items-center justify-center transition-transform duration-150 group-hover:scale-110"
                             style={{ color: isActive ? 'var(--primary-foreground)' : undefined }}
                           >
                             {item.icon}
                           </span>
-                          <span
-                            style={{ color: isActive ? 'var(--primary-foreground)' : undefined }}
-                          >
-                            {item.label}
-                          </span>
-                        </div>
-                        <ChevronRight 
-                          size={14} 
-                          style={{ color: isActive ? 'var(--primary-foreground)' : undefined }} 
-                        />
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-3">
+                              <span
+                                className="transition-colors shrink-0"
+                                style={{ color: isActive ? 'var(--primary-foreground)' : undefined }}
+                              >
+                                {item.icon}
+                              </span>
+                              <span
+                                style={{ color: isActive ? 'var(--primary-foreground)' : undefined }}
+                              >
+                                {item.label}
+                              </span>
+                            </div>
+                            <ChevronRight
+                              size={14}
+                              style={{ color: isActive ? 'var(--primary-foreground)' : undefined }}
+                            />
+                          </>
+                        )}
                       </button>
                     );
                   })}
@@ -1568,65 +1703,129 @@ function MainApp() {
 
         {/* Usuario y Accesos Rápidos (Fijo abajo) */}
         <div className="shrink-0 border-t border-[var(--border)] bg-[var(--muted)]/30">
-          {/* Fila superior: Accesos rápidos del sistema */}
-          <div className="px-3 pt-3 pb-2 grid grid-cols-2 gap-2">
-            <button
-              onClick={() => {
-                window.dispatchEvent(
-                  new CustomEvent('nexora:solicitar-canal-whatsapp', {
-                    detail: { soloConfiguracion: true },
-                  })
-                );
-                if (isMobile) setMobileMenuOpen(false);
-              }}
-              className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 transition-colors cursor-pointer"
-              title="Mi aplicación de WhatsApp (Business / Normal / Web)"
-            >
-              <MessageSquare size={14} />
-              <span className="text-[10px] font-bold">WhatsApp</span>
-            </button>
-            <button
-              onClick={() => {
-                navigateToView('personalizacion');
-                if (isMobile) setMobileMenuOpen(false);
-              }}
-              className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl border transition-colors cursor-pointer"
-              style={
-                vistaActual === 'personalizacion'
-                  ? { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)', borderColor: 'var(--primary)' }
-                  : { borderColor: 'var(--border)', backgroundColor: 'var(--muted)' }
-              }
-              title="Configuración Global & Personalización ⚙️"
-            >
-              <Settings size={14} />
-              <span className="text-[10px] font-bold">Ajustes</span>
-            </button>
-          </div>
-
-          {/* Fila inferior: Identidad de sesión + Cerrar sesión */}
-          <div className="px-3 pb-3 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <UserAvatar
-                nombre={user?.nombre}
-                email={user?.email}
-                sizeClassName="w-8 h-8"
-                textClassName="text-xs font-bold"
+          {collapsed ? (
+            <div className="py-3 px-2 flex flex-col items-center gap-2">
+              <button
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent('nexora:solicitar-canal-whatsapp', {
+                      detail: { soloConfiguracion: true },
+                    })
+                  );
+                }}
+                onMouseEnter={(e) => showTooltip(e, 'WhatsApp')}
+                onMouseLeave={hideTooltip}
+                aria-label="WhatsApp"
+                className="w-11 h-10 flex items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 transition-colors cursor-pointer"
+              >
+                <MessageSquare size={17} />
+              </button>
+              <button
+                onClick={() => {
+                  navigateToView('personalizacion');
+                }}
+                onMouseEnter={(e) => showTooltip(e, 'Ajustes y Personalización')}
+                onMouseLeave={hideTooltip}
+                aria-label="Ajustes"
+                className="w-11 h-10 flex items-center justify-center rounded-xl border transition-colors cursor-pointer"
+                style={
+                  vistaActual === 'personalizacion'
+                    ? { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)', borderColor: 'var(--primary)' }
+                    : { borderColor: 'var(--border)', backgroundColor: 'var(--muted)' }
+                }
+              >
+                <Settings size={17} />
+              </button>
+              <div
+                className="w-8 border-t border-[var(--border)] my-0.5"
               />
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold truncate capitalize">{capitalizarNombreCompleto(user?.nombre) || 'Usuario'}</div>
-                <div className="text-[10px] text-[var(--muted-foreground)] truncate">
-                  {isSuperAdmin ? 'Super Admin' : user?.rol === 'ROL_ADMIN' ? (isGlobalAdmin ? 'Admin General' : 'Admin de Sucursal') : user?.rol === 'ROL_VENDEDOR' ? 'Vendedor' : user?.rol === 'ROL_BODEGUERO' ? 'Bodeguero' : 'Desconocido'}
-                </div>
+              <div
+                onMouseEnter={(e) =>
+                  showTooltip(e, `${capitalizarNombreCompleto(user?.nombre) || 'Usuario'} · ${userRoleLabel}`)
+                }
+                onMouseLeave={hideTooltip}
+                className="flex items-center justify-center cursor-default"
+              >
+                <UserAvatar
+                  nombre={user?.nombre}
+                  email={user?.email}
+                  sizeClassName="w-9 h-9"
+                  textClassName="text-xs font-bold"
+                />
               </div>
+              <button
+                onClick={() => setShowLogoutModal(true)}
+                onMouseEnter={(e) => showTooltip(e, 'Cerrar sesión')}
+                onMouseLeave={hideTooltip}
+                aria-label="Cerrar sesión"
+                className="w-11 h-10 flex items-center justify-center rounded-xl text-[var(--muted-foreground)] hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer"
+              >
+                <LogOut size={17} />
+              </button>
             </div>
-            <button
-              onClick={() => setShowLogoutModal(true)}
-              className="p-2 rounded-xl text-[var(--muted-foreground)] hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer shrink-0"
-              title="Cerrar sesión"
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
+          ) : (
+            <>
+              {/* Fila superior: Accesos rápidos del sistema */}
+              <div className="px-3 pt-3 pb-2 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent('nexora:solicitar-canal-whatsapp', {
+                        detail: { soloConfiguracion: true },
+                      })
+                    );
+                    if (isMobile) setMobileMenuOpen(false);
+                  }}
+                  className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 transition-colors cursor-pointer"
+                  title="Mi aplicación de WhatsApp (Business / Normal / Web)"
+                >
+                  <MessageSquare size={14} />
+                  <span className="text-[10px] font-bold">WhatsApp</span>
+                </button>
+                <button
+                  onClick={() => {
+                    navigateToView('personalizacion');
+                    if (isMobile) setMobileMenuOpen(false);
+                  }}
+                  className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl border transition-colors cursor-pointer"
+                  style={
+                    vistaActual === 'personalizacion'
+                      ? { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)', borderColor: 'var(--primary)' }
+                      : { borderColor: 'var(--border)', backgroundColor: 'var(--muted)' }
+                  }
+                  title="Configuración Global & Personalización ⚙️"
+                >
+                  <Settings size={14} />
+                  <span className="text-[10px] font-bold">Ajustes</span>
+                </button>
+              </div>
+
+              {/* Fila inferior: Identidad de sesión + Cerrar sesión */}
+              <div className="px-3 pb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <UserAvatar
+                    nombre={user?.nombre}
+                    email={user?.email}
+                    sizeClassName="w-8 h-8"
+                    textClassName="text-xs font-bold"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-semibold truncate capitalize">{capitalizarNombreCompleto(user?.nombre) || 'Usuario'}</div>
+                    <div className="text-[10px] text-[var(--muted-foreground)] truncate">
+                      {userRoleLabel}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowLogoutModal(true)}
+                  className="p-2 rounded-xl text-[var(--muted-foreground)] hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer shrink-0"
+                  title="Cerrar sesión"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -1639,9 +1838,23 @@ function MainApp() {
     <div className="h-screen max-h-screen w-full flex overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
 
       {/* ─── SIDEBAR ESCRITORIO (Fijo, visible en pantallas >= md) ─── */}
-      <aside className="hidden md:flex w-64 h-full max-h-screen border-r border-[var(--border)] bg-[var(--card)] flex-col justify-between shrink-0 overflow-hidden">
+      <aside
+        className={`hidden md:flex ${
+          sidebarCollapsed ? 'w-[76px]' : 'w-64'
+        } h-full max-h-screen border-r border-[var(--border)] bg-[var(--card)] flex-col justify-between shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out`}
+      >
         {renderSidebarContent(false)}
       </aside>
+
+      {/* ─── TOOLTIP FLOTANTE PARA SIDEBAR COLAPSADO (ESCRITORIO) ─── */}
+      {sidebarCollapsed && collapsedTooltip && (
+        <div
+          className="hidden md:flex fixed left-[84px] -translate-y-1/2 z-[70] pointer-events-none items-center px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] whitespace-nowrap"
+          style={{ top: collapsedTooltip.top }}
+        >
+          {collapsedTooltip.label}
+        </div>
+      )}
 
       {/* ─── SIDEBAR MÓVIL (Off-canvas Drawer) ─── */}
       {mobileMenuOpen && (
