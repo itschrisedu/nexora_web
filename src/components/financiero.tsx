@@ -5948,9 +5948,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     const abonosPdf = (cobroItem.abonos || []).map((a) => ({
       fecha: new Date(a.createdAt).toLocaleDateString('es-EC'),
-      metodo: a.metodoPago || 'Efectivo',
+      metodo: a.metodo || 'Efectivo',
       monto: Number(a.monto || 0),
-      referencia: a.referencia || a.notas || undefined,
+      referencia: a.notas || undefined,
     }));
 
     descargarNotaVentaPdf({
