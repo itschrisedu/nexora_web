@@ -97,7 +97,7 @@ export interface HistorialComercialPdfData {
 /**
  * Carga una imagen remota y la convierte en data URL Base64 para incrustarla en el PDF
  */
-async function cargarImagenComoBase64(url: string, timeoutMs = 2500): Promise<string | null> {
+export async function cargarImagenComoBase64(url: string, timeoutMs = 2500): Promise<string | null> {
   if (!url || typeof window === 'undefined') return null;
   if (url.startsWith('data:image/')) return url;
 
@@ -154,7 +154,7 @@ async function cargarImagenComoBase64(url: string, timeoutMs = 2500): Promise<st
 /**
  * Dibuja un placeholder visual elegante cuando no hay imagen disponible del calzado
  */
-function dibujarPlaceholderCalzado(doc: jsPDF, x: number, y: number, size: number, nombre: string) {
+export function dibujarPlaceholderCalzado(doc: jsPDF, x: number, y: number, size: number, nombre: string) {
   doc.setFillColor(241, 245, 249); // Slate 100
   doc.setDrawColor(203, 213, 225); // Slate 300
   doc.roundedRect(x, y, size, size, 1.2, 1.2, 'FD');

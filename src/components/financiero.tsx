@@ -5905,7 +5905,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
   };
 
-  const handleDescargarNotaPdf = (
+  const handleDescargarNotaPdf = async (
     cliente: ClienteCartera,
     cobroItem: Cobro,
     numNota: string,
@@ -5930,6 +5930,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       modelo: g.modelName,
       color: g.color || undefined,
       serie: getNombreSerie(g.serieNombre, g.tallas),
+      imageUrl: g.imageUrl || null,
       tallasTexto: g.tallas.map((t) => `T${t.numero}: ${t.cantidad}`).join(', '),
       cantidadPares: g.totalPares,
       etiquetaVolumen: g.etiquetaVolumen,
@@ -5953,7 +5954,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       referencia: a.notas || undefined,
     }));
 
-    descargarNotaVentaPdf({
+    await descargarNotaVentaPdf({
       emisor: {
         nombre: emisorNombre,
         ruc: emisorRuc,

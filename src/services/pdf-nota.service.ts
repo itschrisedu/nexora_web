@@ -1,10 +1,13 @@
 import { jsPDF } from 'jspdf';
 import { capitalizarNombreCompleto } from '@/utils/text-formatters';
+import { cargarImagenComoBase64, dibujarPlaceholderCalzado } from './pdf-historial.service';
 
 export interface NotaPdfModeloItem {
   modelo: string;
   color?: string;
   serie?: string;
+  imageUrl?: string | null;
+  loadedImageBase64?: string | null;
   tallasTexto: string;
   cantidadPares: number;
   etiquetaVolumen: string;
@@ -214,7 +217,7 @@ export function generarNotaVentaPdfDoc(data: NotaVentaPdfData): jsPDF {
     doc.setFontSize(7.5);
     doc.setTextColor(255, 255, 255);
     doc.text('MODELO / SERIE / COLOR', 15, y + 5.3);
-    doc.text('CURVA DE TALLAS', 78, y + 5.3);
+    doc.text('CURVA DE TALLAS', 80, y + 5.3);
     doc.text('PARES', 143, y + 5.3, { align: 'right' });
     doc.text('P. UNIT.', 168, y + 5.3, { align: 'right' });
     doc.text('SUBTOTAL', pageWidth - 15, y + 5.3, { align: 'right' });
@@ -249,10 +252,10 @@ export function generarNotaVentaPdfDoc(data: NotaVentaPdfData): jsPDF {
         .filter(Boolean)
         .join(' · ');
 
-      const tallasLines = doc.splitTextToSize(item.tallasTexto || '—', 52);
-      const modeloLines = doc.splitTextToSize(item.modelo, 58);
-      const alturaContenido = Math.max(modeloLines.length * 4 + (detallesSub ? 4 : 0), tallasLines.length * 3.8);
-      const alturaFila = Math.max(12, alturaContenido + 5);
+      const tallasLines = doc.splitTextToSize(item.tallasTexto || '—', 50);
+      const modeloLines = doc.splitTextToSize(item.modelo, 45);
+      const alturaContenido = Math.max(modeloLines.length * 4 + (detallesSub ? 4.5 : 0), tallasLines.length * 3.8);
+      const alturaFila = Math.max(18, alturaContenido + 5);
 
       if (y + alturaFila > pageHeight - 28) {
         doc.addPage();
@@ -268,46 +271,64 @@ export function generarNotaVentaPdfDoc(data: NotaVentaPdfData): jsPDF {
       doc.setDrawColor(226, 232, 240);
       doc.line(marginX, y + alturaFila, pageWidth - marginX, y + alturaFila);
 
+      // Miniatura del modelo
+      const imgX = 14.5;
+      const imgY = y + 2;
+      const imgSize = 14;
+      if (item.loadedImageBase64) {
+        try {
+          doc.setFillColor(255, 255, 255);
+          doc.setDrawColor(203, 213, 225);
+          doc.roundedRect(imgX, imgY, imgSize, imgSize, 1.2, 1.2, 'FD');
+          doc.addImage(item.loadedImageBase64, 'JPEG', imgX + 0.5, imgY + 0.5, imgSize - 1, imgSize - 1);
+        } catch {
+          dibujarPlaceholderCalzado(doc, imgX, imgY, imgSize, item.modelo);
+        }
+      } else {
+        dibujarPlaceholderCalzado(doc, imgX, imgY, imgSize, item.modelo);
+      }
+
       // Modelo + serie/color
+      const textModeloX = 31;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(15, 23, 42);
-      doc.text(modeloLines, 15, y + 4.8);
+      doc.text(modeloLines, textModeloX, y + 5.5);
 
       if (detallesSub) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(6.8);
         doc.setTextColor(100, 116, 139);
-        doc.text(detallesSub.slice(0, 48), 15, y + 4.8 + modeloLines.length * 4);
+        doc.text(detallesSub.slice(0, 38), textModeloX, y + 5.5 + modeloLines.length * 4);
       }
 
       // Tallas
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.2);
       doc.setTextColor(51, 65, 85);
-      doc.text(tallasLines, 78, y + 4.8);
+      doc.text(tallasLines, 80, y + 5.5);
 
       // Pares y volumen
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(15, 23, 42);
-      doc.text(`${item.cantidadPares}`, 143, y + 5, { align: 'right' });
+      doc.text(`${item.cantidadPares}`, 143, y + 6, { align: 'right' });
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.5);
       doc.setTextColor(100, 116, 139);
-      doc.text(item.etiquetaVolumen, 143, y + 9, { align: 'right' });
+      doc.text(item.etiquetaVolumen, 143, y + 10, { align: 'right' });
 
       // Precio unitario
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(51, 65, 85);
-      doc.text(`$${item.precioUnitario.toFixed(2)}`, 168, y + 6, { align: 'right' });
+      doc.text(`$${item.precioUnitario.toFixed(2)}`, 168, y + 7, { align: 'right' });
 
       // Subtotal
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.5);
       doc.setTextColor(16, 185, 129);
-      doc.text(`$${item.subtotal.toFixed(2)}`, pageWidth - 15, y + 6, { align: 'right' });
+      doc.text(`$${item.subtotal.toFixed(2)}`, pageWidth - 15, y + 7, { align: 'right' });
 
       y += alturaFila;
     });
@@ -470,10 +491,24 @@ export function generarNotaVentaPdfDoc(data: NotaVentaPdfData): jsPDF {
 }
 
 /**
- * Descarga directamente el PDF de la Nota de Venta / Entrega
+ * Descarga directamente el PDF de la Nota de Venta / Entrega (precargando imágenes de modelos)
  */
-export function descargarNotaVentaPdf(data: NotaVentaPdfData): void {
-  const doc = generarNotaVentaPdfDoc(data);
+export async function descargarNotaVentaPdf(data: NotaVentaPdfData): Promise<void> {
+  const itemsConImagenes = await Promise.all(
+    (data.items || []).map(async (item) => {
+      if (item.loadedImageBase64) return item;
+      const b64 = item.imageUrl ? await cargarImagenComoBase64(item.imageUrl) : null;
+      return {
+        ...item,
+        loadedImageBase64: b64,
+      };
+    })
+  );
+
+  const doc = generarNotaVentaPdfDoc({
+    ...data,
+    items: itemsConImagenes,
+  });
   const numLimpio = (data.nota.numero || 'Nota').replace(/[^a-zA-Z0-9_-]/g, '_');
   const clienteLimpio = (data.cliente.nombre || 'Cliente')
     .trim()
