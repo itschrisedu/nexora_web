@@ -162,6 +162,8 @@ import { capitalizarNombreCompleto, formatearNombreSerie, normalizarParaBusqueda
 
 import { descargarReporteDeudoresPdf } from '../services/pdf-deudores.service';
 
+import { descargarNotaVentaPdf } from '../services/pdf-nota.service';
+
 import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 
 import { calcularCurvaParaTallasNum } from '../utils/curvas';
@@ -5903,6 +5905,93 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
   };
 
+  const handleDescargarNotaPdf = (
+    cliente: ClienteCartera,
+    cobroItem: Cobro,
+    numNota: string,
+    estadoLabel: string,
+    orderCodigo: string | null
+  ) => {
+    const targetSucursalId = cobroItem.tenantId || selectedSucursalCobroId || activeSucursalId;
+    const sucEmisor =
+      (sucursalesEmpresa || []).find((s: any) => s.id === targetSucursalId) ||
+      (sucursales || []).find((s: any) => s.id === targetSucursalId);
+
+    const emisorNombre = sucEmisor?.name || businessConfig?.nombre || 'CALZADO DE CUERO';
+    const emisorRuc = sucEmisor?.ruc || businessConfig?.ruc || '1804884664001';
+    const emisorDireccion = sucEmisor?.direccion || businessConfig?.direccion || 'Cevallos, Tungurahua, Ecuador';
+    const emisorTelefono = sucEmisor?.telefono || businessConfig?.telefono || (businessConfig as any)?.whatsappContacto || '';
+    const emisorEmail = sucEmisor?.email || businessConfig?.email || '';
+
+    const lineas = cobroItem.lines || cobroItem.saleNote?.lines || [];
+    const grupos = agruparLineasPorModelo(lineas, catalogoProductos);
+
+    const itemsPdf = grupos.map((g) => ({
+      modelo: g.modelName,
+      color: g.color || undefined,
+      serie: getNombreSerie(g.serieNombre, g.tallas),
+      tallasTexto: g.tallas.map((t) => `T${t.numero}: ${t.cantidad}`).join(', '),
+      cantidadPares: g.totalPares,
+      etiquetaVolumen: g.etiquetaVolumen,
+      precioUnitario: g.precioUnitario,
+      subtotal: g.subtotal,
+    }));
+
+    const montoOrig = Number(cobroItem.montoOriginal ?? cobroItem.montoTotal ?? 0);
+    const saldoPend = Number(cobroItem.saldoPendiente ?? 0);
+    const totalAbonadoNota = Math.max(0, Math.round((montoOrig - saldoPend) * 100) / 100);
+
+    const logisticaTexto =
+      cobroItem.tipoEntrega === 'ENVIO'
+        ? `Logística: Envío por ${cobroItem.courier || 'Transporte'}${cobroItem.guiaEnvio ? ` · Guía: ${cobroItem.guiaEnvio}` : ''}${cobroItem.ciudadEnvio ? ` · ${cobroItem.ciudadEnvio}` : ''}`
+        : 'Logística: Entrega presencial en mostrador';
+
+    const abonosPdf = (cobroItem.abonos || []).map((a) => ({
+      fecha: new Date(a.createdAt).toLocaleDateString('es-EC'),
+      metodo: a.metodoPago || 'Efectivo',
+      monto: Number(a.monto || 0),
+      referencia: a.referencia || a.notas || undefined,
+    }));
+
+    descargarNotaVentaPdf({
+      emisor: {
+        nombre: emisorNombre,
+        ruc: emisorRuc,
+        direccion: emisorDireccion,
+        telefono: emisorTelefono,
+        email: emisorEmail,
+        sucursal: cobroItem.sucursalNombre || sucEmisor?.name,
+      },
+      nota: {
+        numero: numNota,
+        orderCodigo: orderCodigo || undefined,
+        fechaEmision: new Date(cobroItem.createdAt).toLocaleDateString('es-EC'),
+        fechaVencimiento: cobroItem.fechaVencimiento
+          ? new Date(cobroItem.fechaVencimiento).toLocaleDateString('es-EC')
+          : undefined,
+        tipo: cobroItem.tipo || 'Crédito',
+        estado: estadoLabel,
+        vendedor: cobroItem.vendedorNombre || undefined,
+        logistica: logisticaTexto,
+        montoOriginal: montoOrig,
+        totalAbonado: totalAbonadoNota,
+        saldoPendiente: saldoPend,
+      },
+      cliente: {
+        nombre: cliente.clienteNombre,
+        cedula: cliente.clienteCedula || 'Consumidor Final',
+        telefono: cliente.clienteTelefono,
+        email: cliente.clienteEmail,
+        direccion: cliente.clienteDireccion,
+        nivelCredito: cliente.clienteNivel,
+      },
+      items: itemsPdf,
+      abonos: abonosPdf,
+    });
+
+    showToast(`${numNota} descargada en PDF correctamente.`, 'success');
+  };
+
 
 
   // Resumen operativo de Cobranza del Día de Hoy
@@ -7401,7 +7490,33 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                                   </div>
 
-                                                  {orderId && onNavigateToPedido && (
+                                                  <div className="flex items-center gap-2.5 flex-wrap">
+
+                                                    {orderId && onNavigateToPedido && (
+
+                                                      <button
+
+                                                        type="button"
+
+                                                        onClick={(e) => {
+
+                                                          e.stopPropagation();
+
+                                                          onNavigateToPedido(orderId, cobroItem.tenantId);
+
+                                                        }}
+
+                                                        className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 hover:underline cursor-pointer"
+
+                                                      >
+
+                                                        <span>Ver pedido completo</span>
+
+                                                        <ExternalLink size={12} />
+
+                                                      </button>
+
+                                                    )}
 
                                                     <button
 
@@ -7411,21 +7526,23 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                                         e.stopPropagation();
 
-                                                        onNavigateToPedido(orderId, cobroItem.tenantId);
+                                                        handleDescargarNotaPdf(cliente, cobroItem, numNota, cCfg.label, orderCodigo);
 
                                                       }}
 
-                                                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 hover:underline cursor-pointer"
+                                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs transition-all cursor-pointer"
+
+                                                      title={`Descargar ${numNota} en formato PDF`}
 
                                                     >
 
-                                                      <span>Ver pedido completo</span>
+                                                      <Download size={13} />
 
-                                                      <ExternalLink size={12} />
+                                                      <span>Descargar Nota (PDF)</span>
 
                                                     </button>
 
-                                                  )}
+                                                  </div>
 
                                                 </div>
 
