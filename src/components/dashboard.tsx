@@ -496,13 +496,20 @@ export default function DashboardComponent({
     });
   }, [ventasChart, tipoMetricaGrafico, plotW, plotH]);
 
-  // Línea de Comparativa / Tendencia Proyectada (Curva punteada suavizada)
+  // Línea de Tendencia Real: Media Móvil Simple de 3 puntos (SMA-3) sobre las ventas reales
   const refSplinePoints = useMemo(() => {
     if (splinePoints.length === 0) return [];
+    const maxVal = Math.max(...splinePoints.map((p) => p.rawValue), 1) * 1.15;
     return splinePoints.map((p, i) => {
-      const factor = 0.72 + 0.24 * Math.sin(i * 1.3);
-      const refY = padTop + (p.y - padTop) * factor;
-      return { x: p.x, y: Math.max(padTop + 2, Math.min(refY, padTop + plotH - 2)) };
+      const start = Math.max(0, i - 2);
+      const windowSlice = splinePoints.slice(start, i + 1);
+      const sma = windowSlice.reduce((sum, item) => sum + item.rawValue, 0) / windowSlice.length;
+      const refY = padTop + (1 - sma / maxVal) * plotH;
+      return {
+        x: p.x,
+        y: Math.max(padTop + 2, Math.min(refY, padTop + plotH - 2)),
+        smaValue: sma,
+      };
     });
   }, [splinePoints, padTop, plotH]);
 
@@ -1335,8 +1342,8 @@ export default function DashboardComponent({
                 <span className="flex items-center gap-1">
                   <span className="w-2.5 h-1 rounded-full bg-emerald-500 inline-block" /> Actual
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-0.5 border-b border-dashed border-slate-400 inline-block" /> Comparativa
+                <span className="flex items-center gap-1" title="Media móvil de los últimos 3 puntos reales del período">
+                  <span className="w-2.5 h-0.5 border-b border-dashed border-slate-400 inline-block" /> Tendencia (Media móvil)
                 </span>
               </div>
             </div>
@@ -1486,6 +1493,14 @@ export default function DashboardComponent({
                       ${Number(activePoint.monto || 0).toFixed(2)}
                     </span>
                     <span className="text-slate-300">({activePoint.pares} pares)</span>
+                    {hoverIndex !== null && refSplinePoints[hoverIndex] && (
+                      <span className="text-slate-400 border-l border-slate-700 pl-2">
+                        Tend.:{' '}
+                        {tipoMetricaGrafico === "MONTO"
+                          ? `$${refSplinePoints[hoverIndex].smaValue.toFixed(2)}`
+                          : `${Math.round(refSplinePoints[hoverIndex].smaValue)} p`}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
