@@ -749,44 +749,22 @@ function ComprobanteContent() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
                   <span className="text-[11px] font-semibold text-slate-500 block">Saldo Anterior</span>
                   <span className="text-base font-bold font-mono text-slate-700 mt-1 block">
                     ${Number(data.m_ant || 0).toFixed(2)}
                   </span>
                 </div>
 
-                {Array.isArray(data.ent) && data.ent.length > 0 && (
-                  <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-2xl">
-                    <span className="text-[11px] font-bold text-blue-800 block">
-                      (+) Entregas ({data.ent.reduce((s: number, e: any) => s + (e.items || []).reduce((si: number, it: any) => si + Number(it.cantidadPares || 0), 0), 0)} p)
-                    </span>
-                    <span className="text-base font-black font-mono text-blue-700 mt-1 block">
-                      +${data.ent.reduce((s: number, e: any) => s + Number(e.monto || 0), 0).toFixed(2)}
-                    </span>
-                  </div>
-                )}
-
-                {Array.isArray(data.dev) && data.dev.length > 0 && (
-                  <div className="p-3.5 bg-rose-50/80 border border-rose-200 rounded-2xl">
-                    <span className="text-[11px] font-bold text-rose-800 block">
-                      (-) Devoluciones ({data.dev.reduce((s: number, d: any) => s + (d.items || []).reduce((si: number, it: any) => si + Number(it.cantidadPares || 0), 0), 0)} p)
-                    </span>
-                    <span className="text-base font-black font-mono text-rose-700 mt-1 block">
-                      -${data.dev.reduce((s: number, d: any) => s + Number(d.monto || 0), 0).toFixed(2)}
-                    </span>
-                  </div>
-                )}
-
-                <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl">
-                  <span className="text-[11px] font-bold text-emerald-800 block">(-) Abono Aplicado</span>
-                  <span className="text-base font-black font-mono text-emerald-700 mt-1 block">
+                <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl">
+                  <span className="text-[11px] font-bold text-emerald-800 block">Abono Aplicado</span>
+                  <span className="text-lg font-black font-mono text-emerald-700 mt-1 block">
                     -${Number(data.m_abo || 0).toFixed(2)}
                   </span>
                 </div>
 
-                <div className={`p-3.5 rounded-2xl border ${
+                <div className={`p-4 rounded-2xl border ${
                   Number(data.m_res || 0) <= 0
                     ? 'bg-blue-50/80 border-blue-200'
                     : 'bg-amber-50/80 border-amber-200'
@@ -794,9 +772,9 @@ function ComprobanteContent() {
                   <span className={`text-[11px] font-bold block ${
                     Number(data.m_res || 0) <= 0 ? 'text-blue-800' : 'text-amber-800'
                   }`}>
-                    (=) Saldo Pendiente
+                    Saldo Pendiente
                   </span>
-                  <span className={`text-base font-black font-mono mt-1 block ${
+                  <span className={`text-lg font-black font-mono mt-1 block ${
                     Number(data.m_res || 0) <= 0 ? 'text-blue-700' : 'text-amber-700'
                   }`}>
                     ${Number(data.m_res || 0).toFixed(2)}
@@ -910,6 +888,60 @@ function ComprobanteContent() {
                   ))}
                 </div>
               )}
+
+              {((Array.isArray(data.ent) && data.ent.length > 0) || (Array.isArray(data.dev) && data.dev.length > 0)) && (() => {
+                const saldoAnt = Number(data.m_ant || 0);
+                const totalEnt = Array.isArray(data.ent)
+                  ? data.ent.reduce((s: number, e: any) => s + Number(e.monto || 0), 0)
+                  : 0;
+                const totalDev = Array.isArray(data.dev)
+                  ? data.dev.reduce((s: number, d: any) => s + Number(d.monto || 0), 0)
+                  : 0;
+                const totalAbono = Number(data.m_abo || 0);
+                const totalNeto = Math.max(0, Math.round((saldoAnt + totalEnt - totalDev) * 100) / 100);
+                const saldoFinal = Number(data.m_res || 0);
+
+                return (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex justify-end">
+                    <div className="w-full sm:w-80 space-y-1.5 text-xs">
+                      {saldoAnt > 0 && (
+                        <div className="flex items-center justify-between text-slate-600">
+                          <span>Saldo Anterior:</span>
+                          <span className="font-mono font-semibold text-slate-800">${saldoAnt.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {totalEnt > 0 && (
+                        <div className="flex items-center justify-between text-slate-700">
+                          <span className="font-semibold">Total Pedido:</span>
+                          <span className="font-mono font-bold text-slate-900">${totalEnt.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {totalDev > 0 && (
+                        <div className="flex items-center justify-between text-rose-700">
+                          <span className="font-semibold">Devolución:</span>
+                          <span className="font-mono font-bold">- ${totalDev.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="border-t border-slate-300 pt-1.5 flex items-center justify-between text-slate-900 font-extrabold">
+                        <span>Total:</span>
+                        <span className="font-mono">${totalNeto.toFixed(2)}</span>
+                      </div>
+                      {totalAbono > 0 && (
+                        <div className="flex items-center justify-between text-emerald-700 font-bold">
+                          <span>Abono:</span>
+                          <span className="font-mono">- ${totalAbono.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="border-t border-slate-300 pt-1.5 flex items-center justify-between text-sm font-black">
+                        <span className="text-slate-900">Saldo Pendiente:</span>
+                        <span className={`font-mono ${saldoFinal <= 0 ? 'text-emerald-600' : 'text-amber-700'}`}>
+                          ${saldoFinal.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {Number(data.m_res || 0) <= 0 ? (
                 <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-emerald-800 text-xs font-bold">
