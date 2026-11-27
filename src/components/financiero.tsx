@@ -4622,7 +4622,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
         acumulado += cant;
 
-        const tId = t.id || String(t.numeroTalla || t.numero);
+        const tId = t.tallaId || t.id || String(t.numeroTalla || t.numero);
 
         const numTalla = t.numeroTalla || t.numero || 38;
 
