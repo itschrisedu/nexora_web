@@ -20,6 +20,11 @@ export interface EntregaHoyDetalle {
   items?: EntregaItemDetalle[];
 }
 
+export interface DevolucionHoyDetalle {
+  descripcion: string;
+  monto: number;
+}
+
 export interface ComprobanteAbonoPdfData {
   emisor: {
     nombre: string;
@@ -55,6 +60,7 @@ export interface ComprobanteAbonoPdfData {
     saldoRestante: number;
     totalNotasPendientes?: number;
     entregasHoy?: EntregaHoyDetalle[];
+    devolucionesHoy?: DevolucionHoyDetalle[];
   };
 }
 
@@ -205,6 +211,28 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
     y += 2;
   }
 
+  // ── 3b. Devoluciones Registradas en la Fecha (si las hay) ──
+  if (data.movimiento.devolucionesHoy && data.movimiento.devolucionesHoy.length > 0) {
+    doc.setFillColor(254, 242, 242);
+    doc.roundedRect(12, y, pageWidth - 24, 7, 1, 1, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(185, 28, 28);
+    doc.text('DEVOLUCIONES / DESCUENTOS REGISTRADOS EN LA FECHA', 16, y + 4.5);
+    y += 9;
+
+    data.movimiento.devolucionesHoy.forEach((dev) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.8);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`• ${(dev.descripcion || 'Devolución de calzado').slice(0, 78)}`, 16, y);
+      doc.setTextColor(185, 28, 28);
+      doc.text(`-$${Number(dev.monto || 0).toFixed(2)}`, pageWidth - 20, y, { align: 'right' });
+      y += 5;
+    });
+    y += 2;
+  }
+
   // ── 4. Cuadro Principal de Liquidación del Abono ─────────────
   doc.setFillColor(15, 23, 42);
   doc.rect(12, y, pageWidth - 24, 7.5, 'F');
@@ -217,6 +245,7 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
   y += 7.5;
 
   const totalEntregasHoy = (data.movimiento.entregasHoy || []).reduce((acc, curr) => acc + curr.monto, 0);
+  const totalDevolucionesHoy = (data.movimiento.devolucionesHoy || []).reduce((acc, curr) => acc + curr.monto, 0);
 
   const descEntregas = (data.movimiento.entregasHoy || []).flatMap((e) => {
     if (e.items && e.items.length > 0) {
@@ -225,10 +254,14 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
     return [`Mercadería entregada $${e.monto.toFixed(2)}`];
   }).join(' • ');
 
-  const filas: Array<{ concepto: string; desc: string; monto: number; tipo: 'NORMAL' | 'ENTREGA' | 'ABONO' | 'SALDO_FINAL' }> = [
+  const descDevoluciones = (data.movimiento.devolucionesHoy || [])
+    .map((d) => `${d.descripcion} (-$${d.monto.toFixed(2)})`)
+    .join(' • ');
+
+  const filas: Array<{ concepto: string; desc: string; monto: number; tipo: 'NORMAL' | 'ENTREGA' | 'DEVOLUCION' | 'ABONO' | 'SALDO_FINAL' }> = [
     {
       concepto: 'Saldo Anterior Adeudado por el Cliente',
-      desc: 'Total pendiente antes de la recepción del abono',
+      desc: 'Total pendiente antes de los movimientos de la fecha',
       monto: data.movimiento.saldoAnterior,
       tipo: 'NORMAL',
     },
@@ -237,9 +270,18 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
   if (totalEntregasHoy > 0 && data.movimiento.entregasHoy) {
     filas.push({
       concepto: '(+) Entrega de Calzado / Mercadería Nueva',
-      desc: descEntregas,
+      desc: descEntregas.slice(0, 95),
       monto: totalEntregasHoy,
       tipo: 'ENTREGA',
+    });
+  }
+
+  if (totalDevolucionesHoy > 0 && data.movimiento.devolucionesHoy) {
+    filas.push({
+      concepto: '(-) Devolución / Descuento Aplicado',
+      desc: descDevoluciones.slice(0, 95),
+      monto: -totalDevolucionesHoy,
+      tipo: 'DEVOLUCION',
     });
   }
 
@@ -276,6 +318,8 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
     doc.setFontSize(8.5);
     if (f.tipo === 'ABONO') {
       doc.setTextColor(16, 185, 129); // Verde esmeralda
+    } else if (f.tipo === 'DEVOLUCION') {
+      doc.setTextColor(185, 28, 28); // Rojo suave
     } else if (f.tipo === 'SALDO_FINAL') {
       doc.setTextColor(f.monto <= 0 ? 16 : 225, f.monto <= 0 ? 185 : 29, f.monto <= 0 ? 129 : 72);
     } else {
@@ -294,6 +338,9 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
     doc.setFontSize(9.5);
     if (f.tipo === 'ABONO') {
       doc.setTextColor(16, 185, 129);
+      doc.text(`-$${Math.abs(f.monto).toFixed(2)}`, pageWidth - 16, y + 7.5, { align: 'right' });
+    } else if (f.tipo === 'DEVOLUCION') {
+      doc.setTextColor(185, 28, 28);
       doc.text(`-$${Math.abs(f.monto).toFixed(2)}`, pageWidth - 16, y + 7.5, { align: 'right' });
     } else if (f.tipo === 'SALDO_FINAL') {
       if (f.monto <= 0) {
@@ -404,9 +451,23 @@ export async function armarMensajeWhatsAppAbono(data: ComprobanteAbonoPdfData, i
     msg += `🔖 *Referencia / Banco:* ${data.comprobante.referencia}\n`;
   }
 
+  const totalEntregas = (data.movimiento.entregasHoy || []).reduce((sum, e) => sum + Number(e.monto || 0), 0);
+  const totalParesEntregados = (data.movimiento.entregasHoy || []).reduce(
+    (sum, e) => sum + (e.items || []).reduce((s, it) => s + Number(it.cantidadPares || 0), 0),
+    0
+  );
+  const totalDevoluciones = (data.movimiento.devolucionesHoy || []).reduce((sum, d) => sum + Number(d.monto || 0), 0);
+
   msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
   if (data.movimiento.saldoAnterior > 0) {
     msg += `💵 *Saldo Anterior:* $${data.movimiento.saldoAnterior.toFixed(2)}\n`;
+  }
+  if (totalEntregas > 0) {
+    const paresInfo = totalParesEntregados > 0 ? ` (${totalParesEntregados} ${totalParesEntregados === 1 ? 'par' : 'pares'})` : '';
+    msg += `📦 *Entregas del día${paresInfo}:* +$${totalEntregas.toFixed(2)}\n`;
+  }
+  if (totalDevoluciones > 0) {
+    msg += `↩️ *Devoluciones del día:* -$${totalDevoluciones.toFixed(2)}\n`;
   }
 
   msg += `✅ *Abono Aplicado:* -$${data.movimiento.montoAbonado.toFixed(2)}\n`;
@@ -422,7 +483,7 @@ export async function armarMensajeWhatsAppAbono(data: ComprobanteAbonoPdfData, i
   try {
     const urlRecibo = await generarUrlPublicaAbono(data);
     if (urlRecibo) {
-      msg += `📥 *Descarga aquí tu comprobante oficial:*\n👉 ${urlRecibo}\n\n`;
+      msg += `📥 *Descarga aquí tu comprobante oficial (detalle completo en PDF):*\n👉 ${urlRecibo}\n\n`;
     }
   } catch (e) {
     // Si falla, el mensaje continúa con el detalle completo

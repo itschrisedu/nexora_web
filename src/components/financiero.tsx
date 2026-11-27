@@ -2617,6 +2617,79 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
 
 
+  const obtenerMovimientosDeFechaCliente = async (cartera: ClienteCartera, fechaRefIso?: string) => {
+    const claveLocal = (raw?: string | Date) => {
+      const d = raw ? new Date(raw) : new Date();
+      if (isNaN(d.getTime())) return '';
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    const targetKey = claveLocal(fechaRefIso);
+
+    const cobrosFecha = cobros.filter(
+      (c) => c.clientId === cartera.clientId && claveLocal(c.createdAt) === targetKey
+    );
+
+    const entregasHoy = cobrosFecha.map((c) => {
+      const lineas = c.lines && c.lines.length > 0 ? c.lines : c.saleNote?.lines || [];
+      const grupos = agruparLineasPorModelo(lineas, catalogoProductos);
+      const montoNota = Number(c.montoOriginal ?? c.montoTotal ?? c.saleNote?.total ?? 0);
+      const numNota = c.saleNote?.numero
+        ? `NOTA #${String(c.saleNote.numero).padStart(4, '0')}`
+        : c.numeroCobro || 'Nota de Venta';
+
+      return {
+        nota: numNota,
+        monto: montoNota,
+        items: grupos.map((g) => ({
+          modelo: g.modelName,
+          color: g.color || undefined,
+          serie: getNombreSerie(g.serieNombre, g.tallas),
+          tallas: g.tallas.map((t) => `T${t.numero}: ${t.cantidad}`).join(', '),
+          cantidadPares: g.totalPares,
+          etiquetaVolumen: g.etiquetaVolumen,
+          precioUnitario: g.precioUnitario,
+          subtotal: g.subtotal,
+        })),
+      };
+    });
+
+    const montoEntregas = entregasHoy.reduce((sum, e) => sum + Number(e.monto || 0), 0);
+    const totalParesEntregados = entregasHoy.reduce(
+      (sum, e) => sum + (e.items || []).reduce((s, it) => s + Number(it.cantidadPares || 0), 0),
+      0
+    );
+
+    let devolucionesHoy: Array<{ descripcion: string; monto: number }> = [];
+    try {
+      let movimientosCliente: any[] = [];
+      if (historialCliente && historialCliente.cliente?.id === cartera.clientId) {
+        movimientosCliente = historialCliente.movimientos || [];
+      } else {
+        const resHist = await ApiService.get(`/financiero/cliente/${cartera.clientId}/historial`);
+        movimientosCliente = resHist?.movimientos || [];
+      }
+      devolucionesHoy = movimientosCliente
+        .filter((m) => m.tipo === 'DEVOLUCION' && claveLocal(m.fecha) === targetKey)
+        .map((m) => ({
+          descripcion: m.titulo || m.descripcion || 'Devolución de calzado',
+          monto: Number(m.monto || 0),
+        }));
+    } catch {
+      // Si falla la consulta de devoluciones, continuar sin bloquear el envío
+    }
+
+    const montoDevoluciones = devolucionesHoy.reduce((sum, d) => sum + Number(d.monto || 0), 0);
+
+    return {
+      entregasHoy,
+      montoEntregas,
+      totalParesEntregados,
+      devolucionesHoy,
+      montoDevoluciones,
+    };
+  };
+
   const handleEnviarComprobanteAbono = async (
 
     cartera: ClienteCartera,
@@ -2630,6 +2703,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       fecha?: string;
 
       hora?: string;
+
+      fechaIso?: string;
 
       notas?: string;
 
@@ -2666,6 +2741,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
 
     const dataAbono = armarDatosComprobanteAbono(cartera, abonoInfo);
+    const movFecha = await obtenerMovimientosDeFechaCliente(cartera, abonoInfo.fechaIso);
+    if (movFecha.entregasHoy.length > 0) {
+      dataAbono.movimiento.entregasHoy = movFecha.entregasHoy;
+    }
+    if (movFecha.devolucionesHoy.length > 0) {
+      dataAbono.movimiento.devolucionesHoy = movFecha.devolucionesHoy;
+    }
 
 
 
@@ -2757,7 +2839,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     cartera: ClienteCartera,
 
-    abonoInfoParam?: { monto: number; metodo: string; fecha?: string; hora?: string }
+    abonoInfoParam?: { monto: number; metodo: string; fecha?: string; hora?: string; fechaIso?: string }
 
   ) => {
 
@@ -2785,6 +2867,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
           metodo: string;
           fecha?: string;
           hora?: string;
+          fechaIso?: string;
           notas?: string;
           numeroNota?: string;
           usuarioNombre?: string;
@@ -2813,6 +2896,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
           hora: new Date(u.createdAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
 
+          fechaIso: u.createdAt,
+
           notas: u.notas,
 
           usuarioNombre: u.usuarioNombre,
@@ -2834,6 +2919,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
           fecha: new Date(u.createdAt).toLocaleDateString('es-EC'),
 
           hora: new Date(u.createdAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
+
+          fechaIso: u.createdAt,
 
           notas: u.notas,
 
@@ -2865,50 +2952,16 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     const montoAbono = ultimoAbono ? ultimoAbono.monto : 0;
 
-    // 3. Detectar si hoy hubo entrega de mercadería para este cliente
-    const cobrosCliente = cobros.filter((c) => c.clientId === cartera.clientId);
-    const cobrosHoy = cobrosCliente.filter((c) => esMismoDia(c.createdAt));
-    const montoEntregaHoy = cobrosHoy.reduce(
-      (sum, c) => sum + Number(c.montoOriginal ?? c.montoTotal ?? c.saleNote?.total ?? 0),
-      0
+    // 3. Movimientos (entregas y devoluciones) de la fecha del último abono
+    const movFecha = await obtenerMovimientosDeFechaCliente(cartera, ultimoAbono?.fechaIso);
+    const montoEntregaDia = movFecha.montoEntregas;
+    const montoDevolucionDia = movFecha.montoDevoluciones;
+
+    // 4. Cálculo matemático de saldo anterior
+    const saldoAnterior = Math.max(
+      0,
+      Math.round((saldoActual + montoAbono + montoDevolucionDia - montoEntregaDia) * 100) / 100
     );
-
-    const lineasHoy = cobrosHoy.flatMap((c) =>
-      c.lines && c.lines.length > 0 ? c.lines : c.saleNote?.lines || []
-    );
-    const gruposEntregaHoy = agruparLineasPorModelo(lineasHoy, catalogoProductos);
-
-    let lineasEntregaTexto = '';
-    if (gruposEntregaHoy.length > 0) {
-      lineasEntregaTexto = gruposEntregaHoy
-        .map((g) => {
-          let cantTexto = '';
-          if (g.etiquetaVolumen) {
-            cantTexto = g.etiquetaVolumen.includes(' (')
-              ? g.etiquetaVolumen.split(' (')[0]
-              : g.etiquetaVolumen;
-          } else {
-            cantTexto = `${g.totalPares} ${g.totalPares === 1 ? 'par' : 'pares'}`;
-          }
-          const colorTexto = g.color ? ` (${g.color})` : '';
-          return `📦 *Entrega:* ${cantTexto} ${g.modelName}${colorTexto} — *$${g.subtotal.toFixed(2)}*`;
-        })
-        .join('\n');
-    } else if (montoEntregaHoy > 0) {
-      lineasEntregaTexto = `📦 *Entrega:* Mercadería de Calzado — *$${montoEntregaHoy.toFixed(2)}*`;
-    }
-
-    // 4. Cálculo matemático de saldo anterior y nuevo saldo
-    let saldoAnterior = saldoActual;
-    let nuevoSaldo = saldoActual;
-
-    if (montoEntregaHoy > 0) {
-      saldoAnterior = Math.max(0, Math.round((saldoActual + montoAbono - montoEntregaHoy) * 100) / 100);
-      nuevoSaldo = Math.round((saldoAnterior + montoEntregaHoy) * 100) / 100;
-    } else if (montoAbono > 0) {
-      saldoAnterior = Math.round((saldoActual + montoAbono) * 100) / 100;
-      nuevoSaldo = saldoAnterior;
-    }
 
     let msg = `Estimado/a *${capitalizarNombreCompleto(cartera.clienteNombre)}*,\n\n`;
     msg += `Le saludamos de *${negocioNombre}*. Le compartimos el estado actual de su cuenta:\n\n`;
@@ -2918,39 +2971,28 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       msg += `📅 *Fecha:* ${hoyLegible}\n`;
     }
 
-    if (montoEntregaHoy > 0) {
-      msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
+    if (saldoAnterior > 0 && (montoEntregaDia > 0 || montoDevolucionDia > 0 || montoAbono > 0)) {
       msg += `💵 *Saldo Anterior:* $${saldoAnterior.toFixed(2)}\n`;
-      msg += `${lineasEntregaTexto}\n`;
-      msg += `💵 *Nuevo Saldo:* $${nuevoSaldo.toFixed(2)}\n`;
-      if (montoAbono > 0) {
-        msg += `✅ *Abono Recibido:* -$${montoAbono.toFixed(2)} (${ultimoAbono?.metodo || 'EFECTIVO'})\n`;
-      }
-      if (saldoActual <= 0) {
-        msg += `🎉 *SALDO PENDIENTE ACTUAL: $0.00 (CUENTA SALDADA)*\n`;
-      } else {
-        msg += `📌 *SALDO PENDIENTE ACTUAL: $${saldoActual.toFixed(2)}*\n`;
-      }
-      msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
-    } else if (montoAbono > 0) {
-      msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
-      msg += `💵 *Saldo Anterior:* $${saldoAnterior.toFixed(2)}\n`;
-      msg += `✅ *Abono Recibido:* -$${montoAbono.toFixed(2)} (${ultimoAbono?.metodo || 'EFECTIVO'})\n`;
-      if (saldoActual <= 0) {
-        msg += `🎉 *SALDO PENDIENTE ACTUAL: $0.00 (CUENTA SALDADA)*\n`;
-      } else {
-        msg += `📌 *SALDO PENDIENTE ACTUAL: $${saldoActual.toFixed(2)}*\n`;
-      }
-      msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
-    } else {
-      msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
-      if (saldoActual <= 0) {
-        msg += `🎉 *SALDO PENDIENTE ACTUAL: $0.00 (SIN DEUDA PENDIENTE)*\n`;
-      } else {
-        msg += `📌 *SALDO PENDIENTE ACTUAL: $${saldoActual.toFixed(2)}*\n`;
-      }
-      msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
     }
+    if (montoEntregaDia > 0) {
+      const paresTxt = movFecha.totalParesEntregados > 0
+        ? ` (${movFecha.totalParesEntregados} ${movFecha.totalParesEntregados === 1 ? 'par' : 'pares'})`
+        : '';
+      msg += `📦 *Entregas del día${paresTxt}:* +$${montoEntregaDia.toFixed(2)}\n`;
+    }
+    if (montoDevolucionDia > 0) {
+      msg += `↩️ *Devoluciones del día:* -$${montoDevolucionDia.toFixed(2)}\n`;
+    }
+    if (montoAbono > 0) {
+      msg += `✅ *Abono Recibido:* -$${montoAbono.toFixed(2)} (${ultimoAbono?.metodo || 'EFECTIVO'})\n`;
+    }
+    if (saldoActual <= 0) {
+      msg += `🎉 *SALDO PENDIENTE ACTUAL: $0.00 (${montoAbono > 0 ? 'CUENTA SALDADA' : 'SIN DEUDA PENDIENTE'})*\n`;
+    } else {
+      msg += `📌 *SALDO PENDIENTE ACTUAL: $${saldoActual.toFixed(2)}*\n`;
+    }
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
 
 
 
@@ -2982,11 +3024,18 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       });
 
+      if (movFecha.entregasHoy.length > 0) {
+        dataAbonoParaLink.movimiento.entregasHoy = movFecha.entregasHoy;
+      }
+      if (movFecha.devolucionesHoy.length > 0) {
+        dataAbonoParaLink.movimiento.devolucionesHoy = movFecha.devolucionesHoy;
+      }
+
       const urlComprobante = await generarUrlPublicaAbono(dataAbonoParaLink);
 
       if (urlComprobante) {
 
-        msg += `\n📥 *Descarga aquí tu comprobante oficial:*\n👉 ${urlComprobante}\n`;
+        msg += `\n📥 *Descarga aquí tu comprobante oficial (detalle completo en PDF):*\n👉 ${urlComprobante}\n`;
 
       }
 
@@ -8850,6 +8899,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                     hora: new Date(a.createdAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
 
+                                    fechaIso: a.createdAt,
+
                                     notas: a.notas,
 
                                     numeroNota: a.reciboRef || 'Abono a cuenta',
@@ -10835,6 +10886,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                               fecha: new Date(m.fecha).toLocaleDateString('es-EC'),
 
                                               hora: new Date(m.fecha).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
+
+                                              fechaIso: m.fecha,
 
                                               notas: m.referencia || m.comprobante || undefined,
 
