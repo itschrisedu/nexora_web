@@ -181,21 +181,34 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
     y += 9;
 
     data.movimiento.entregasHoy.forEach((e) => {
+      if (e.nota) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(30, 64, 175);
+        doc.text(`${e.nota}`, 16, y);
+        doc.text(`Total Nota: $${Number(e.monto || 0).toFixed(2)}`, pageWidth - 20, y, { align: 'right' });
+        y += 4;
+      }
       if (e.items && e.items.length > 0) {
         e.items.forEach((item) => {
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(8);
           doc.setTextColor(15, 23, 42);
           const colorStr = item.color ? ` (${item.color})` : '';
+          const serieStr = item.serie ? ` · Serie: ${item.serie}` : '';
           const volStr = item.etiquetaVolumen || `${item.cantidadPares} pares`;
+          const precioUnitStr =
+            item.precioUnitario !== undefined && Number(item.precioUnitario) > 0
+              ? ` · $${Number(item.precioUnitario).toFixed(2)} c/par`
+              : '';
           const tallasStr = item.tallas ? ` [${item.tallas}]` : '';
-          doc.text(`• ${item.modelo}${colorStr}`, 16, y);
+          doc.text(`• ${item.modelo}${colorStr}${serieStr}`, 16, y);
           doc.text(`$${item.subtotal.toFixed(2)}`, pageWidth - 20, y, { align: 'right' });
           y += 4;
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(7.2);
           doc.setTextColor(71, 85, 105);
-          doc.text(`    ${volStr}${tallasStr}`, 18, y);
+          doc.text(`    ${volStr}${precioUnitStr}${tallasStr}`, 18, y);
           y += 4;
         });
       } else {
@@ -274,6 +287,15 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
       monto: totalEntregasHoy,
       tipo: 'ENTREGA',
     });
+
+    if (data.movimiento.saldoAnterior > 0) {
+      filas.push({
+        concepto: '(=) Total Acumulado (Saldo Anterior + Entregas)',
+        desc: 'Suma del saldo previo más la mercadería entregada en la fecha',
+        monto: Math.round((data.movimiento.saldoAnterior + totalEntregasHoy) * 100) / 100,
+        tipo: 'NORMAL',
+      });
+    }
   }
 
   if (totalDevolucionesHoy > 0 && data.movimiento.devolucionesHoy) {
@@ -285,20 +307,21 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
     });
   }
 
-  filas.push(
-    {
-      concepto: 'MONTO DEL ABONO RECIBIDO',
+  if (data.movimiento.montoAbonado > 0) {
+    filas.push({
+      concepto: '(-) MONTO DEL ABONO RECIBIDO',
       desc: `Liquidación vía ${data.comprobante.formaPago}${data.comprobante.referencia ? ` (Ref: ${data.comprobante.referencia})` : ''}`,
       monto: -data.movimiento.montoAbonado,
       tipo: 'ABONO',
-    },
-    {
-      concepto: 'SALDO PENDIENTE ACTUAL RESTANTE',
-      desc: data.movimiento.saldoRestante <= 0 ? '¡CUENTA TOTALMENTE SALDADA!' : 'Saldo remanente por cobrar',
-      monto: data.movimiento.saldoRestante,
-      tipo: 'SALDO_FINAL',
-    }
-  );
+    });
+  }
+
+  filas.push({
+    concepto: 'SALDO PENDIENTE ACTUAL RESTANTE',
+    desc: data.movimiento.saldoRestante <= 0 ? '¡CUENTA TOTALMENTE SALDADA!' : 'Saldo remanente por cobrar',
+    monto: data.movimiento.saldoRestante,
+    tipo: 'SALDO_FINAL',
+  });
 
   filas.forEach((f, idx) => {
     const alturaFila = 12;

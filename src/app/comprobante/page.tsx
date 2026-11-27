@@ -800,7 +800,9 @@ function ComprobanteContent() {
                               <div>
                                 <span className="font-bold text-slate-800">{it.modelo}</span>
                                 {it.color ? ` (${it.color})` : ''}
+                                {it.serie ? ` · Serie: ${it.serie}` : ''}
                                 {it.etiquetaVolumen ? ` · ${it.etiquetaVolumen}` : ` · ${it.cantidadPares} pares`}
+                                {Number(it.precioUnitario || 0) > 0 ? ` · $${Number(it.precioUnitario).toFixed(2)} c/par` : ''}
                                 {it.tallas ? <span className="block text-[10px] text-slate-500">{it.tallas}</span> : null}
                               </div>
                               <span className="font-mono font-semibold text-slate-800 shrink-0">${Number(it.subtotal || 0).toFixed(2)}</span>
