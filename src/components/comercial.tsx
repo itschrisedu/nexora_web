@@ -6473,11 +6473,23 @@ export default function ComercialComponent({
 
           const countEnEsperaStock = pedidosDeSucursal.filter((p) => p.estado === 'EN_ESPERA_STOCK').length;
 
-          const countEntregado = pedidosDeSucursal.filter((p) => p.estado === 'ENTREGADO' || p.estado === 'ENTREGADO_PARCIAL').length;
+          const cumpleFechaEntregado = (p: Pedido) => {
+            if (verTodoElHistorial) return true;
+            const raw = (p as any).fecha || p.createdAt;
+            const fechaP = raw ? raw.split('T')[0] : '';
+            if (!fechaP) return true;
+            if (filtroFechaDesde && fechaP < filtroFechaDesde) return false;
+            if (filtroFechaHasta && fechaP > filtroFechaHasta) return false;
+            return true;
+          };
 
-          const countEntregaTotal = pedidosDeSucursal.filter((p) => p.estado === 'ENTREGADO').length;
+          const entregadosEnRango = pedidosDeSucursal.filter(cumpleFechaEntregado);
 
-          const countEntregaParcial = pedidosDeSucursal.filter((p) => p.estado === 'ENTREGADO_PARCIAL').length;
+          const countEntregado = entregadosEnRango.filter((p) => p.estado === 'ENTREGADO' || p.estado === 'ENTREGADO_PARCIAL').length;
+
+          const countEntregaTotal = entregadosEnRango.filter((p) => p.estado === 'ENTREGADO').length;
+
+          const countEntregaParcial = entregadosEnRango.filter((p) => p.estado === 'ENTREGADO_PARCIAL').length;
 
           const countCancelado = pedidosDeSucursal.filter((p) => p.estado === 'CANCELADO').length;
 
