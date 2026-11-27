@@ -2853,131 +2853,131 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
 
 
-    const hoyLegible = new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+    const claveLocal = (raw?: string | Date) => {
+      const d = raw ? new Date(raw) : new Date();
+      if (isNaN(d.getTime())) return '';
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
 
+    const hoyLegible = new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
     const negocioNombre = businessConfig?.nombre || 'Administración de Cobros';
 
+    // 1. Obtener el historial comercial real del cliente para tomar la ÚLTIMA FECHA con movimientos
+    let movimientosHistorial: any[] = [];
+    try {
+      if (historialCliente && historialCliente.cliente?.id === cartera.clientId) {
+        movimientosHistorial = historialCliente.movimientos || [];
+      } else {
+        const resHist = await ApiService.get(`/financiero/cliente/${cartera.clientId}/historial`);
+        movimientosHistorial = resHist?.movimientos || [];
+      }
+    } catch {
+      movimientosHistorial = [];
+    }
 
+    const movimientosOrdenados = [...movimientosHistorial]
+      .filter((m) => m && m.fecha)
+      .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
-    // 1. Obtener el último abono real registrado del cliente (directo de sus cobros o de ultimos3AbonosCliente)
+    let fechaRefIso: string | undefined = abonoInfoParam?.fechaIso;
+    if (!fechaRefIso && movimientosOrdenados.length > 0) {
+      fechaRefIso = movimientosOrdenados[0].fecha;
+    }
+    if (!fechaRefIso && cartera.cobros && cartera.cobros.length > 0) {
+      const cobrosOrdenados = [...cartera.cobros].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      fechaRefIso = cobrosOrdenados[0]?.createdAt;
+    }
 
-    let ultimoAbono:
-      | {
-          monto: number;
-          metodo: string;
-          fecha?: string;
-          hora?: string;
-          fechaIso?: string;
-          notas?: string;
-          numeroNota?: string;
-          usuarioNombre?: string;
-          sucursalNombre?: string;
-        }
-      | undefined = abonoInfoParam;
+    const targetKey = claveLocal(fechaRefIso);
+    const fechaRefLegible = fechaRefIso
+      ? new Date(fechaRefIso).toLocaleDateString('es-EC')
+      : hoyLegible;
+    const horaRefLegible = fechaRefIso
+      ? new Date(fechaRefIso).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })
+      : undefined;
 
-    if (!ultimoAbono) {
+    // 2. Filtrar TODOS los movimientos (pedidos, devoluciones y abonos) de esa última fecha registrada
+    const movsDeUltimaFecha = movimientosOrdenados.filter((m) => claveLocal(m.fecha) === targetKey);
+    const pedidosUltimaFecha = movsDeUltimaFecha.filter((m) => m.tipo === 'COMPRA_PEDIDO');
+    const devolucionesUltimaFecha = movsDeUltimaFecha.filter((m) => m.tipo === 'DEVOLUCION');
+    const abonosUltimaFecha = movsDeUltimaFecha.filter((m) => m.tipo === 'ABONO');
 
+    let entregasUltimaFecha = pedidosUltimaFecha.map((p) => {
+      const itemsAgrupados = construirItemsAgrupadosMovimientoPedido(p);
+      return {
+        nota: p.numeroCodigo || p.titulo || 'Pedido',
+        monto: Number(p.monto || 0),
+        items: itemsAgrupados.map((it) => ({
+          modelo: it.modelo,
+          color: it.color,
+          serie: it.serie,
+          tallas: it.tallasTexto,
+          cantidadPares: it.cantidadPares,
+          etiquetaVolumen: it.etiquetaVolumen,
+          precioUnitario: it.precioUnitario,
+          subtotal: it.subtotal,
+        })),
+      };
+    });
+
+    if (entregasUltimaFecha.length === 0) {
+      const movFallback = await obtenerMovimientosDeFechaCliente(cartera, fechaRefIso);
+      entregasUltimaFecha = movFallback.entregasHoy;
+    }
+
+    const montoEntregaDia = entregasUltimaFecha.reduce((sum, e) => sum + Number(e.monto || 0), 0);
+    const totalParesEntregadosDia = entregasUltimaFecha.reduce(
+      (sum, e) => sum + (e.items || []).reduce((s, it) => s + Number(it.cantidadPares || 0), 0),
+      0
+    );
+
+    const devolucionesHoyDia = devolucionesUltimaFecha.map((d) => ({
+      descripcion: d.titulo || d.descripcion || 'Devolución de calzado',
+      monto: Number(d.monto || 0),
+    }));
+    const montoDevolucionDia = devolucionesHoyDia.reduce((sum, d) => sum + Number(d.monto || 0), 0);
+
+    let montoAbono = abonoInfoParam
+      ? abonoInfoParam.monto
+      : abonosUltimaFecha.reduce((sum, a) => sum + Number(a.monto || 0), 0);
+    const ultimoAbonoFecha = abonosUltimaFecha[0];
+    let metodoAbonoRef = abonoInfoParam?.metodo || ultimoAbonoFecha?.metodo || 'EFECTIVO';
+
+    if (!abonoInfoParam && abonosUltimaFecha.length === 0 && movimientosOrdenados.length === 0) {
       const todosAbonosCliente = (cartera.cobros || [])
         .flatMap((c) => c.abonos || [])
-        .filter((a) => a && Number(a.monto || 0) > 0 && a.createdAt)
+        .filter((a) => a && Number(a.monto || 0) > 0 && a.createdAt && claveLocal(a.createdAt) === targetKey)
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
       if (todosAbonosCliente.length > 0) {
-
-        const u = todosAbonosCliente[0];
-
-        ultimoAbono = {
-
-          monto: Number(u.monto),
-
-          metodo: u.metodo || 'EFECTIVO',
-
-          fecha: new Date(u.createdAt).toLocaleDateString('es-EC'),
-
-          hora: new Date(u.createdAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
-
-          fechaIso: u.createdAt,
-
-          notas: u.notas,
-
-          usuarioNombre: u.usuarioNombre,
-
-          sucursalNombre: u.usuarioSucursal,
-
-        };
-
-      } else if (cartera.clientId === carteraSeleccionada?.clientId && ultimos3AbonosCliente.length > 0) {
-
-        const u = ultimos3AbonosCliente[0];
-
-        ultimoAbono = {
-
-          monto: u.montoTotal,
-
-          metodo: u.metodo,
-
-          fecha: new Date(u.createdAt).toLocaleDateString('es-EC'),
-
-          hora: new Date(u.createdAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
-
-          fechaIso: u.createdAt,
-
-          notas: u.notas,
-
-          numeroNota: u.reciboRef,
-
-          usuarioNombre: u.usuarioNombre,
-
-          sucursalNombre: u.usuarioSucursal,
-
-        };
-
+        montoAbono = todosAbonosCliente.reduce((sum, a) => sum + Number(a.monto || 0), 0);
+        metodoAbonoRef = todosAbonosCliente[0].metodo || 'EFECTIVO';
       }
-
     }
 
-
-
-    // 2. Saldo actual deudor real
-
+    // 3. Saldo actual deudor real y cálculo matemático de saldo anterior
     let saldoActual = Number(cartera.saldoTotalPendiente || 0);
-
     if (abonoInfoParam) {
-
       saldoActual = Math.max(0, saldoActual - abonoInfoParam.monto);
-
     }
 
-
-
-    const montoAbono = ultimoAbono ? ultimoAbono.monto : 0;
-
-    // 3. Movimientos (entregas y devoluciones) de la fecha del último abono
-    const movFecha = await obtenerMovimientosDeFechaCliente(cartera, ultimoAbono?.fechaIso);
-    const montoEntregaDia = movFecha.montoEntregas;
-    const montoDevolucionDia = movFecha.montoDevoluciones;
-
-    // 4. Cálculo matemático de saldo anterior
     const saldoAnterior = Math.max(
       0,
       Math.round((saldoActual + montoAbono + montoDevolucionDia - montoEntregaDia) * 100) / 100
     );
 
     let msg = `Estimado/a *${capitalizarNombreCompleto(cartera.clienteNombre)}*,\n\n`;
-    msg += `Le saludamos de *${negocioNombre}*. Le compartimos el estado actual de su cuenta:\n\n`;
-    if (ultimoAbono?.fecha) {
-      msg += `📅 *Fecha del último abono:* ${ultimoAbono.fecha}${ultimoAbono.hora ? ` a las ${ultimoAbono.hora}` : ''}\n`;
-    } else {
-      msg += `📅 *Fecha:* ${hoyLegible}\n`;
-    }
+    msg += `Le saludamos de *${negocioNombre}*. Le compartimos el estado de su cuenta correspondiente a su último movimiento:\n\n`;
+    msg += `📅 *Fecha de referencia:* ${fechaRefLegible}${horaRefLegible ? ` a las ${horaRefLegible}` : ''}\n`;
 
     msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
-    if (saldoAnterior > 0 && (montoEntregaDia > 0 || montoDevolucionDia > 0 || montoAbono > 0)) {
+    if (saldoAnterior > 0 || montoEntregaDia > 0 || montoDevolucionDia > 0 || montoAbono > 0) {
       msg += `💵 *Saldo Anterior:* $${saldoAnterior.toFixed(2)}\n`;
     }
     if (montoEntregaDia > 0) {
-      const paresTxt = movFecha.totalParesEntregados > 0
-        ? ` (${movFecha.totalParesEntregados} ${movFecha.totalParesEntregados === 1 ? 'par' : 'pares'})`
+      const paresTxt = totalParesEntregadosDia > 0
+        ? ` (${totalParesEntregadosDia} ${totalParesEntregadosDia === 1 ? 'par' : 'pares'})`
         : '';
       msg += `📦 *Entregas del día${paresTxt}:* +$${montoEntregaDia.toFixed(2)}\n`;
     }
@@ -2985,7 +2985,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       msg += `↩️ *Devoluciones del día:* -$${montoDevolucionDia.toFixed(2)}\n`;
     }
     if (montoAbono > 0) {
-      msg += `✅ *Abono Recibido:* -$${montoAbono.toFixed(2)} (${ultimoAbono?.metodo || 'EFECTIVO'})\n`;
+      msg += `✅ *Abono Recibido:* -$${montoAbono.toFixed(2)} (${metodoAbonoRef})\n`;
     }
     if (saldoActual <= 0) {
       msg += `🎉 *SALDO PENDIENTE ACTUAL: $0.00 (${montoAbono > 0 ? 'CUENTA SALDADA' : 'SIN DEUDA PENDIENTE'})*\n`;
@@ -2994,41 +2994,26 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     }
     msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
 
-
-
-    // Generar enlace oficial del comprobante PDF con la fecha del último abono
-
+    // Generar enlace oficial del comprobante PDF con la fecha del último movimiento del historial
     try {
-
       const dataAbonoParaLink = armarDatosComprobanteAbono(cartera, {
-
         monto: montoAbono,
-
-        metodo: ultimoAbono?.metodo || 'EFECTIVO',
-
-        fecha: ultimoAbono?.fecha || new Date().toLocaleDateString('es-EC'),
-
-        hora: ultimoAbono?.hora,
-
-        notas: ultimoAbono?.notas,
-
-        numeroNota: ultimoAbono?.numeroNota || 'Estado de Cuenta',
-
-        usuarioNombre: ultimoAbono?.usuarioNombre,
-
-        sucursalNombre: ultimoAbono?.sucursalNombre,
-
+        metodo: metodoAbonoRef,
+        fecha: fechaRefLegible,
+        hora: horaRefLegible,
+        notas: ultimoAbonoFecha?.referencia || ultimoAbonoFecha?.notas || undefined,
+        numeroNota: ultimoAbonoFecha?.reciboRef ? `Recibo #${ultimoAbonoFecha.reciboRef}` : 'Estado de Cuenta',
+        usuarioNombre: ultimoAbonoFecha?.cobradoPor,
+        sucursalNombre: ultimoAbonoFecha?.cobradoPorSucursal,
         saldoAnterior,
-
         nuevoSaldo: saldoActual,
-
       });
 
-      if (movFecha.entregasHoy.length > 0) {
-        dataAbonoParaLink.movimiento.entregasHoy = movFecha.entregasHoy;
+      if (entregasUltimaFecha.length > 0) {
+        dataAbonoParaLink.movimiento.entregasHoy = entregasUltimaFecha;
       }
-      if (movFecha.devolucionesHoy.length > 0) {
-        dataAbonoParaLink.movimiento.devolucionesHoy = movFecha.devolucionesHoy;
+      if (devolucionesHoyDia.length > 0) {
+        dataAbonoParaLink.movimiento.devolucionesHoy = devolucionesHoyDia;
       }
 
       const urlComprobante = await generarUrlPublicaAbono(dataAbonoParaLink);
