@@ -10739,7 +10739,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                 <div className="space-y-0.5">
 
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
 
                                     <span className="font-extrabold text-xs text-[var(--foreground)]">{m.titulo}</span>
 
@@ -10749,9 +10749,45 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                     </span>
 
+                                    {isDevolucion && (
+
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+
+                                        {isExpanded ? 'Ocultar detalle' : 'Ver detalle'}
+
+                                        {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+
+                                      </span>
+
+                                    )}
+
                                   </div>
 
                                   <div className="text-[11px] text-[var(--muted-foreground)]">{m.descripcion}</div>
+
+                                  {isDevolucion && lineas.length > 0 && !isExpanded && (
+
+                                    <div className="text-[10.5px] font-semibold text-rose-700 dark:text-rose-300 mt-0.5 flex flex-wrap items-center gap-1.5">
+
+                                      <span>👟</span>
+
+                                      <span>
+
+                                        {Array.from(
+
+                                          new Set(
+
+                                            lineas.map((l: any) => `${l.modelName || 'Calzado'}${l.color ? ` (${l.color})` : ''}`)
+
+                                          )
+
+                                        ).join(' · ')}
+
+                                      </span>
+
+                                    </div>
+
+                                  )}
 
 
 
@@ -11175,19 +11211,43 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                               <div className="mt-3.5 pt-3 border-t border-[var(--border)] space-y-2.5">
 
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
 
                                   <span className="font-black text-[11px] text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
 
-                                    📦 DETALLE DE ARTÍCULOS SOLICITADOS — {m.numeroCodigo || m.titulo}
+                                    {isDevolucion
+                                      ? `↩️ DETALLE DE CALZADO DEVUELTO — ${m.titulo}`
+                                      : `📦 DETALLE DE ARTÍCULOS SOLICITADOS — ${m.numeroCodigo || m.titulo}`}
 
                                   </span>
 
-                                  <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
+                                  <div className="flex items-center gap-2">
 
-                                    {lineas.length} {lineas.length === 1 ? 'ítem' : 'ítems'}
+                                    {isDevolucion && m.detalles?.destinoStock && (
 
-                                  </span>
+                                      <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold border ${
+
+                                        m.detalles.destinoStock === 'REINGRESO_INVENTARIO'
+
+                                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
+
+                                          : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
+
+                                      }`}>
+
+                                        {m.detalles.destinoStock === 'REINGRESO_INVENTARIO' ? 'Reingreso a Bodega' : 'Baja por Falla'}
+
+                                      </span>
+
+                                    )}
+
+                                    <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
+
+                                      {lineas.length} {lineas.length === 1 ? 'ítem' : 'ítems'}
+
+                                    </span>
+
+                                  </div>
 
                                 </div>
 
@@ -11306,7 +11366,15 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                                       key={idx}
 
-                                                      className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-md text-[10px] font-bold"
+                                                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+
+                                                        isDevolucion
+
+                                                          ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20'
+
+                                                          : 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
+
+                                                      }`}
 
                                                     >
 
@@ -11326,7 +11394,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                             <div className="text-right shrink-0">
 
-                                              <span className="text-xs font-black text-emerald-600 block">
+                                              <span className={`text-xs font-black block ${isDevolucion ? 'text-rose-600' : 'text-emerald-600'}`}>
 
                                                 {totalPares} {totalPares === 1 ? 'par' : 'pares'}
 
@@ -11334,7 +11402,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                               <span className="text-[10px] text-[var(--muted-foreground)] font-semibold block">
 
-                                                ${(totalPares * Number(item.precioUnitario || 0)).toFixed(2)}
+                                                {isDevolucion ? '-' : ''}${(totalPares * Number(item.precioUnitario || 0)).toFixed(2)}
 
                                               </span>
 
