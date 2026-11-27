@@ -220,6 +220,7 @@ export async function generarUrlPublicaAbono(data: ComprobanteAbonoPdfData): Pro
         modelo: it.modelo,
         color: it.color || '',
         serie: it.serie || '',
+        imageUrl: it.imageUrl || '',
         tallas: it.tallas || '',
         cantidadPares: Number(it.cantidadPares || 0),
         etiquetaVolumen: it.etiquetaVolumen || '',
@@ -232,7 +233,19 @@ export async function generarUrlPublicaAbono(data: ComprobanteAbonoPdfData): Pro
   if (data.movimiento.devolucionesHoy && data.movimiento.devolucionesHoy.length > 0) {
     payload.dev = data.movimiento.devolucionesHoy.map((d) => ({
       descripcion: d.descripcion,
+      destino: d.destino || '',
       monto: Math.round(Number(d.monto || 0) * 100) / 100,
+      items: (d.items || []).map((it) => ({
+        modelo: it.modelo,
+        color: it.color || '',
+        serie: it.serie || '',
+        imageUrl: it.imageUrl || '',
+        tallas: it.tallas || '',
+        cantidadPares: Number(it.cantidadPares || 0),
+        etiquetaVolumen: it.etiquetaVolumen || '',
+        precioUnitario: Number(it.precioUnitario || 0),
+        subtotal: Math.round(Number(it.subtotal || 0) * 100) / 100,
+      })),
     }));
   }
 

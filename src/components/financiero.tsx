@@ -2645,6 +2645,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
           modelo: g.modelName,
           color: g.color || undefined,
           serie: getNombreSerie(g.serieNombre, g.tallas),
+          imageUrl: g.imageUrl || null,
           tallas: g.tallas.map((t) => `T${t.numero}: ${t.cantidad}`).join(', '),
           cantidadPares: g.totalPares,
           etiquetaVolumen: g.etiquetaVolumen,
@@ -2660,7 +2661,22 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       0
     );
 
-    let devolucionesHoy: Array<{ descripcion: string; monto: number }> = [];
+    let devolucionesHoy: Array<{
+      descripcion: string;
+      destino?: string;
+      monto: number;
+      items?: Array<{
+        modelo: string;
+        color?: string;
+        serie?: string;
+        imageUrl?: string | null;
+        tallas?: string;
+        cantidadPares: number;
+        etiquetaVolumen?: string;
+        precioUnitario?: number;
+        subtotal: number;
+      }>;
+    }> = [];
     try {
       let movimientosCliente: any[] = [];
       if (historialCliente && historialCliente.cliente?.id === cartera.clientId) {
@@ -2671,10 +2687,31 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       }
       devolucionesHoy = movimientosCliente
         .filter((m) => m.tipo === 'DEVOLUCION' && claveLocal(m.fecha) === targetKey)
-        .map((m) => ({
-          descripcion: m.titulo || m.descripcion || 'Devolución de calzado',
-          monto: Number(m.monto || 0),
-        }));
+        .map((m) => {
+          const itemsAgrupados = construirItemsAgrupadosMovimientoPedido(m);
+          const destino =
+            m.detalles?.destinoStock === 'REINGRESO_INVENTARIO'
+              ? 'Reingreso a Bodega'
+              : m.detalles?.destinoStock
+                ? 'Baja por Falla'
+                : undefined;
+          return {
+            descripcion: m.titulo || m.descripcion || 'Devolución de calzado',
+            destino,
+            monto: Number(m.monto || 0),
+            items: itemsAgrupados.map((it) => ({
+              modelo: it.modelo,
+              color: it.color,
+              serie: it.serie,
+              imageUrl: it.imageUrl,
+              tallas: it.tallasTexto,
+              cantidadPares: it.cantidadPares,
+              etiquetaVolumen: it.etiquetaVolumen,
+              precioUnitario: it.precioUnitario,
+              subtotal: it.subtotal,
+            })),
+          };
+        });
     } catch {
       // Si falla la consulta de devoluciones, continuar sin bloquear el envío
     }
@@ -2913,6 +2950,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
           modelo: it.modelo,
           color: it.color,
           serie: it.serie,
+          imageUrl: it.imageUrl || null,
           tallas: it.tallasTexto,
           cantidadPares: it.cantidadPares,
           etiquetaVolumen: it.etiquetaVolumen,
@@ -2933,10 +2971,31 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       0
     );
 
-    const devolucionesHoyDia = devolucionesUltimaFecha.map((d) => ({
-      descripcion: d.titulo || d.descripcion || 'Devolución de calzado',
-      monto: Number(d.monto || 0),
-    }));
+    const devolucionesHoyDia = devolucionesUltimaFecha.map((d) => {
+      const itemsAgrupados = construirItemsAgrupadosMovimientoPedido(d);
+      const destino =
+        d.detalles?.destinoStock === 'REINGRESO_INVENTARIO'
+          ? 'Reingreso a Bodega'
+          : d.detalles?.destinoStock
+            ? 'Baja por Falla'
+            : undefined;
+      return {
+        descripcion: d.titulo || d.descripcion || 'Devolución de calzado',
+        destino,
+        monto: Number(d.monto || 0),
+        items: itemsAgrupados.map((it) => ({
+          modelo: it.modelo,
+          color: it.color,
+          serie: it.serie,
+          imageUrl: it.imageUrl,
+          tallas: it.tallasTexto,
+          cantidadPares: it.cantidadPares,
+          etiquetaVolumen: it.etiquetaVolumen,
+          precioUnitario: it.precioUnitario,
+          subtotal: it.subtotal,
+        })),
+      };
+    });
     const montoDevolucionDia = devolucionesHoyDia.reduce((sum, d) => sum + Number(d.monto || 0), 0);
 
     let montoAbono = abonoInfoParam

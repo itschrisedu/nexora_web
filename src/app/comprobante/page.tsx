@@ -796,14 +796,28 @@ function ComprobanteContent() {
                       {Array.isArray(ent.items) && ent.items.length > 0 && (
                         <div className="space-y-1 pt-1 border-t border-slate-100">
                           {ent.items.map((it: any, i2: number) => (
-                            <div key={i2} className="flex items-start justify-between gap-2 text-[11px] text-slate-600">
-                              <div>
-                                <span className="font-bold text-slate-800">{it.modelo}</span>
-                                {it.color ? ` (${it.color})` : ''}
-                                {it.serie ? ` · Serie: ${it.serie}` : ''}
-                                {it.etiquetaVolumen ? ` · ${it.etiquetaVolumen}` : ` · ${it.cantidadPares} pares`}
-                                {Number(it.precioUnitario || 0) > 0 ? ` · $${Number(it.precioUnitario).toFixed(2)} c/par` : ''}
-                                {it.tallas ? <span className="block text-[10px] text-slate-500">{it.tallas}</span> : null}
+                            <div key={i2} className="flex items-start justify-between gap-2.5 text-[11px] text-slate-600 py-1">
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                {it.imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={it.imageUrl}
+                                    alt={it.modelo}
+                                    className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0 bg-white"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0">
+                                    {(it.modelo || 'CAL').slice(0, 3).toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <span className="font-bold text-slate-800">{it.modelo}</span>
+                                  {it.color ? ` (${it.color})` : ''}
+                                  {it.serie ? ` · Serie: ${it.serie}` : ''}
+                                  {it.etiquetaVolumen ? ` · ${it.etiquetaVolumen}` : ` · ${it.cantidadPares} pares`}
+                                  {Number(it.precioUnitario || 0) > 0 ? ` · $${Number(it.precioUnitario).toFixed(2)} c/par` : ''}
+                                  {it.tallas ? <span className="block text-[10px] text-slate-500">{it.tallas}</span> : null}
+                                </div>
                               </div>
                               <span className="font-mono font-semibold text-slate-800 shrink-0">${Number(it.subtotal || 0).toFixed(2)}</span>
                             </div>
@@ -816,14 +830,54 @@ function ComprobanteContent() {
               )}
 
               {Array.isArray(data.dev) && data.dev.length > 0 && (
-                <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-2">
+                <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-2.5">
                   <div className="text-[11px] font-extrabold uppercase text-rose-800 tracking-wider">
                     Devoluciones Registradas en la Fecha
                   </div>
                   {data.dev.map((d: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between text-xs text-rose-900">
-                      <span className="font-semibold">{d.descripcion || 'Devolución de calzado'}</span>
-                      <span className="font-mono font-bold text-rose-700">-${Number(d.monto || 0).toFixed(2)}</span>
+                    <div key={idx} className="p-2.5 bg-white border border-rose-200/80 rounded-xl space-y-1.5">
+                      <div className="flex items-center justify-between gap-2 text-xs text-rose-900">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold">{d.descripcion || 'Devolución de calzado'}</span>
+                          {d.destino && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                              {d.destino}
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-mono font-bold text-rose-700 shrink-0">-${Number(d.monto || 0).toFixed(2)}</span>
+                      </div>
+                      {Array.isArray(d.items) && d.items.length > 0 && (
+                        <div className="space-y-1 pt-1 border-t border-rose-100">
+                          {d.items.map((it: any, i2: number) => (
+                            <div key={i2} className="flex items-start justify-between gap-2.5 text-[11px] text-slate-600 py-1">
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                {it.imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={it.imageUrl}
+                                    alt={it.modelo}
+                                    className="w-10 h-10 rounded-lg object-cover border border-rose-200 shrink-0 bg-white"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center text-[10px] font-bold text-rose-400 shrink-0">
+                                    {(it.modelo || 'CAL').slice(0, 3).toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <span className="font-bold text-slate-800">{it.modelo}</span>
+                                  {it.color ? ` (${it.color})` : ''}
+                                  {it.serie ? ` · Serie: ${it.serie}` : ''}
+                                  {it.etiquetaVolumen ? ` · ${it.etiquetaVolumen}` : ` · ${it.cantidadPares} pares`}
+                                  {Number(it.precioUnitario || 0) > 0 ? ` · $${Number(it.precioUnitario).toFixed(2)} c/par` : ''}
+                                  {it.tallas ? <span className="block text-[10px] text-rose-700/80 font-medium">{it.tallas}</span> : null}
+                                </div>
+                              </div>
+                              <span className="font-mono font-semibold text-rose-700 shrink-0">-${Number(it.subtotal || 0).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -2,11 +2,14 @@ import { jsPDF } from 'jspdf';
 import { generarUrlPublicaAbono } from './comprobante-url.service';
 import { capitalizarNombreCompleto } from '@/utils/text-formatters';
 import { abrirWhatsAppUniversal } from '@/utils/whatsapp';
+import { cargarImagenComoBase64, dibujarPlaceholderCalzado } from './pdf-historial.service';
 
 export interface EntregaItemDetalle {
   modelo: string;
   color?: string;
   serie?: string;
+  imageUrl?: string | null;
+  loadedImageBase64?: string | null;
   tallas?: string; // Ej: "T38: 1, T39: 2, T40: 1"
   cantidadPares: number;
   etiquetaVolumen?: string; // Ej: "1 Docena" o "4 pares"
@@ -23,6 +26,8 @@ export interface EntregaHoyDetalle {
 export interface DevolucionHoyDetalle {
   descripcion: string;
   monto: number;
+  destino?: string;
+  items?: EntregaItemDetalle[];
 }
 
 export interface ComprobanteAbonoPdfData {
@@ -75,7 +80,15 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
   });
 
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   let y = 14;
+
+  const asegurarEspacio = (alturaNecesaria: number) => {
+    if (y + alturaNecesaria > pageHeight - 24) {
+      doc.addPage();
+      y = 16;
+    }
+  };
 
   // ── 1. Encabezado Institucional del Negocio ─────────────
   doc.setFillColor(15, 23, 42); // Slate 900
@@ -171,7 +184,62 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
   y += 31;
 
   // ── 3. Detalles de Notas / Entregas Relacionadas (si las hay) ──
+  const dibujarItemCalzadoPdf = (item: EntregaItemDetalle, esDevolucion: boolean = false) => {
+    const tallasStr = item.tallas ? `[${item.tallas}]` : '';
+    const tallasLines = tallasStr ? doc.splitTextToSize(tallasStr, pageWidth - 56) : [];
+    const alturaFila = Math.max(15, 10 + tallasLines.length * 3.5);
+    asegurarEspacio(alturaFila + 2);
+
+    const imgX = 16;
+    const imgY = y + 1;
+    const imgSize = 12;
+    if (item.loadedImageBase64) {
+      try {
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(203, 213, 225);
+        doc.roundedRect(imgX, imgY, imgSize, imgSize, 1.2, 1.2, 'FD');
+        doc.addImage(item.loadedImageBase64, 'JPEG', imgX + 0.5, imgY + 0.5, imgSize - 1, imgSize - 1);
+      } catch {
+        dibujarPlaceholderCalzado(doc, imgX, imgY, imgSize, item.modelo);
+      }
+    } else {
+      dibujarPlaceholderCalzado(doc, imgX, imgY, imgSize, item.modelo);
+    }
+
+    const textX = 31;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+    const colorStr = item.color ? ` (${item.color})` : '';
+    const serieStr = item.serie ? ` · Serie: ${item.serie}` : '';
+    const volStr = item.etiquetaVolumen || `${item.cantidadPares} pares`;
+    const precioUnitStr =
+      item.precioUnitario !== undefined && Number(item.precioUnitario) > 0
+        ? ` · $${Number(item.precioUnitario).toFixed(2)} c/par`
+        : '';
+
+    doc.text(`• ${item.modelo}${colorStr}${serieStr}`, textX, y + 4.5);
+    if (esDevolucion) {
+      doc.setTextColor(185, 28, 28);
+      doc.text(`-$${Number(item.subtotal || 0).toFixed(2)}`, pageWidth - 18, y + 4.5, { align: 'right' });
+    } else {
+      doc.setTextColor(15, 23, 42);
+      doc.text(`$${Number(item.subtotal || 0).toFixed(2)}`, pageWidth - 18, y + 4.5, { align: 'right' });
+    }
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.2);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`${volStr}${precioUnitStr}`, textX, y + 8.5);
+    if (tallasLines.length > 0) {
+      doc.text(tallasLines, textX, y + 12);
+    }
+
+    y += alturaFila;
+  };
+
   if (data.movimiento.entregasHoy && data.movimiento.entregasHoy.length > 0) {
+    asegurarEspacio(16);
     doc.setFillColor(241, 245, 249);
     doc.roundedRect(12, y, pageWidth - 24, 7, 1, 1, 'F');
     doc.setFont('helvetica', 'bold');
@@ -182,50 +250,33 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
 
     data.movimiento.entregasHoy.forEach((e) => {
       if (e.nota) {
+        asegurarEspacio(8);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7.5);
+        doc.setFontSize(7.8);
         doc.setTextColor(30, 64, 175);
         doc.text(`${e.nota}`, 16, y);
-        doc.text(`Total Nota: $${Number(e.monto || 0).toFixed(2)}`, pageWidth - 20, y, { align: 'right' });
-        y += 4;
+        doc.text(`Total Nota: $${Number(e.monto || 0).toFixed(2)}`, pageWidth - 18, y, { align: 'right' });
+        y += 4.5;
       }
       if (e.items && e.items.length > 0) {
-        e.items.forEach((item) => {
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8);
-          doc.setTextColor(15, 23, 42);
-          const colorStr = item.color ? ` (${item.color})` : '';
-          const serieStr = item.serie ? ` · Serie: ${item.serie}` : '';
-          const volStr = item.etiquetaVolumen || `${item.cantidadPares} pares`;
-          const precioUnitStr =
-            item.precioUnitario !== undefined && Number(item.precioUnitario) > 0
-              ? ` · $${Number(item.precioUnitario).toFixed(2)} c/par`
-              : '';
-          const tallasStr = item.tallas ? ` [${item.tallas}]` : '';
-          doc.text(`• ${item.modelo}${colorStr}${serieStr}`, 16, y);
-          doc.text(`$${item.subtotal.toFixed(2)}`, pageWidth - 20, y, { align: 'right' });
-          y += 4;
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(7.2);
-          doc.setTextColor(71, 85, 105);
-          doc.text(`    ${volStr}${precioUnitStr}${tallasStr}`, 18, y);
-          y += 4;
-        });
+        e.items.forEach((item) => dibujarItemCalzadoPdf(item, false));
       } else {
+        asegurarEspacio(6);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
         doc.setTextColor(15, 23, 42);
         doc.text(`• Mercadería entregada`, 16, y);
-        doc.text(`$${e.monto.toFixed(2)}`, pageWidth - 20, y, { align: 'right' });
-        y += 4.5;
+        doc.text(`$${e.monto.toFixed(2)}`, pageWidth - 18, y, { align: 'right' });
+        y += 5;
       }
-      y += 1.5;
+      y += 2;
     });
     y += 2;
   }
 
   // ── 3b. Devoluciones Registradas en la Fecha (si las hay) ──
   if (data.movimiento.devolucionesHoy && data.movimiento.devolucionesHoy.length > 0) {
+    asegurarEspacio(16);
     doc.setFillColor(254, 242, 242);
     doc.roundedRect(12, y, pageWidth - 24, 7, 1, 1, 'F');
     doc.setFont('helvetica', 'bold');
@@ -235,18 +286,26 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
     y += 9;
 
     data.movimiento.devolucionesHoy.forEach((dev) => {
+      asegurarEspacio(8);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.8);
       doc.setTextColor(15, 23, 42);
-      doc.text(`• ${(dev.descripcion || 'Devolución de calzado').slice(0, 78)}`, 16, y);
+      const destinoTxt = dev.destino ? ` (${dev.destino})` : '';
+      doc.text(`• ${(dev.descripcion || 'Devolución de calzado').slice(0, 70)}${destinoTxt}`, 16, y);
       doc.setTextColor(185, 28, 28);
-      doc.text(`-$${Number(dev.monto || 0).toFixed(2)}`, pageWidth - 20, y, { align: 'right' });
+      doc.text(`-$${Number(dev.monto || 0).toFixed(2)}`, pageWidth - 18, y, { align: 'right' });
       y += 5;
+
+      if (dev.items && dev.items.length > 0) {
+        dev.items.forEach((item) => dibujarItemCalzadoPdf(item, true));
+      }
+      y += 1.5;
     });
     y += 2;
   }
 
   // ── 4. Cuadro Principal de Liquidación del Abono ─────────────
+  asegurarEspacio(36);
   doc.setFillColor(15, 23, 42);
   doc.rect(12, y, pageWidth - 24, 7.5, 'F');
 
@@ -451,10 +510,54 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
 }
 
 /**
- * Descarga el PDF del comprobante de abono
+ * Pre-carga imágenes de entregas y devoluciones en paralelo para incrustarlas en el PDF
  */
-export function descargarComprobanteAbonoPdf(data: ComprobanteAbonoPdfData): void {
-  const doc = generarComprobanteAbonoPdfDoc(data);
+export async function preCargarImagenesComprobanteAbono(data: ComprobanteAbonoPdfData): Promise<ComprobanteAbonoPdfData> {
+  const preloadItems = async (items?: EntregaItemDetalle[]) => {
+    if (!items || items.length === 0) return items;
+    return Promise.all(
+      items.map(async (it) => {
+        if (it.loadedImageBase64) return it;
+        const b64 = it.imageUrl ? await cargarImagenComoBase64(it.imageUrl) : null;
+        return { ...it, loadedImageBase64: b64 };
+      })
+    );
+  };
+
+  const entregasConImg = data.movimiento.entregasHoy
+    ? await Promise.all(
+        data.movimiento.entregasHoy.map(async (e) => ({
+          ...e,
+          items: await preloadItems(e.items),
+        }))
+      )
+    : undefined;
+
+  const devolucionesConImg = data.movimiento.devolucionesHoy
+    ? await Promise.all(
+        data.movimiento.devolucionesHoy.map(async (d) => ({
+          ...d,
+          items: await preloadItems(d.items),
+        }))
+      )
+    : undefined;
+
+  return {
+    ...data,
+    movimiento: {
+      ...data.movimiento,
+      entregasHoy: entregasConImg,
+      devolucionesHoy: devolucionesConImg,
+    },
+  };
+}
+
+/**
+ * Descarga el PDF del comprobante de abono (con miniaturas precargadas)
+ */
+export async function descargarComprobanteAbonoPdf(data: ComprobanteAbonoPdfData): Promise<void> {
+  const dataConImg = await preCargarImagenesComprobanteAbono(data);
+  const doc = generarComprobanteAbonoPdfDoc(dataConImg);
   const cleanNum = data.comprobante.numero.replace(/[^a-zA-Z0-9_-]/g, '_');
   doc.save(`Recibo_Abono_${cleanNum}.pdf`);
 }
