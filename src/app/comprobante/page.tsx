@@ -749,37 +749,92 @@ function ComprobanteContent() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                  <span className="text-[11px] font-semibold text-slate-500 block">Saldo Anterior</span>
-                  <span className="text-base font-bold font-mono text-slate-700 mt-1 block">
-                    ${Number(data.m_ant || 0).toFixed(2)}
-                  </span>
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                    <span className="text-[11px] font-semibold text-slate-500 block">Saldo Anterior</span>
+                    <span className="text-base font-bold font-mono text-slate-700 mt-1 block">
+                      ${Number(data.m_ant || 0).toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl">
+                    <span className="text-[11px] font-bold text-emerald-800 block">Abono Aplicado</span>
+                    <span className="text-lg font-black font-mono text-emerald-700 mt-1 block">
+                      -${Number(data.m_abo || 0).toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className={`p-4 rounded-2xl border ${
+                    Number(data.m_res || 0) <= 0
+                      ? 'bg-blue-50/80 border-blue-200'
+                      : 'bg-amber-50/80 border-amber-200'
+                  }`}>
+                    <span className={`text-[11px] font-bold block ${
+                      Number(data.m_res || 0) <= 0 ? 'text-blue-800' : 'text-amber-800'
+                    }`}>
+                      Saldo Pendiente
+                    </span>
+                    <span className={`text-lg font-black font-mono mt-1 block ${
+                      Number(data.m_res || 0) <= 0 ? 'text-blue-700' : 'text-amber-700'
+                    }`}>
+                      ${Number(data.m_res || 0).toFixed(2)}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl">
-                  <span className="text-[11px] font-bold text-emerald-800 block">Abono Aplicado</span>
-                  <span className="text-lg font-black font-mono text-emerald-700 mt-1 block">
-                    -${Number(data.m_abo || 0).toFixed(2)}
-                  </span>
-                </div>
+                {((Array.isArray(data.ent) && data.ent.length > 0) || (Array.isArray(data.dev) && data.dev.length > 0)) && (() => {
+                  const tieneEnt = Array.isArray(data.ent) && data.ent.length > 0;
+                  const tieneDev = Array.isArray(data.dev) && data.dev.length > 0;
+                  const paresEnt = tieneEnt
+                    ? data.ent.reduce((s: number, e: any) => s + (e.items || []).reduce((si: number, it: any) => si + Number(it.cantidadPares || 0), 0), 0)
+                    : 0;
+                  const totalEnt = tieneEnt
+                    ? data.ent.reduce((s: number, e: any) => s + Number(e.monto || 0), 0)
+                    : 0;
+                  const paresDev = tieneDev
+                    ? data.dev.reduce((s: number, d: any) => s + (d.items || []).reduce((si: number, it: any) => si + Number(it.cantidadPares || 0), 0), 0)
+                    : 0;
+                  const totalDev = tieneDev
+                    ? data.dev.reduce((s: number, d: any) => s + Number(d.monto || 0), 0)
+                    : 0;
 
-                <div className={`p-4 rounded-2xl border ${
-                  Number(data.m_res || 0) <= 0
-                    ? 'bg-blue-50/80 border-blue-200'
-                    : 'bg-amber-50/80 border-amber-200'
-                }`}>
-                  <span className={`text-[11px] font-bold block ${
-                    Number(data.m_res || 0) <= 0 ? 'text-blue-800' : 'text-amber-800'
-                  }`}>
-                    Saldo Pendiente
-                  </span>
-                  <span className={`text-lg font-black font-mono mt-1 block ${
-                    Number(data.m_res || 0) <= 0 ? 'text-blue-700' : 'text-amber-700'
-                  }`}>
-                    ${Number(data.m_res || 0).toFixed(2)}
-                  </span>
-                </div>
+                  return (
+                    <div className={`grid gap-3 ${tieneEnt && tieneDev ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                      {tieneEnt && (
+                        <div className="px-4 py-3 bg-blue-50/80 border border-blue-200 rounded-2xl flex items-center justify-between gap-3">
+                          <div>
+                            <span className="text-[11px] font-bold text-blue-800 block whitespace-nowrap">
+                              (+) Entregas del Día
+                            </span>
+                            <span className="text-[11px] font-semibold text-blue-600/90 block">
+                              {paresEnt} {paresEnt === 1 ? 'par' : 'pares'} entregados
+                            </span>
+                          </div>
+                          <span className="text-lg font-black font-mono text-blue-700 shrink-0">
+                            +${totalEnt.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+
+                      {tieneDev && (
+                        <div className="px-4 py-3 bg-rose-50/80 border border-rose-200 rounded-2xl flex items-center justify-between gap-3">
+                          <div>
+                            <span className="text-[11px] font-bold text-rose-800 block whitespace-nowrap">
+                              (-) Devoluciones del Día
+                            </span>
+                            <span className="text-[11px] font-semibold text-rose-600/90 block">
+                              {paresDev} {paresDev === 1 ? 'par' : 'pares'} devueltos
+                            </span>
+                          </div>
+                          <span className="text-lg font-black font-mono text-rose-700 shrink-0">
+                            -${totalDev.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {Array.isArray(data.ent) && data.ent.length > 0 && (
