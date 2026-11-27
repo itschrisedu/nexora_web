@@ -154,7 +154,7 @@ import {
 
 } from '../services/pdf-historial.service';
 
-import { generarUrlPublicaAbono, generarUrlPublicaHistorial, generarUrlPublicaFactura } from '../services/comprobante-url.service';
+import { generarUrlPublicaAbono, generarUrlPublicaHistorial, generarUrlPublicaFactura, generarUrlPublicaPedidoCliente } from '../services/comprobante-url.service';
 
 import ConfirmModal from './ui/confirm-modal';
 
@@ -6146,6 +6146,186 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     showToast(`${numNota} descargada en PDF correctamente.`, 'success');
   };
 
+  const construirItemsAgrupadosMovimientoPedido = (m: any) => {
+    const lineasRaw: any[] = m.detalles?.lineas || m.lineas || [];
+    const gruposMap = new Map<string, any[]>();
+    lineasRaw.forEach((l: any) => {
+      const key = `${l.productId || l.modelName || 'PROD'}_${l.tipoVenta || 'GENERAL'}`;
+      if (!gruposMap.has(key)) gruposMap.set(key, []);
+      gruposMap.get(key)!.push(l);
+    });
+
+    return Array.from(gruposMap.values()).map((items) => {
+      const first = items[0];
+      const totalPares = items.reduce((s: number, it: any) => s + Number(it.cantidad || 0), 0);
+      const precioUnitario = Number(first.precioUnitario || 0);
+      const subtotal = Math.round(totalPares * precioUnitario * 100) / 100;
+      const tallasTexto = items
+        .slice()
+        .sort((a: any, b: any) => Number(a.numeroTalla || 0) - Number(b.numeroTalla || 0))
+        .map((l: any) => `T${l.numeroTalla}: ${l.cantidad}`)
+        .join(', ');
+
+      const docenas = totalPares / 12;
+      const etiquetaVolumen =
+        totalPares === 6
+          ? '½ Docena (6 pares)'
+          : totalPares === 12
+            ? '1 Docena (12 pares)'
+            : totalPares % 12 === 0 && totalPares > 0
+              ? `${docenas} Docenas (${totalPares} pares)`
+              : `${totalPares} ${totalPares === 1 ? 'par' : 'pares'}`;
+
+      return {
+        modelo: first.modelName || 'Calzado',
+        color: first.color || undefined,
+        serie: first.serieNombre || 'Estándar',
+        imageUrl: first.imageUrl || null,
+        tallasTexto,
+        cantidadPares: totalPares,
+        etiquetaVolumen,
+        precioUnitario,
+        subtotal,
+      };
+    });
+  };
+
+  const handleDescargarPedidoHistorialPdf = async (m: any) => {
+    const cli = historialCliente?.cliente || carteraSeleccionada;
+    const targetSucursalId = selectedSucursalCobroId || activeSucursalId;
+    const sucEmisor =
+      (sucursalesEmpresa || []).find((s: any) => s.id === targetSucursalId) ||
+      (sucursales || []).find((s: any) => s.id === targetSucursalId);
+
+    const emisorNombre = sucEmisor?.name || businessConfig?.nombre || 'CALZADO DE CUERO';
+    const emisorRuc = sucEmisor?.ruc || businessConfig?.ruc || '1804884664001';
+    const emisorDireccion = sucEmisor?.direccion || businessConfig?.direccion || 'Cevallos, Tungurahua, Ecuador';
+    const emisorTelefono = sucEmisor?.telefono || businessConfig?.telefono || (businessConfig as any)?.whatsappContacto || '';
+    const emisorEmail = sucEmisor?.email || businessConfig?.email || '';
+
+    const itemsPdf = construirItemsAgrupadosMovimientoPedido(m);
+    const numPedido = m.numeroCodigo || m.titulo || `PED-${String(m.pedidoId || m.id || '').slice(0, 6).toUpperCase()}`;
+    const montoTotal = Number(m.monto || 0);
+
+    await descargarNotaVentaPdf({
+      emisor: {
+        nombre: emisorNombre,
+        ruc: emisorRuc,
+        direccion: emisorDireccion,
+        telefono: emisorTelefono,
+        email: emisorEmail,
+        sucursal: sucEmisor?.name,
+      },
+      nota: {
+        numero: numPedido,
+        orderCodigo: m.numeroCodigo || undefined,
+        fechaEmision: new Date(m.fecha).toLocaleDateString('es-EC'),
+        tipo: m.metodo || 'Pedido',
+        estado: m.estado || 'Registrado',
+        vendedor: m.vendedorNombre || undefined,
+        logistica: m.fechaEntrega
+          ? `Entregado el ${new Date(m.fechaEntrega).toLocaleDateString('es-EC')}`
+          : 'Pedido registrado en historial comercial',
+        montoOriginal: montoTotal,
+        totalAbonado: 0,
+        saldoPendiente: m.nuevoSaldo !== undefined ? Number(m.nuevoSaldo) : montoTotal,
+      },
+      cliente: {
+        nombre: (cli as any)?.nombre || (cli as any)?.clienteNombre || 'Cliente',
+        cedula: (cli as any)?.cedula || (cli as any)?.clienteCedula || 'Consumidor Final',
+        telefono: (cli as any)?.telefono || (cli as any)?.clienteTelefono,
+        email: (cli as any)?.email || (cli as any)?.clienteEmail,
+        direccion: (cli as any)?.direccion || (cli as any)?.clienteDireccion,
+        nivelCredito: (cli as any)?.nivelCredito || (cli as any)?.clienteNivel,
+      },
+      items: itemsPdf,
+      abonos: [],
+    });
+
+    showToast(`${numPedido} descargado en PDF correctamente.`, 'success');
+  };
+
+  const handleCompartirPedidoHistorialWhatsApp = async (m: any) => {
+    const cli = historialCliente?.cliente || carteraSeleccionada;
+    const telefono = (cli as any)?.telefono || (cli as any)?.clienteTelefono || '';
+    if (!telefono || telefono === '—') {
+      showToast('El cliente no tiene número de teléfono registrado para WhatsApp.', 'warning');
+      return;
+    }
+
+    const targetSucursalId = selectedSucursalCobroId || activeSucursalId;
+    const sucEmisor =
+      (sucursalesEmpresa || []).find((s: any) => s.id === targetSucursalId) ||
+      (sucursales || []).find((s: any) => s.id === targetSucursalId);
+
+    const emisorNombre = sucEmisor?.name || businessConfig?.nombre || 'CALZADO DE CUERO';
+    const itemsPdf = construirItemsAgrupadosMovimientoPedido(m);
+    const totalPares = itemsPdf.reduce((sum, it) => sum + it.cantidadPares, 0);
+    const montoTotal = Number(m.monto || 0);
+    const numPedido = m.numeroCodigo || m.titulo || `PED-${String(m.pedidoId || m.id || '').slice(0, 6).toUpperCase()}`;
+    const fechaPedido = new Date(m.fecha).toLocaleDateString('es-EC');
+
+    let urlPedido = '';
+    try {
+      urlPedido = await generarUrlPublicaPedidoCliente({
+        pedido: {
+          id: m.pedidoId || m.id,
+          numeroCodigo: numPedido,
+          fecha: fechaPedido,
+          tipoPago: m.metodo || 'Crédito',
+        },
+        cliente: {
+          nombre: (cli as any)?.nombre || (cli as any)?.clienteNombre || 'Cliente',
+          cedula: (cli as any)?.cedula || (cli as any)?.clienteCedula,
+          telefono,
+          direccion: (cli as any)?.direccion || (cli as any)?.clienteDireccion,
+        },
+        emisor: {
+          nombre: emisorNombre,
+          ruc: sucEmisor?.ruc || businessConfig?.ruc,
+          direccion: sucEmisor?.direccion || businessConfig?.direccion,
+          telefono: sucEmisor?.telefono || businessConfig?.telefono,
+          email: sucEmisor?.email || businessConfig?.email,
+        },
+        lineas: itemsPdf.map((it) => ({
+          modelo: it.modelo,
+          color: it.color,
+          serie: it.serie,
+          imageUrl: it.imageUrl || undefined,
+          numeracion: it.tallasTexto,
+          cantidadPares: it.cantidadPares,
+          precioUnitario: it.precioUnitario,
+          subtotal: it.subtotal,
+        })),
+        totales: {
+          totalPares,
+          totalPagar: montoTotal,
+        },
+      });
+    } catch {
+      // Si falla la generación del enlace, continúa enviando el resumen
+    }
+
+    const nombreCli = capitalizarNombreCompleto((cli as any)?.nombre || (cli as any)?.clienteNombre || 'Cliente');
+    let msg = `Estimado/a *${nombreCli}*,\n\n`;
+    msg += `Le saludamos de *${emisorNombre}*. Le compartimos el detalle de su pedido:\n\n`;
+    msg += `📦 *Pedido:* ${numPedido}\n`;
+    msg += `📅 *Fecha:* ${fechaPedido}\n`;
+    if (totalPares > 0) {
+      msg += `👟 *Cantidad:* ${totalPares} ${totalPares === 1 ? 'par' : 'pares'}\n`;
+    }
+    msg += `💵 *Total:* $${montoTotal.toFixed(2)}\n`;
+    if (m.estado) {
+      msg += `📌 *Estado:* ${m.estado}\n`;
+    }
+    if (urlPedido) {
+      msg += `\n📥 *Descarga aquí tu comprobante oficial (detalle completo en PDF):*\n👉 ${urlPedido}\n`;
+    }
+    msg += `\n¡Muchas gracias por su preferencia!\n*${emisorNombre}*`;
+
+    handleEnviarWhatsAppTexto(telefono, msg);
+  };
+
 
 
   // Resumen operativo de Cobranza del Día de Hoy
@@ -10912,6 +11092,64 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                         className="p-1.5 rounded-lg bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/30 transition-colors cursor-pointer shadow-2xs flex items-center justify-center"
 
                                         title={`Enviar Comprobante por WhatsApp (${formatoEnvioAbono})`}
+
+                                      >
+
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+
+                                      </button>
+
+                                    )}
+
+                                  </div>
+
+                                )}
+
+                                {m.tipo === 'COMPRA_PEDIDO' && (
+
+                                  <div className="flex items-center justify-end gap-1 mt-1.5">
+
+                                    <button
+
+                                      type="button"
+
+                                      onClick={(e) => {
+
+                                        e.stopPropagation();
+
+                                        handleDescargarPedidoHistorialPdf(m);
+
+                                      }}
+
+                                      className="p-1 rounded bg-[var(--muted)]/40 hover:bg-emerald-500/10 text-emerald-600 border border-[var(--border)] text-[9px] font-bold flex items-center gap-0.5 transition-colors cursor-pointer"
+
+                                      title="Descargar Pedido / Nota en PDF"
+
+                                    >
+
+                                      <Download size={11} />
+
+                                      <span>PDF</span>
+
+                                    </button>
+
+                                    {(historialCliente?.cliente?.telefono || carteraSeleccionada?.clienteTelefono) && (
+
+                                      <button
+
+                                        type="button"
+
+                                        onClick={(e) => {
+
+                                          e.stopPropagation();
+
+                                          handleCompartirPedidoHistorialWhatsApp(m);
+
+                                        }}
+
+                                        className="p-1.5 rounded-lg bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/30 transition-colors cursor-pointer shadow-2xs flex items-center justify-center"
+
+                                        title="Compartir Pedido por WhatsApp con enlace público"
 
                                       >
 
