@@ -260,6 +260,17 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
       }
       if (e.items && e.items.length > 0) {
         e.items.forEach((item) => dibujarItemCalzadoPdf(item, false));
+        const paresNota = e.items.reduce((s, it) => s + Number(it.cantidadPares || 0), 0);
+        asegurarEspacio(7);
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(16, y, pageWidth - 32, 6, 1, 1, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.2);
+        doc.setTextColor(51, 65, 85);
+        doc.text(`Total de pares: ${paresNota} ${paresNota === 1 ? 'par' : 'pares'}  ·  Modalidad: ${data.comprobante.formaPago || 'Crédito'}`, 19, y + 4);
+        doc.setTextColor(15, 23, 42);
+        doc.text(`Total Nota: $${Number(e.monto || 0).toFixed(2)}`, pageWidth - 19, y + 4, { align: 'right' });
+        y += 7.5;
       } else {
         asegurarEspacio(6);
         doc.setFont('helvetica', 'bold');
@@ -339,9 +350,19 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
     },
   ];
 
+  const totalParesEntregasHoy = (data.movimiento.entregasHoy || []).reduce(
+    (acc, curr) => acc + (curr.items || []).reduce((s, it) => s + Number(it.cantidadPares || 0), 0),
+    0
+  );
+  const totalParesDevolucionesHoy = (data.movimiento.devolucionesHoy || []).reduce(
+    (acc, curr) => acc + (curr.items || []).reduce((s, it) => s + Number(it.cantidadPares || 0), 0),
+    0
+  );
+
   if (totalEntregasHoy > 0 && data.movimiento.entregasHoy) {
+    const paresEntStr = totalParesEntregasHoy > 0 ? ` (${totalParesEntregasHoy} ${totalParesEntregasHoy === 1 ? 'par' : 'pares'})` : '';
     filas.push({
-      concepto: '(+) Entrega de Calzado / Mercadería Nueva',
+      concepto: `(+) Entrega de Calzado / Mercadería Nueva${paresEntStr}`,
       desc: descEntregas.slice(0, 95),
       monto: totalEntregasHoy,
       tipo: 'ENTREGA',
@@ -358,8 +379,9 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
   }
 
   if (totalDevolucionesHoy > 0 && data.movimiento.devolucionesHoy) {
+    const paresDevStr = totalParesDevolucionesHoy > 0 ? ` (${totalParesDevolucionesHoy} ${totalParesDevolucionesHoy === 1 ? 'par' : 'pares'})` : '';
     filas.push({
-      concepto: '(-) Devolución / Descuento Aplicado',
+      concepto: `(-) Devolución / Descuento Aplicado${paresDevStr}`,
       desc: descDevoluciones.slice(0, 95),
       monto: -totalDevolucionesHoy,
       tipo: 'DEVOLUCION',
