@@ -2457,6 +2457,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       fecha?: string;
 
+      hora?: string;
+
       notas?: string;
 
       numeroNota?: string;
@@ -2477,7 +2479,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     const fechaLegible = abonoInfo.fecha || hoy.toLocaleDateString('es-EC');
 
-    const horaLegible = hoy.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+    const horaLegible = abonoInfo.hora || hoy.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
 
 
 
@@ -2627,6 +2629,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       fecha?: string;
 
+      hora?: string;
+
       notas?: string;
 
       numeroNota?: string;
@@ -2749,11 +2753,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
 
 
-  const handleEnviarEstadoCuentaWhatsApp = (
+  const handleEnviarEstadoCuentaWhatsApp = async (
 
     cartera: ClienteCartera,
 
-    abonoInfoParam?: { monto: number; metodo: string; fecha?: string }
+    abonoInfoParam?: { monto: number; metodo: string; fecha?: string; hora?: string }
 
   ) => {
 
@@ -2773,23 +2777,75 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
 
 
-    // 1. Obtener el último abono registrado unificado
+    // 1. Obtener el último abono real registrado del cliente (directo de sus cobros o de ultimos3AbonosCliente)
 
-    let ultimoAbono = abonoInfoParam;
+    let ultimoAbono:
+      | {
+          monto: number;
+          metodo: string;
+          fecha?: string;
+          hora?: string;
+          notas?: string;
+          numeroNota?: string;
+          usuarioNombre?: string;
+          sucursalNombre?: string;
+        }
+      | undefined = abonoInfoParam;
 
-    if (!ultimoAbono && ultimos3AbonosCliente.length > 0) {
+    if (!ultimoAbono) {
 
-      const u = ultimos3AbonosCliente[0];
+      const todosAbonosCliente = (cartera.cobros || [])
+        .flatMap((c) => c.abonos || [])
+        .filter((a) => a && Number(a.monto || 0) > 0 && a.createdAt)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-      ultimoAbono = {
+      if (todosAbonosCliente.length > 0) {
 
-        monto: u.montoTotal,
+        const u = todosAbonosCliente[0];
 
-        metodo: u.metodo,
+        ultimoAbono = {
 
-        fecha: new Date(u.createdAt).toLocaleDateString('es-EC'),
+          monto: Number(u.monto),
 
-      };
+          metodo: u.metodo || 'EFECTIVO',
+
+          fecha: new Date(u.createdAt).toLocaleDateString('es-EC'),
+
+          hora: new Date(u.createdAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
+
+          notas: u.notas,
+
+          usuarioNombre: u.usuarioNombre,
+
+          sucursalNombre: u.usuarioSucursal,
+
+        };
+
+      } else if (cartera.clientId === carteraSeleccionada?.clientId && ultimos3AbonosCliente.length > 0) {
+
+        const u = ultimos3AbonosCliente[0];
+
+        ultimoAbono = {
+
+          monto: u.montoTotal,
+
+          metodo: u.metodo,
+
+          fecha: new Date(u.createdAt).toLocaleDateString('es-EC'),
+
+          hora: new Date(u.createdAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
+
+          notas: u.notas,
+
+          numeroNota: u.reciboRef,
+
+          usuarioNombre: u.usuarioNombre,
+
+          sucursalNombre: u.usuarioSucursal,
+
+        };
+
+      }
 
     }
 
@@ -2856,7 +2912,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     let msg = `Estimado/a *${capitalizarNombreCompleto(cartera.clienteNombre)}*,\n\n`;
     msg += `Le saludamos de *${negocioNombre}*. Le compartimos el estado actual de su cuenta:\n\n`;
-    msg += `📅 *Fecha:* ${hoyLegible}\n`;
+    if (ultimoAbono?.fecha) {
+      msg += `📅 *Fecha del último abono:* ${ultimoAbono.fecha}${ultimoAbono.hora ? ` a las ${ultimoAbono.hora}` : ''}\n`;
+    } else {
+      msg += `📅 *Fecha:* ${hoyLegible}\n`;
+    }
 
     if (montoEntregaHoy > 0) {
       msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -2890,6 +2950,50 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         msg += `📌 *SALDO PENDIENTE ACTUAL: $${saldoActual.toFixed(2)}*\n`;
       }
       msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    }
+
+
+
+    // Generar enlace oficial del comprobante PDF con la fecha del último abono
+
+    try {
+
+      const dataAbonoParaLink = armarDatosComprobanteAbono(cartera, {
+
+        monto: montoAbono,
+
+        metodo: ultimoAbono?.metodo || 'EFECTIVO',
+
+        fecha: ultimoAbono?.fecha || new Date().toLocaleDateString('es-EC'),
+
+        hora: ultimoAbono?.hora,
+
+        notas: ultimoAbono?.notas,
+
+        numeroNota: ultimoAbono?.numeroNota || 'Estado de Cuenta',
+
+        usuarioNombre: ultimoAbono?.usuarioNombre,
+
+        sucursalNombre: ultimoAbono?.sucursalNombre,
+
+        saldoAnterior,
+
+        nuevoSaldo: saldoActual,
+
+      });
+
+      const urlComprobante = await generarUrlPublicaAbono(dataAbonoParaLink);
+
+      if (urlComprobante) {
+
+        msg += `\n📥 *Descarga aquí tu comprobante oficial:*\n👉 ${urlComprobante}\n`;
+
+      }
+
+    } catch (e) {
+
+      // Si falla la generación del enlace, continúa enviando el resumen completo
+
     }
 
 
@@ -8744,6 +8848,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                     fecha: new Date(a.createdAt).toLocaleDateString('es-EC'),
 
+                                    hora: new Date(a.createdAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
+
                                     notas: a.notas,
 
                                     numeroNota: a.reciboRef || 'Abono a cuenta',
@@ -10727,6 +10833,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                               metodo: m.metodo || 'EFECTIVO',
 
                                               fecha: new Date(m.fecha).toLocaleDateString('es-EC'),
+
+                                              hora: new Date(m.fecha).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
 
                                               notas: m.referencia || m.comprobante || undefined,
 
