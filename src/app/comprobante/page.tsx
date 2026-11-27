@@ -344,6 +344,8 @@ function ComprobanteContent() {
           saldoAnterior: Number(data.m_ant || 0),
           montoAbonado: Number(data.m_abo || 0),
           saldoRestante: Number(data.m_res || 0),
+          entregasHoy: Array.isArray(data.ent) ? data.ent : undefined,
+          devolucionesHoy: Array.isArray(data.dev) ? data.dev : undefined,
         },
       };
       descargarComprobanteAbonoPdf(pdfData);
@@ -779,6 +781,51 @@ function ComprobanteContent() {
                   </span>
                 </div>
               </div>
+
+              {Array.isArray(data.ent) && data.ent.length > 0 && (
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+                  <div className="text-[11px] font-extrabold uppercase text-slate-700 tracking-wider">
+                    Entregas de Calzado en la Fecha
+                  </div>
+                  {data.ent.map((ent: any, idx: number) => (
+                    <div key={idx} className="p-2.5 bg-white border border-slate-200 rounded-xl space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                        <span>{ent.nota || 'Nota de Entrega'}</span>
+                        <span className="font-mono text-slate-900">+${Number(ent.monto || 0).toFixed(2)}</span>
+                      </div>
+                      {Array.isArray(ent.items) && ent.items.length > 0 && (
+                        <div className="space-y-1 pt-1 border-t border-slate-100">
+                          {ent.items.map((it: any, i2: number) => (
+                            <div key={i2} className="flex items-start justify-between gap-2 text-[11px] text-slate-600">
+                              <div>
+                                <span className="font-bold text-slate-800">{it.modelo}</span>
+                                {it.color ? ` (${it.color})` : ''}
+                                {it.etiquetaVolumen ? ` · ${it.etiquetaVolumen}` : ` · ${it.cantidadPares} pares`}
+                                {it.tallas ? <span className="block text-[10px] text-slate-500">{it.tallas}</span> : null}
+                              </div>
+                              <span className="font-mono font-semibold text-slate-800 shrink-0">${Number(it.subtotal || 0).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {Array.isArray(data.dev) && data.dev.length > 0 && (
+                <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-2">
+                  <div className="text-[11px] font-extrabold uppercase text-rose-800 tracking-wider">
+                    Devoluciones Registradas en la Fecha
+                  </div>
+                  {data.dev.map((d: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between text-xs text-rose-900">
+                      <span className="font-semibold">{d.descripcion || 'Devolución de calzado'}</span>
+                      <span className="font-mono font-bold text-rose-700">-${Number(d.monto || 0).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {Number(data.m_res || 0) <= 0 ? (
                 <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-emerald-800 text-xs font-bold">

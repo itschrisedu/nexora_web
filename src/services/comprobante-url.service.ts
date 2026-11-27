@@ -191,12 +191,14 @@ async function guardarYObtenerToken(tipo: string, payload: any): Promise<string>
  * Genera el enlace publico ultra-corto para un Comprobante de Abono
  */
 export async function generarUrlPublicaAbono(data: ComprobanteAbonoPdfData): Promise<string> {
-  const payload = {
+  const payload: Record<string, any> = {
     t: 'ABONO',
     num: data.comprobante.numero?.trim() || 'REC',
     f: data.comprobante.fecha || '',
     h: data.comprobante.hora || '',
     fp: data.comprobante.formaPago || 'EFECTIVO',
+    ref: data.comprobante.referencia || '',
+    not: data.comprobante.notas || '',
     c_nom: data.cliente.nombre || 'Cliente',
     c_id: data.cliente.cedula || '',
     c_tel: data.cliente.telefono || '',
@@ -205,7 +207,34 @@ export async function generarUrlPublicaAbono(data: ComprobanteAbonoPdfData): Pro
     m_abo: Math.round(Number(data.movimiento.montoAbonado || 0) * 100) / 100,
     m_res: Math.round(Number(data.movimiento.saldoRestante || 0) * 100) / 100,
     e_nom: data.emisor.nombre || 'NEXORA',
+    e_ruc: data.emisor.ruc || '',
+    e_dir: data.emisor.direccion || '',
+    e_tel: data.emisor.telefono || '',
   };
+
+  if (data.movimiento.entregasHoy && data.movimiento.entregasHoy.length > 0) {
+    payload.ent = data.movimiento.entregasHoy.map((e) => ({
+      nota: e.nota,
+      monto: Math.round(Number(e.monto || 0) * 100) / 100,
+      items: (e.items || []).map((it) => ({
+        modelo: it.modelo,
+        color: it.color || '',
+        serie: it.serie || '',
+        tallas: it.tallas || '',
+        cantidadPares: Number(it.cantidadPares || 0),
+        etiquetaVolumen: it.etiquetaVolumen || '',
+        precioUnitario: Number(it.precioUnitario || 0),
+        subtotal: Math.round(Number(it.subtotal || 0) * 100) / 100,
+      })),
+    }));
+  }
+
+  if (data.movimiento.devolucionesHoy && data.movimiento.devolucionesHoy.length > 0) {
+    payload.dev = data.movimiento.devolucionesHoy.map((d) => ({
+      descripcion: d.descripcion,
+      monto: Math.round(Number(d.monto || 0) * 100) / 100,
+    }));
+  }
 
   return guardarYObtenerToken('ABONO', payload);
 }
